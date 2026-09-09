@@ -39,7 +39,24 @@ jobs:
 
           if isinstance(data, dict):
               print("KEYS:", list(data.keys()))
+　　　　　　　　　print("TOTAL:", data.get("total"))
+print("DATE:", data.get("date"))
 
+venues = data.get("venues")
+
+print("VENUES_TYPE:", type(venues).__name__)
+
+if isinstance(venues, list):
+    print("VENUES_COUNT:", len(venues))
+    for i, venue in enumerate(venues[:3]):
+        print("VENUE", i + 1)
+        print(json.dumps(venue, ensure_ascii=False, indent=2)[:12000])
+
+elif isinstance(venues, dict):
+    print("VENUE_KEYS:", list(venues.keys()))
+    for i, (key, venue) in enumerate(list(venues.items())[:3]):
+        print("VENUE_KEY:", key)
+        print(json.dumps(venue, ensure_ascii=False, indent=2)[:12000])
               for key, value in data.items():
                   if isinstance(value, list):
                       print("LIST:", key, "COUNT:", len(value))
