@@ -6,33 +6,27 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/all_races_tomorrow.yml"
+      - "notify_discord.py"
+      - "tests/test_notify_discord.py"
+
+permissions:
+  contents: read
 
 jobs:
   inspect:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 3
     steps:
-      - name: Check raw races API
-        run: |
-          python3 - <<'PY'
-          import urllib.request
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-          url = "https://boat-ai-partner.gpmy262mkw.chatgpt.site/api/races"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-          req = urllib.request.Request(
-              url,
-              data=b"{}",
-              headers={
-                  "Content-Type": "application/json",
-                  "User-Agent": "Boat-AI-Inspector/1.0"
-              },
-              method="POST"
-          )
+      - name: Test unpublished data and notification error handling
+        run: python -m unittest discover -s tests -v
 
-          with urllib.request.urlopen(req, timeout=60) as res:
-              body = res.read().decode("utf-8", "replace")
-
-          print("=== RAW RESPONSE ===")
-          print(body[:30000])
-
-          PY
+      - name: Check races API without sending Discord messages
+        run: python notify_discord.py --check
