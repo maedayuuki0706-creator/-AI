@@ -12,10 +12,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check races API
+      - name: Check raw races API
         run: |
           python3 - <<'PY'
-          import json
           import urllib.request
 
           url = "https://boat-ai-partner.gpmy262mkw.chatgpt.site/api/races"
@@ -32,41 +31,8 @@ jobs:
 
           with urllib.request.urlopen(req, timeout=60) as res:
               body = res.read().decode("utf-8", "replace")
-              data = json.loads(body)
 
-          print("=== API CHECK ===")
-          print("TYPE:", type(data).__name__)
-
-          if isinstance(data, dict):
-              print("KEYS:", list(data.keys()))
-              print("TOTAL:", data.get("total"))
-              print("DATE:", data.get("date"))
-              print("VENUES:", data.get("venues"))
-
-              races = data.get("data")
-
-              print("DATA_TYPE:", type(races).__name__)
-
-              if isinstance(races, list):
-                  print("DATA_COUNT:", len(races))
-
-                  for i, race in enumerate(races[:5]):
-                      print("RACE", i + 1)
-                      print(json.dumps(
-                          race,
-                          ensure_ascii=False,
-                          indent=2
-                      )[:15000])
-
-              elif isinstance(races, dict):
-                  print("DATA_KEYS:", list(races.keys()))
-
-                  for i, (key, value) in enumerate(list(races.items())[:5]):
-                      print("DATA_KEY:", key)
-                      print(json.dumps(
-                          value,
-                          ensure_ascii=False,
-                          indent=2
-                      )[:15000])
+          print("=== RAW RESPONSE ===")
+          print(body[:30000])
 
           PY
