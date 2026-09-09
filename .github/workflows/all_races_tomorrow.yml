@@ -41,30 +41,32 @@ jobs:
               print("KEYS:", list(data.keys()))
               print("TOTAL:", data.get("total"))
               print("DATE:", data.get("date"))
+              print("VENUES:", data.get("venues"))
 
-              venues = data.get("venues")
-              print("VENUES_TYPE:", type(venues).__name__)
+              races = data.get("data")
 
-              if isinstance(venues, list):
-                  print("VENUES_COUNT:", len(venues))
+              print("DATA_TYPE:", type(races).__name__)
 
-                  for i, venue in enumerate(venues[:3]):
-                      print("VENUE", i + 1)
+              if isinstance(races, list):
+                  print("DATA_COUNT:", len(races))
+
+                  for i, race in enumerate(races[:5]):
+                      print("RACE", i + 1)
                       print(json.dumps(
-                          venue,
+                          race,
                           ensure_ascii=False,
                           indent=2
-                      )[:12000])
+                      )[:15000])
 
-              elif isinstance(venues, dict):
-                  print("VENUE_KEYS:", list(venues.keys()))
+              elif isinstance(races, dict):
+                  print("DATA_KEYS:", list(races.keys()))
 
-                  for i, (key, venue) in enumerate(list(venues.items())[:3]):
-                      print("VENUE_KEY:", key)
+                  for i, (key, value) in enumerate(list(races.items())[:5]):
+                      print("DATA_KEY:", key)
                       print(json.dumps(
-                          venue,
+                          value,
                           ensure_ascii=False,
                           indent=2
-                      )[:12000])
+                      )[:15000])
 
           PY
