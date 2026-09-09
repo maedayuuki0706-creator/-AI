@@ -1,1 +1,51 @@
+name: Inspect All Races API
 
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/all_races_tomorrow.yml"
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check races API
+        run: |
+          python3 - <<'PY'
+          import json
+          import urllib.request
+
+          url = "https://boat-ai-partner.gpmy262mkw.chatgpt.site/api/races"
+
+          req = urllib.request.Request(
+              url,
+              data=b"{}",
+              headers={
+                  "Content-Type": "application/json",
+                  "User-Agent": "Boat-AI-Inspector/1.0"
+              },
+              method="POST"
+          )
+
+          with urllib.request.urlopen(req, timeout=60) as res:
+              body = res.read().decode("utf-8", "replace")
+              data = json.loads(body)
+
+          print("=== API CHECK ===")
+          print("TYPE:", type(data).__name__)
+
+          if isinstance(data, dict):
+              print("KEYS:", list(data.keys()))
+
+              for key, value in data.items():
+                  if isinstance(value, list):
+                      print("LIST:", key, "COUNT:", len(value))
+
+                      for i, item in enumerate(value[:3]):
+                          print("ITEM", i + 1)
+                          print(json.dumps(item, ensure_ascii=False, indent=2))
+
+          PY
