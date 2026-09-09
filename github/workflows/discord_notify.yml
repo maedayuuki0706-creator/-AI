@@ -1,0 +1,25 @@
+name: Boat AI Discord Notify
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Discord notifier
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PROJECT_ID: appgprj_6a98533edf2481919b33aeebf6c41c6a
+          PREDICTION_URL: ${{ secrets.PREDICTION_URL }}
+        run: python notify_discord.py
