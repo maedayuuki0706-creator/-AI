@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#07111f" />
+  <title>競艇AIナビ</title>
+  <style>
+    :root{
+      --bg:#07111f;--panel:#0d1b2d;--panel2:#10233a;--line:#203854;--text:#f4f8ff;
+      --muted:#90a6bf;--cyan:#35d0ff;--green:#46e3a1;--amber:#ffcd5d;--red:#ff6b7a;
+    }
+    *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#06101d,#0a1626 42%,#081320);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif}
+    .wrap{max-width:980px;margin:auto;padding:18px 16px 48px}
+    .hero{padding:14px 2px 18px}.eyebrow{font-size:12px;letter-spacing:.12em;color:var(--cyan);font-weight:800}.title{font-size:30px;line-height:1.1;margin:5px 0 8px;font-weight:900}.sub{color:var(--muted);font-size:13px;line-height:1.7}
+    .badge{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid #23435f;border-radius:999px;background:#0c1b2b;font-size:12px;color:#bcd0e5;margin-top:12px}.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0 18px}.card{background:rgba(13,27,45,.92);border:1px solid var(--line);border-radius:16px;padding:14px}.metric-label{font-size:11px;color:var(--muted);margin-bottom:7px}.metric{font-size:24px;font-weight:900}.metric small{font-size:12px;color:var(--muted);font-weight:700}
+    .section{margin-top:18px}.section-head{display:flex;align-items:end;justify-content:space-between;margin-bottom:10px}.section h2{font-size:17px;margin:0}.section-note{font-size:11px;color:var(--muted)}
+    .race{background:linear-gradient(180deg,#0e1e32,#0b192a);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:10px}.race-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.venue{font-size:19px;font-weight:900}.deadline{color:var(--muted);font-size:12px}.source{font-size:10px;color:#93abc4;margin-top:3px}.pill{font-size:11px;font-weight:800;padding:6px 9px;border-radius:999px;background:#132b43;border:1px solid #294762;color:#cae9ff;white-space:nowrap}
+    .group{margin-top:12px}.label{font-size:11px;color:var(--muted);margin-bottom:6px}.picks{display:flex;gap:7px;flex-wrap:wrap}.pick{font-weight:900;font-size:15px;background:#091525;border:1px solid #25425f;padding:8px 10px;border-radius:10px}.pick.main{border-color:#246f86;box-shadow:inset 0 0 0 1px rgba(53,208,255,.08)}.pick.cover{border-color:#4b586a}
+    .empty{border:1px dashed #28435e;border-radius:18px;padding:28px 18px;text-align:center;color:var(--muted);background:rgba(11,25,42,.6)}
+    .foot{margin-top:28px;padding:14px;border-top:1px solid #18304a;color:#6f88a2;font-size:11px;line-height:1.7;text-align:center}
+    .lane-row{display:flex;gap:4px;margin-top:12px}.lane{height:4px;flex:1;border-radius:999px}.l1{background:#f5f5f5}.l2{background:#444}.l3{background:#e44343}.l4{background:#4b75d1}.l5{background:#e7cb34}.l6{background:#66bd67}
+    .error{color:#ff9aa5;font-size:12px;margin-top:8px}
+    @media(max-width:700px){.grid{grid-template-columns:repeat(2,1fr)}.title{font-size:27px}.metric{font-size:22px}.race-top{align-items:center}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div class="eyebrow">BOAT RACE PREDICTION</div>
+      <div class="title">競艇AIナビ</div>
+      <div class="sub">レースデータ・モーター・ST・コース傾向などを組み合わせて予想を検証中。現在は試験運用版です。</div>
+      <div class="badge"><span class="dot"></span> 公開テスト中 / ログイン不要</div>
+    </section>
+
+    <section class="grid" aria-label="学習状況">
+      <div class="card"><div class="metric-label">検証レース</div><div class="metric" id="samples">--</div></div>
+      <div class="card"><div class="metric-label">的中率</div><div class="metric" id="hitRate">--<small>%</small></div></div>
+      <div class="card"><div class="metric-label">1着読取率</div><div class="metric" id="winnerRate">--<small>%</small></div></div>
+      <div class="card"><div class="metric-label">更新</div><div class="metric" id="updated" style="font-size:15px">--</div></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><h2>最新の予想</h2><div class="section-note">新しいものから表示</div></div>
+      <div id="raceList"><div class="empty">予想データを読み込み中…</div></div>
+      <div id="err" class="error"></div>
+    </section>
+
+    <div class="foot">このサイトは試験運用中の予想支援ツールです。結果を保証するものではありません。<br>競艇AIナビ</div>
+  </main>
+
+<script>
+  const pct = v => (Number(v || 0) * 100).toFixed(1);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  async function loadSummary(){
+    try{
+      const r = await fetch('/api/summary',{cache:'no-store'}); const d = await r.json();
+      document.getElementById('samples').textContent = d.samples ?? 0;
+      document.getElementById('hitRate').innerHTML = `${pct(d.overall?.any_hit_rate)}<small>%</small>`;
+      document.getElementById('winnerRate').innerHTML = `${pct(d.overall?.winner_read_rate)}<small>%</small>`;
+      document.getElementById('updated').textContent = d.updated_at ? new Date(d.updated_at).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '--';
+    }catch(e){ document.getElementById('err').textContent='集計データを取得できませんでした'; }
+  }
+  function raceHtml(x){
+    const main=(x.main||[]).map(p=>`<span class="pick main">${esc(p)}</span>`).join('');
+    const cover=(x.cover||[]).map(p=>`<span class="pick cover">${esc(p)}</span>`).join('');
+    const status=x.user_reported_outcome==='miss'?'結果: 不的中':x.user_reported_outcome==='hit'?'結果: 的中':'予想公開済み';
+    return `<article class="race">
+      <div class="race-top"><div><div class="venue">${esc(x.venue||'--')} ${esc(x.rno||'')}R</div><div class="deadline">締切 ${esc(x.deadline||'--')}</div><div class="source">${esc(x.source||'競艇AI')}</div></div><div class="pill">${esc(status)}</div></div>
+      <div class="lane-row"><i class="lane l1"></i><i class="lane l2"></i><i class="lane l3"></i><i class="lane l4"></i><i class="lane l5"></i><i class="lane l6"></i></div>
+      ${main?`<div class="group"><div class="label">本線</div><div class="picks">${main}</div></div>`:''}
+      ${cover?`<div class="group"><div class="label">押さえ</div><div class="picks">${cover}</div></div>`:''}
+    </article>`;
+  }
+  async function loadPredictions(){
+    try{
+      const r=await fetch('/api/predictions?limit=20',{cache:'no-store'}); const d=await r.json(); const items=d.items||[];
+      document.getElementById('raceList').innerHTML = items.length ? items.map(raceHtml).join('') : '<div class="empty">まだ公開済みの予想はありません</div>';
+    }catch(e){ document.getElementById('raceList').innerHTML='<div class="empty">予想データを取得できませんでした</div>'; }
+  }
+  loadSummary(); loadPredictions();
+  setInterval(()=>{loadSummary();loadPredictions()},60000);
+</script>
+</body>
+</html>
