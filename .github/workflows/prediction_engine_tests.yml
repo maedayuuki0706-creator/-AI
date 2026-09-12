@@ -1,0 +1,22 @@
+name: Prediction Engine Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "prediction_engine.py"
+      - "tests/test_prediction_engine.py"
+      - ".github/workflows/prediction_engine_tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run prediction engine tests
+        run: python3 -m unittest tests/test_prediction_engine.py -v
