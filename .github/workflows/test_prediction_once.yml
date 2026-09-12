@@ -7,59 +7,23 @@ on:
       - ".github/workflows/test_prediction_once.yml"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Send test prediction
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Send direct Discord test
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          import sys
-          import urllib.request
-          import urllib.error
-
-          message = (
-              "🚤 **【架空の予想・送信テスト】**\n"
-              "テスト会場 12R（実在しないレース）\n\n"
-              "**3連単・表示サンプル**\n"
-              "本線：1-2-3\n"
-              "対抗：1-3-2\n"
-              "押さえ：1-2-4\n\n"
-              "※表示確認用です。実際のレース予想ではありません。\n"
-              "※オッズ・的中率・期待値は算出していません。"
-          )
-
-          url = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
-          if not url:
-              sys.exit("DISCORD_WEBHOOK_URL is missing.")
-
-          payload = json.dumps({
-              "content": message,
-              "allowed_mentions": {"parse": []}
-          }, ensure_ascii=False).encode("utf-8")
-
-          request = urllib.request.Request(
-              url,
-              data=payload,
-              headers={
-                  "Content-Type": "application/json",
-                  "User-Agent": "Boat-AI-Test/1.0"
-              },
-              method="POST"
-          )
-
-          try:
-              with urllib.request.urlopen(request, timeout=20) as response:
-                  print("Discord accepted the test:", response.status)
-          except urllib.error.HTTPError as error:
-              sys.exit("Discord HTTP error: " + str(error.code))
-          except Exception:
-              sys.exit("Delivery not confirmed. Check Discord before retrying.")
-          PY
+        run: python direct_discord_notify.py --test
