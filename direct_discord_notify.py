@@ -2,8 +2,8 @@
 
 No dependency on the ChatGPT Site API. The scheduled path is:
 BOAT RACE official data -> local prediction_engine.py -> Discord webhook.
-If structured race parsing fails, official computer focus is used only as a fallback
-so notification delivery does not silently stop.
+Every delivered prediction is also appended to data/prediction_log.jsonl so a
+daily learner can compare it with official results later.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from datetime import datetime
 import html
 import json
 import os
+from pathlib import Path
 import re
 import sys
 import unicodedata
@@ -25,7 +26,8 @@ from prediction_engine import analyze_race
 
 JST = ZoneInfo("Asia/Tokyo")
 BASE = "https://www.boatrace.jp/owpc/pc/race"
-UA = "Boat-AI-Navi/3.1 (+direct-discord-notifier)"
+UA = "Boat-AI-Navi/3.2 (+direct-discord-notifier)"
+LOG_PATH = Path("data/prediction_log.jsonl")
 VENUES = {
     "01":"桐生","02":"戸田","03":"江戸川","04":"平和島","05":"多摩川","06":"浜名湖",
     "07":"蒲郡","08":"常滑","09":"津","10":"三国","11":"びわこ","12":"住之江",
@@ -87,23 +89,13 @@ def deadlines(day: str, jcd: str) -> list[str]:
 
 
 def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
-    """Parse the six basic data rows from the official racelist text.
-
-    We intentionally use only stable, visible values: national/local rates, average
-    ST, F count and motor rates. Missing advanced data stays neutral in the model.
-    """
     text = textify(fetch(official_url("racelist", day, jcd, rno)))
     start = text.find("登録番号/級別")
     if start >= 0:
         text = text[start:]
-
-    row_re = re.compile(
-        r"(?m)^([1-6])\s*\n(?:[^\n]*\n){0,4}?(\d{4})\s*/\s*(A1|A2|B1|B2)\b"
-    )
+    row_re = re.compile(r"(?m)^([1-6])\s*\n(?:[^\n]*\n){0,4}?(\d{4})\s*/\s*(A1|A2|B1|B2)\b")
     matches = list(row_re.finditer(text))
-    # Keep the first clean 1..6 sequence only; later current-form numbers can look similar.
-    selected = []
-    expected = 1
+    selected, expected = [], 1
     for m in matches:
         lane = int(m.group(1))
         if lane == expected:
@@ -113,7 +105,6 @@ def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
                 break
     if len(selected) != 6:
         return []
-
     boats: list[dict] = []
     for i, m in enumerate(selected):
         lane = int(m.group(1))
@@ -122,28 +113,16 @@ def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
         fl = re.search(r"F\s*(\d+)\s*\nL\s*(\d+)\s*\n", chunk)
         if not fl:
             return []
-        tail = chunk[fl.end():]
-        vals = re.findall(r"(?<![\d.])(?:\d+\.\d+|\d+)(?![\d.])", tail)
+        vals = re.findall(r"(?<![\d.])(?:\d+\.\d+|\d+)(?![\d.])", chunk[fl.end():])
         if len(vals) < 13:
             return []
-        try:
-            nums = [float(x) for x in vals[:13]]
-        except ValueError:
-            return []
-        avg_st = nums[0]
+        nums = [float(x) for x in vals[:13]]
         boats.append({
-            "lane": lane,
-            "course": lane,
-            "predicted_course": lane,
-            "avg_st": avg_st,
-            "flying": int(fl.group(1)) > 0,
-            "win_rate": nums[1],
-            "top2_rate": nums[2],
-            "top3_rate": nums[3],
-            "local_win_rate": nums[4],
-            "local_top2_rate": nums[5],
-            "motor_top2_rate": nums[8],
-            "motor_top3_rate": nums[9],
+            "lane": lane, "course": lane, "predicted_course": lane,
+            "avg_st": nums[0], "flying": int(fl.group(1)) > 0,
+            "win_rate": nums[1], "top2_rate": nums[2], "top3_rate": nums[3],
+            "local_win_rate": nums[4], "local_top2_rate": nums[5],
+            "motor_top2_rate": nums[8], "motor_top3_rate": nums[9],
         })
     return boats
 
@@ -153,8 +132,7 @@ def engine_picks(day: str, jcd: str, rno: int) -> tuple[list[str], float | None]
     if len(boats) != 6:
         return [], None
     result = analyze_race({"race": {"venue": VENUES.get(jcd, jcd), "boats": boats}, "boats": boats})
-    picks = [row["combination"] for row in result.get("trifecta", [])[:8]]
-    return picks, result.get("confidence")
+    return [row["combination"] for row in result.get("trifecta", [])[:8]], result.get("confidence")
 
 
 def parse_focus(day: str, jcd: str, rno: int) -> list[str]:
@@ -164,7 +142,6 @@ def parse_focus(day: str, jcd: str, rno: int) -> list[str]:
         return []
     end = text.find("この予想に対する自信度", start)
     block = text[start:end if end > start else start + 1200]
-    block = block.replace("=", "=").replace("-", "-")
     picks: list[str] = []
     for a, op, b, c in re.findall(r"(?<!\d)([1-6])\s*([=-])\s*([1-6])\s*-\s*([1-6])(?!\d)", block):
         candidates = [f"{a}-{b}-{c}", f"{b}-{a}-{c}"] if op == "=" else [f"{a}-{b}-{c}"]
@@ -197,6 +174,23 @@ def send_discord(content: str) -> None:
             raise RuntimeError(f"Discord HTTP {r.status}")
 
 
+def log_prediction(record: dict) -> None:
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    key = f"{record['day']}:{record['jcd']}:{record['rno']}"
+    existing = set()
+    if LOG_PATH.exists():
+        for line in LOG_PATH.read_text(encoding="utf-8").splitlines():
+            try:
+                row = json.loads(line)
+                existing.add(f"{row.get('day')}:{row.get('jcd')}:{row.get('rno')}")
+            except Exception:
+                continue
+    if key in existing:
+        return
+    with LOG_PATH.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+
 def minutes_until(now: datetime, hhmm: str) -> float:
     h, m = map(int, hhmm.split(":"))
     target = now.replace(hour=h, minute=m, second=0, microsecond=0)
@@ -205,20 +199,13 @@ def minutes_until(now: datetime, hhmm: str) -> float:
 
 def make_message(jcd: str, rno: int, deadline: str, picks: list[str], exhibition: bool, source: str, confidence: float | None) -> str:
     venue = VENUES.get(jcd, jcd)
-    main = picks[:3]
-    cover = picks[3:6]
-    lines = [
-        "🚤 **競艇AIナビ｜直前予想**",
-        f"**{venue} {rno}R**　締切予定 **{deadline}**",
-        f"展示：{'取得確認' if exhibition else '未確認'} / 予想：{source}",
-    ]
+    main, cover = picks[:3], picks[3:6]
+    lines = ["🚤 **競艇AIナビ｜直前予想**", f"**{venue} {rno}R**　締切予定 **{deadline}**", f"展示：{'取得確認' if exhibition else '未確認'} / 予想：{source}"]
     if confidence is not None:
         lines.append(f"モデル信頼度：{round(float(confidence) * 100)}%")
     lines.append("")
-    if main:
-        lines += ["**本線**", " / ".join(main)]
-    if cover:
-        lines += ["**押さえ**", " / ".join(cover)]
+    if main: lines += ["**本線**", " / ".join(main)]
+    if cover: lines += ["**押さえ**", " / ".join(cover)]
     lines += ["", "※BOAT RACE公式の当日データを直接取得。サイトAPI障害の影響を受けない通知経路です。"]
     return "\n".join(lines)
 
@@ -226,22 +213,15 @@ def make_message(jcd: str, rno: int, deadline: str, picks: list[str], exhibition
 def run_once(now: datetime | None = None, *, force_test: bool = False) -> int:
     now = now or datetime.now(JST)
     if force_test:
-        send_discord(
-            "✅ **競艇AIナビ 通知テスト成功**\n"
-            "BOAT RACE公式→予想エンジン→Discord直送ルートへ切り替えました。\n"
-            f"{now.strftime('%Y-%m-%d %H:%M:%S JST')}"
-        )
+        send_discord("✅ **競艇AIナビ 通知テスト成功**\nBOAT RACE公式→予想エンジン→Discord直送ルートは動作しています。\n" + now.strftime('%Y-%m-%d %H:%M:%S JST'))
         print("Discord test sent")
         return 0
-
     day = now.strftime("%Y%m%d")
     venues = discover_venues(day)
     if not venues:
         print("No active venues found")
         return 0
-
-    sent = 0
-    checked = 0
+    sent = checked = 0
     for jcd in venues:
         try:
             times = deadlines(day, jcd)
@@ -249,23 +229,24 @@ def run_once(now: datetime | None = None, *, force_test: bool = False) -> int:
             print(f"deadline fetch failed jcd={jcd}: {type(e).__name__}")
             continue
         for idx, t in enumerate(times, 1):
-            delta = minutes_until(now, t)
-            # One approximately 5-minute notification window, 10-15 minutes before post.
-            if not (10.0 <= delta < 15.0):
+            if not (10.0 <= minutes_until(now, t) < 15.0):
                 continue
             checked += 1
             try:
                 picks, confidence = engine_picks(day, jcd, idx)
                 source = "独自AI"
                 if not picks:
-                    picks = parse_focus(day, jcd, idx)
-                    confidence = None
-                    source = "公式フォーカス補完"
+                    picks, confidence, source = parse_focus(day, jcd, idx), None, "公式フォーカス補完"
                 if not picks:
-                    print(f"skip {jcd} {idx}R: no usable prediction")
                     continue
                 exhibition = beforeinfo_available(day, jcd, idx)
                 send_discord(make_message(jcd, idx, t, picks, exhibition, source, confidence))
+                log_prediction({
+                    "day": day, "jcd": jcd, "venue": VENUES.get(jcd, jcd), "rno": idx,
+                    "deadline": t, "sent_at": now.isoformat(), "source": source,
+                    "confidence": confidence, "exhibition": exhibition,
+                    "main": picks[:3], "cover": picks[3:6], "all_picks": picks[:8],
+                })
                 sent += 1
                 print(f"sent {VENUES.get(jcd,jcd)} {idx}R {t} source={source}")
             except Exception as e:
@@ -275,17 +256,11 @@ def run_once(now: datetime | None = None, *, force_test: bool = False) -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser()
-    p.add_argument("--test", action="store_true")
-    args = p.parse_args()
-    try:
-        return run_once(force_test=args.test)
-    except urllib.error.HTTPError as e:
-        print(f"HTTP error: {e.code}")
-    except urllib.error.URLError:
-        print("Network error")
-    except Exception as e:
-        print(f"Notifier error: {type(e).__name__}: {e}")
+    p = argparse.ArgumentParser(); p.add_argument("--test", action="store_true"); args = p.parse_args()
+    try: return run_once(force_test=args.test)
+    except urllib.error.HTTPError as e: print(f"HTTP error: {e.code}")
+    except urllib.error.URLError: print("Network error")
+    except Exception as e: print(f"Notifier error: {type(e).__name__}: {e}")
     return 1
 
 
