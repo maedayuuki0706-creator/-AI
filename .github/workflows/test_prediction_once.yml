@@ -11,11 +11,12 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,7 +26,26 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Send direct Discord test
+      - name: Send direct Discord test and report status
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python direct_discord_notify.py --test
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          python direct_discord_notify.py --test
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            state=success
+            description="Discord webhook accepted the Boat AI test"
+          else
+            state=failure
+            description="Discord webhook test failed"
+          fi
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "{\"state\":\"${state}\",\"context\":\"boat-ai/discord-delivery\",\"description\":\"${description}\"}"
+          exit "$code"
