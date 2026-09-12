@@ -6,7 +6,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: boat-ai-notify
+  cancel-in-progress: false
 
 jobs:
   notify:
@@ -15,13 +19,28 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Run direct BOAT RACE official -> Discord notifier
+      - name: Run direct BOAT RACE official -> AI -> Discord notifier
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python direct_discord_notify.py
+
+      - name: Persist newly delivered predictions
+        run: |
+          if git diff --quiet -- data/prediction_log.jsonl 2>/dev/null && [ -z "$(git status --porcelain data/prediction_log.jsonl 2>/dev/null)" ]; then
+            echo "No new prediction log"
+            exit 0
+          fi
+          git config user.name "boat-ai-learning-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/prediction_log.jsonl
+          git commit -m "Log delivered race predictions" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
