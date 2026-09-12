@@ -10,6 +10,7 @@ import re
 import urllib.parse
 import urllib.request
 from zoneinfo import ZoneInfo
+from race_context import clean
 
 JST = ZoneInfo("Asia/Tokyo")
 BASE = "https://www.boatrace.jp/owpc/pc/race"
@@ -32,8 +33,7 @@ def official_result_url(day: str, jcd: str, rno: int) -> str:
 
 def parse_finish_order(raw: str) -> list[int]:
     # Official result pages include lane numbers next to 1st/2nd/3rd finish rows.
-    text = re.sub(r"<[^>]+>", "\n", raw)
-    text = re.sub(r"\s+", " ", text)
+    text = clean(raw)
     patterns = [
         r"1着\s*([1-6]).{0,120}?2着\s*([1-6]).{0,120}?3着\s*([1-6])",
         r"着順.{0,300}?\b1\b\s+([1-6]).{0,120}?\b2\b\s+([1-6]).{0,120}?\b3\b\s+([1-6])",
@@ -77,7 +77,8 @@ def evaluate_prediction(row: dict, result: list[int]) -> dict:
     combo = "-".join(map(str, result))
     main = row.get("main") or []
     cover = row.get("cover") or []
-    all_picks = row.get("all_picks") or []
+    # Only combinations actually displayed in Discord count as delivered picks.
+    all_picks = list(dict.fromkeys(main + cover))
     top_pick = all_picks[0] if all_picks else None
     top_first = int(top_pick.split("-")[0]) if isinstance(top_pick, str) and re.match(r"^[1-6]-", top_pick) else None
     return {
@@ -92,6 +93,13 @@ def evaluate_prediction(row: dict, result: list[int]) -> dict:
 
 
 def aggregate(rows: list[dict]) -> dict:
+    # Morning and final updates are one race, not two independent observations.
+    latest = {}
+    for row in rows:
+        key = (row.get("day"), row.get("jcd"), row.get("rno"))
+        if key not in latest or row.get("phase", "final") == "final":
+            latest[key] = row
+    rows = list(latest.values())
     total = len(rows)
     def pct(n: int) -> float:
         return round(n / total, 4) if total else 0.0
@@ -134,10 +142,10 @@ def aggregate(rows: list[dict]) -> dict:
 def main() -> int:
     predictions = load_jsonl(LOG_PATH)
     evaluated = load_jsonl(RESULTS_PATH)
-    done = {f"{r.get('day')}:{r.get('jcd')}:{r.get('rno')}" for r in evaluated}
+    done = {f"{r.get('day')}:{r.get('jcd')}:{r.get('rno')}:{r.get('phase', 'final')}" for r in evaluated}
     new_count = 0
     for row in predictions:
-        key = f"{row.get('day')}:{row.get('jcd')}:{row.get('rno')}"
+        key = f"{row.get('day')}:{row.get('jcd')}:{row.get('rno')}:{row.get('phase', 'final')}"
         if key in done:
             continue
         try:

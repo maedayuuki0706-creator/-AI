@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths:
       - "prediction_engine.py"
+      - "direct_discord_notify.py"
+      - "race_context.py"
+      - "notification_policy.json"
+      - "daily_learning.py"
+      - "tests/**"
       - "tests/test_prediction_engine.py"
       - ".github/workflows/prediction_engine_tests.yml"
   workflow_dispatch:
@@ -19,4 +24,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run prediction engine tests
-        run: python3 -m unittest tests/test_prediction_engine.py -v
+        run: python3 -m unittest discover -s tests -v

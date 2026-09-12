@@ -52,9 +52,8 @@ def _norm_rate(value: Any, *, scale: float = 100.0, default: float = 0.5) -> flo
         v = float(value)
     except (TypeError, ValueError):
         return default
-    if v > 1.0:
-        v /= scale
-    return _clip(v)
+    # Inputs use official units: rates in percent, win rate on the 0–10 scale.
+    return _clip(v / scale)
 
 
 def _norm_st(value: Any, default: float = 0.5) -> float:
@@ -64,6 +63,8 @@ def _norm_st(value: Any, default: float = 0.5) -> float:
     try:
         st = float(value)
     except (TypeError, ValueError):
+        return default
+    if st < 0 or st > 1:
         return default
     return _clip((0.35 - st) / 0.30)
 
@@ -197,6 +198,8 @@ def score_boat(boat: Mapping[str, Any], race: Mapping[str, Any]) -> Dict[str, An
     elif course == 6:
         raw *= 0.97
 
+    raw += max(-0.01, min(0.01, float(boat.get("previous_day_score_delta") or 0)))
+
     return {
         "lane": lane,
         "predicted_course": course,
@@ -261,7 +264,7 @@ def analyze_race(payload: Mapping[str, Any]) -> Dict[str, Any]:
     confidence = _clip(0.5 + (top_score - second_score) * 2.5)
 
     return {
-        "model_version": "kyoutei-navi-knowledge-v1",
+        "model_version": "kyoutei-navi-form-v1-unvalidated",
         "venue": race.get("venue"),
         "boats": scored,
         "trifecta": trifectas,

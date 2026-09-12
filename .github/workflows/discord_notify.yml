@@ -15,7 +15,7 @@ concurrency:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -33,6 +33,7 @@ jobs:
         run: python detailed_discord_notify.py
 
       - name: Persist newly delivered predictions
+        if: always()
         run: |
           if git diff --quiet -- data/prediction_log.jsonl 2>/dev/null && [ -z "$(git status --porcelain data/prediction_log.jsonl 2>/dev/null)" ]; then
             echo "No new prediction log"
