@@ -5,9 +5,13 @@ on:
     - cron: "*/5 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   notify:
     runs-on: ubuntu-latest
+    timeout-minutes: 4
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -17,9 +21,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run Discord notifier
+      - name: Run direct BOAT RACE official -> Discord notifier
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          PROJECT_ID: appgprj_6a98533edf2481919b33aeebf6c41c6a
-          NOTIFICATION_RUN_TOKEN: ${{ secrets.NOTIFICATION_RUN_TOKEN }}
-        run: python notify_discord.py
+        run: python direct_discord_notify.py
