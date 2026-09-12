@@ -27,10 +27,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run direct BOAT RACE official -> AI -> Discord notifier
+      - name: Run detailed BOAT RACE official -> AI -> Discord notifier
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python direct_discord_notify.py
+        run: python detailed_discord_notify.py
 
       - name: Persist newly delivered predictions
         run: |
