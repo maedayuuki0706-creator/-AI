@@ -30,7 +30,7 @@ jobs:
       - name: Run exhibition-aware all-race notifier
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python exhibition_final_discord.py
+        run: python detailed_discord_notify.py
 
       - name: Persist newly delivered predictions
         if: always()
