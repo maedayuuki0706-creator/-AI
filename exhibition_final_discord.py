@@ -34,14 +34,16 @@ def analyze_after_exhibition(day, jcd, rno):
         return None
     preview = analysis.get("preview") or {}
     boats = analysis.get("inputs") or []
-    if preview.get("exhibition_count") != 6:
+    if len(boats) != 6:
         return None
-    if len(boats) != 6 or any(boat.get("exhibition_time") is None for boat in boats):
-        return None
+    reasons = []
+    if preview.get("exhibition_count") != 6 or any(boat.get("exhibition_time") is None for boat in boats):
+        reasons.append('展示6艇が未確認のため判断保留。')
     # Require a substantially complete live odds board rather than guessing.
     odds_count = sum(1 for row in analysis.get("trifecta", []) if row.get("odds") is not None)
     if odds_count < 100:
-        return None
+        reasons.append(f'公開オッズの確認待ち（{odds_count}/120通り）。')
+    analysis['delivery_wait_reasons'] = reasons
     return analysis
 
 

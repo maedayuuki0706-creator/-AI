@@ -19,6 +19,7 @@ import time
 import direct_discord_notify as base
 from race_context import clean
 from discord_formation import unique_picks
+from race_notices import read_notices
 
 REPORT_DIR = Path('data/daily_reports')
 RESULT_DIR = Path('data/official_results')
@@ -74,11 +75,13 @@ def delivery_time(row):
 
 def latest_predictions(rows, day):
     selected, excluded = {}, []
+    withdrawals = {race_key(r) for r in read_notices() if r.get('day') == day
+                   and r.get('status') == 'withdrawn' and delivery_time(r) is not None}
     for row in rows:
         if row.get('day') != day:
             continue
         sent = delivery_time(row)
-        if sent is None:
+        if sent is None or race_key(row) in withdrawals:
             excluded.append(row)
             continue
         key = race_key(row)
@@ -229,7 +232,7 @@ def report_messages(report):
              '1口100円のシミュレーション。各Rは締切前の最新配信だけを採用し、更新分は差替え。',
              '回収率＝確定分の公式払戻・返還÷確定分投票額。結果待ちは率に含めず、全返還・特払いは的中率から除外。']
     if report['excluded_deliveries']:
-        lines.append(f"締切後・時刻不明の配信 {report['excluded_deliveries']}件は実績から除外。")
+        lines.append(f"締切後・時刻不明・欠場の配信 {report['excluded_deliveries']}件は実績から除外。")
     messages = ['\\n'.join(lines)]
     grouped = defaultdict(list)
     for race in report['races']:

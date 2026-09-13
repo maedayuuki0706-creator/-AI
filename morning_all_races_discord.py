@@ -84,7 +84,7 @@ def compact_formation(rows: list[dict]) -> tuple[str, dict]:
 
 def compact_virtual(allocation: dict) -> str:
     if allocation.get("status") != "bet":
-        return "仮0口(見送り)"
+        return f"見送り推奨｜仮0口（{allocation.get('reason') or '条件未達'}）"
     bets = "/".join(
         f"{b['combination']}@{b['odds']:.1f}×{b['units']}"
         for b in allocation["bets"]
@@ -180,12 +180,19 @@ def run_once(now: datetime | None = None) -> int:
                 analysis = future.result()
             except Exception as exc:
                 print(f"morning analysis failed {key[0]} {key[1]}R: {type(exc).__name__}")
+                try:
+                    base.send_race_notice(day,key[0],key[1],key[2],'unavailable','公式データを取得できません。欠場の確定情報ではありません。')
+                except Exception as notice_error:
+                    print(f"morning status failed: {type(notice_error).__name__}")
                 continue
-            if analysis:
-                if len(analysis.get("inputs") or []) != 6:
-                    print(f"morning excluded without six boats: {key[0]} {key[1]}R")
-                    continue
-                analyses[key] = analysis
+            if not analysis or not base.valid_six_boats(analysis, base.load_policy()):
+                kind, reason = base.unavailable_race_status(day,key[0],key[1])
+                try:
+                    base.send_race_notice(day,key[0],key[1],key[2],kind,reason)
+                except Exception as notice_error:
+                    print(f"morning status failed: {type(notice_error).__name__}")
+                continue
+            analyses[key] = analysis
 
     if not analyses:
         return 0

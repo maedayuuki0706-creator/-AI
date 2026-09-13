@@ -111,7 +111,8 @@ class DeliveryAccountingTests(unittest.TestCase):
         now = datetime(2026, 9, 13, 8, 45, tzinfo=base.JST)
         rows = [{'combination': '-'.join(map(str, combo)), 'probability': 1 / 120, 'odds': None, 'expected_value': None}
                 for combo in permutations(range(1, 7), 3)]
-        analysis = {'heads': {lane: 1 / 6 for lane in range(1, 7)}, 'trifecta': rows,
+        analysis = {'inputs': [{'lane': lane} for lane in range(1, 7)],
+                    'heads': {lane: 1 / 6 for lane in range(1, 7)}, 'trifecta': rows,
                     'preview': {'exhibition_count': 0}, 'model_version': 'test'}
         with tempfile.TemporaryDirectory() as tmp, patch.object(base, 'LOG_PATH', Path(tmp) / 'predictions.jsonl'), patch.object(morning, 'CARD_DIR', Path(tmp) / 'cards'), patch.object(morning, 'datetime') as clock, patch.object(base, 'fetch'), patch.object(base, 'discover_venues', return_value=['08']), patch.object(base, 'deadlines', return_value=['10:00'] * 12), patch.object(base, 'analyze_official', return_value=analysis), patch.object(base, 'send_discord') as send, patch.object(morning.time, 'sleep'):
             clock.now.return_value = now

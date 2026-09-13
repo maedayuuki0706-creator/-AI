@@ -109,6 +109,9 @@ def analysis_message_with_virtual(day, jcd, rno, deadline, phase, analysis, rows
     # original six core picks; extra 7-14th points are prediction coverage.
     allocation = allocate_virtual_bets(rows[:6])
     _VIRTUAL[(day, jcd, int(rno), phase)] = allocation
+    if allocation.get('status') != 'bet':
+        message = (f"{base.VENUES.get(jcd, jcd)} {rno}レース\n見送り推奨\n"
+                   f"理由：{allocation.get('reason') or '仮想投票の条件未達'}\n\n" + message)
     extra = "\n\n**仮想投票（1口=100円）**\n" + compact_virtual_text(allocation)
     extra += "\n日次集計は締切前の最新配信で差替え（追加投票なし）。"
 

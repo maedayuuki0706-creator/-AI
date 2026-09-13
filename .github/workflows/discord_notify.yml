@@ -13,6 +13,8 @@ on:
       - "morning_all_races_discord.py"
       - "virtual_betting.py"
       - "notification_policy.json"
+      - "race_notices.py"
+      - "notification_runner.py"
 
 permissions:
   contents: write
@@ -36,10 +38,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run exhibition-aware all-race notifier
+      - name: Deliver predictions and race status notices
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python detailed_discord_notify.py
+          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '600' || '0' }}
+        run: python notification_runner.py
 
       - name: Persist newly delivered predictions
         if: always()

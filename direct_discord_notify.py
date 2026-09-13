@@ -27,6 +27,7 @@ from zoneinfo import ZoneInfo
 from prediction_engine import analyze_race
 from race_context import previous_form
 from discord_formation import formation_summary, formation_lines
+from race_notices import withdrawal_lanes, notice_message, read_notices, record_notice
 
 JST = ZoneInfo("Asia/Tokyo")
 BASE = "https://www.boatrace.jp/owpc/pc/race"
@@ -200,6 +201,8 @@ def parse_odds(raw: str) -> dict:
 
 
 def analyze_official(day: str, jcd: str, rno: int) -> dict | None:
+    if withdrawal_lanes(fetch(official_url('racelist',day,jcd,rno))):
+        return None
     boats=parse_racelist_boats(day,jcd,rno)
     if len(boats)!=6:
         return None
@@ -304,6 +307,55 @@ def valid_six_boats(analysis, policy):
     return len(boats) == 6 and {b.get('lane') for b in boats} == set(range(1,7))
 
 
+def unavailable_race_status(day, jcd, rno):
+    try:
+        lanes = withdrawal_lanes(fetch(official_url('racelist', day, jcd, rno)))
+    except Exception:
+        lanes = []
+    if lanes:
+        return 'withdrawn', '・'.join(map(str, lanes)) + '号艇が欠場のため予想対象外。'
+    return 'unavailable', '6艇の出走データを確認できないため予想対象外。公式の欠場は未確認です。'
+
+
+def send_race_notice(day, jcd, rno, deadline, kind, reason, *, now=None, dry_run=False):
+    if not load_policy().get('notify_race_status', True):
+        return False
+    current = now if dry_run and now is not None else datetime.now(JST)
+    if current.strftime('%Y%m%d') != day or minutes_until(current, deadline) < load_policy()['final_min_lead_minutes']:
+        return False
+    key = (day, jcd, int(rno), kind)
+    sent = {(r.get('day'), r.get('jcd'), r.get('rno'), r.get('status')) for r in read_notices()}
+    if key in sent:
+        return False
+    message = notice_message(VENUES.get(jcd, jcd), rno, kind, reason)
+    if dry_run:
+        print(message)
+        return True
+    send_discord(message)
+    record_notice({'day': day, 'jcd': jcd, 'venue': VENUES.get(jcd, jcd), 'rno': int(rno),
+                   'deadline': deadline, 'status': kind, 'reason': reason,
+                   'sent_at': datetime.now(JST).isoformat(), 'record_type': 'race_status'})
+    print(f'sent status {jcd} {rno}R {kind}')
+    return True
+
+
+def ai_skip_reason(analysis, policy):
+    preview = analysis.get('preview') or {}
+    rule = policy['other_venues']
+    reasons = []
+    if analysis.get('grade') not in rule['grades']:
+        reasons.append(f"AI評価{analysis.get('grade') or '未確定'}が選別基準外")
+    for name, label, unit, limit in (('wind_speed', '風速', 'm', rule['max_wind_m']), ('wave_cm', '波高', 'cm', rule['max_wave_cm'])):
+        value = preview.get(name)
+        if value is None:
+            reasons.append(label + 'が未確認')
+        elif value > limit:
+            reasons.append(f'{label}{value}{unit}が基準{limit}{unit}を超過')
+    if not any(p.get('expected_value') is not None and p['expected_value'] >= rule['min_expected_value'] and p['probability'] >= rule['min_pick_probability'] for p in analysis.get('trifecta', [])):
+        reasons.append('確率・期待値の条件を満たす買い目なし')
+    return '／'.join(reasons) or 'AI選別条件に達していないため。'
+
+
 def required_venue(policy,day,jcd):
     required = policy.get('all_races',{}).get(day,[])
     return '*' in required or jcd in required
@@ -381,7 +433,7 @@ def make_analysis_message(day,jcd,rno,deadline,phase,analysis,rows,required):
     lines.append(f"風速 {str(wind)+'m' if wind is not None else '未取得'} / 波高 {str(wave)+'cm' if wave is not None else '未取得'} / 進入 {'展示順を反映' if preview['entry_observed'] else '枠なり仮定'}")
     if any(b.get('exhibition_flying') for b in boats.values()):lines.append('展示Fあり：速さの加点には使わず、平均STを重視。')
     if phase=='preliminary' or preview['exhibition_count']<6:lines.append('判断：展示待ち。直前データで再判定。')
-    elif not selected_by_ai(analysis,load_policy()):lines.append('判断：見送り寄り。全レース配信の参考予想。')
+    elif not selected_by_ai(analysis,load_policy()):lines.append('判断：AI選別基準外。全レース配信の参考予想。')
     else:lines.append('判断：条件に合う候補あり。公開オッズの変動に注意。')
     if not any(p.get('odds') for p in rows):lines.append('オッズ：未公開・期待値は未判定')
     for p in rows:
@@ -417,21 +469,32 @@ def run_once(now: datetime | None=None, *, force_test=False,dry_run=False) -> in
             jcd,rno,deadline,phase=jobs[future]
             try:
                 analysis=future.result()
-                if not analysis:
-                    failures+=1;print(f'Waiting for six valid racers: {jcd} {rno}R');continue
-                if not valid_six_boats(analysis, policy):
-                    print(f'Excluded without six boats: {jcd} {rno}R')
+            except Exception as e:
+                failures += 1
+                print(f'Official analysis failed {jcd} {rno}R: {type(e).__name__}')
+                try:
+                    send_race_notice(day,jcd,rno,deadline,'unavailable','公式データを取得できません。欠場の確定情報ではありません。',now=now,dry_run=dry_run)
+                except Exception as notice_error:
+                    print(f'Status delivery failed {jcd} {rno}R: {type(notice_error).__name__}')
+                continue
+            try:
+                if not analysis or not valid_six_boats(analysis, policy):
+                    kind, reason = unavailable_race_status(day,jcd,rno)
+                    send_race_notice(day,jcd,rno,deadline,kind,reason,now=now,dry_run=dry_run)
+                    print(f'Excluded race: {jcd} {rno}R {kind}')
                     continue
                 required=required_venue(policy,day,jcd)
-                if not required and not selected_by_ai(analysis,policy):continue
                 current=now if dry_run else datetime.now(JST)
                 if current.strftime('%Y%m%d')!=day or minutes_until(current,deadline)<policy['final_min_lead_minutes']:continue
+                waiting = list(analysis.get('delivery_wait_reasons') or [])
                 if phase == 'final' and analysis['preview']['exhibition_count'] < 6:
-                    # Keep retrying for the actual exhibition instead of using
-                    # up the final delivery slot on another provisional card.
-                    if any((day,jcd,rno,p) in delivered for p in ('morning','preliminary')):
-                        continue
-                    phase = 'preliminary'
+                    waiting.append(f"展示データ {analysis['preview']['exhibition_count']}/6艇。そろうまで判断保留です。")
+                if waiting:
+                    send_race_notice(day,jcd,rno,deadline,'waiting','／'.join(dict.fromkeys(waiting)),now=now,dry_run=dry_run)
+                    continue
+                if not required and not selected_by_ai(analysis,policy):
+                    send_race_notice(day,jcd,rno,deadline,'pass',ai_skip_reason(analysis,policy),now=now,dry_run=dry_run)
+                    continue
                 rows=displayed_picks(analysis,required)
                 message=make_analysis_message(day,jcd,rno,deadline,phase,analysis,rows,required)
                 if dry_run:
