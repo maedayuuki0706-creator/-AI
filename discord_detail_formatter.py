@@ -1,3 +1,6 @@
+from discord_formation import formation_summary, formation_lines
+
+
 def finish_probabilities(trifecta):
     probs = {i: {"first": 0.0, "second": 0.0, "third": 0.0} for i in range(1, 7)}
     for row in trifecta or []:
@@ -46,12 +49,7 @@ def format_detailed_message(venue, rno, deadline, picks, exhibition, source, con
         f"予想：**{source}** / 展示：{'取得確認' if exhibition else '未確認'} / 信頼度：**{confidence_grade(confidence)}**",
         "",
     ]
-    if main:
-        lines += ["**◎ 本線**", " / ".join(main)]
-    if cover:
-        lines += ["**○ 押さえ**", " / ".join(cover)]
-    if len(picks) > 6:
-        lines += ["**△ 穴候補**", " / ".join(picks[6:8])]
+    lines += formation_lines(formation_summary(main, cover, picks[6:8]))
 
     if result and boats:
         probs = finish_probabilities(result.get("trifecta", []))
@@ -67,7 +65,7 @@ def format_detailed_message(venue, rno, deadline, picks, exhibition, source, con
         for b in boats:
             fmark = " F持ち" if b.get("flying") else ""
             lines.append(
-                f"{b['lane']}号艇{fmark}｜全国 {float(b.get('win_rate',0)):.2f} / 当地 {float(b.get('local_win_rate',0)):.2f} "
+                f"{b['lane']}号艇{fmark}｜全国 {float(b.get('win_rate') or 0):.2f} / 当地 {format(float(b['local_win_rate']), '.2f') if b.get('local_win_rate') is not None else '未取得'} "
                 f"/ ST {float(b.get('avg_st',0)):.2f} / M2連 {float(b.get('motor_top2_rate',0)):.1f}%"
             )
         scored = result.get("boats", [])

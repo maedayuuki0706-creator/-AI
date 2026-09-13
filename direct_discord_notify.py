@@ -26,6 +26,7 @@ from zoneinfo import ZoneInfo
 
 from prediction_engine import analyze_race
 from race_context import previous_form
+from discord_formation import formation_summary, formation_lines
 
 JST = ZoneInfo("Asia/Tokyo")
 BASE = "https://www.boatrace.jp/owpc/pc/race"
@@ -333,8 +334,8 @@ def make_analysis_message(day,jcd,rno,deadline,phase,analysis,rows,required):
     lines=[f'🚤 **競艇AIナビ｜{label}**',f'**{day[4:6]}/{day[6:8]} {VENUES[jcd]} {rno}R**　締切 **{deadline}**',
         f"評価：{analysis['grade'] or '展示待ち'} / 展示 {preview['exhibition_count']}/6艇"]
     if required:lines.append('常滑・全レース配信枠（見送り判断も含む）')
-    lines+=['','**3連単・本線**',' / '.join(p['combination'] for p in rows[:3])]
-    if len(rows)>3:lines+=['**押さえ・別の頭の可能性**',' / '.join(p['combination'] for p in rows[3:])]
+    summary=formation_summary([p['combination'] for p in rows[:3]], [p['combination'] for p in rows[3:]])
+    lines+=['', *formation_lines(summary)]
     lines+=['','**AI展開の想定**']
     leader=max(analysis['heads'],key=analysis['heads'].get)
     course=boats[leader]['predicted_course']
@@ -405,10 +406,12 @@ def run_once(now: datetime | None=None, *, force_test=False,dry_run=False) -> in
                     print(message+'\n');continue
                 send_discord(message)
                 combos=[p['combination'] for p in rows]
+                summary=formation_summary(combos[:3],combos[3:])
                 log_prediction({'day':day,'jcd':jcd,'venue':VENUES[jcd],'rno':rno,'deadline':deadline,
                     'phase':phase,'sent_at':current.isoformat(),'source':'独自AI・前日参考補正','model_version':analysis['model_version'],
                     'grade':analysis['grade'],'exhibition':analysis['preview']['exhibition_count']==6,
                     'main':combos[:3],'cover':combos[3:],'all_picks':combos,'heads':analysis['heads'],
+                    'message_format':'formation-v1','point_count':summary['point_count'],'formation_sections':summary['sections'],
                     'previous_form':analysis['previous_form']})
                 delivered.add((day,jcd,rno,phase));sent+=1
                 print(f'sent {jcd} {rno}R {phase}')
