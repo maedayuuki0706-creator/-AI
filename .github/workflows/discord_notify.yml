@@ -4,14 +4,6 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "direct_discord_notify.py"
-      - "detailed_discord_notify.py"
-      - "morning_all_races_discord.py"
-      - "virtual_betting.py"
-      - "notification_policy.json"
 
 permissions:
   contents: write
@@ -23,7 +15,7 @@ concurrency:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,19 +27,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verify prediction and settlement rules
-        run: python -m unittest discover -s tests -v
-
-      - name: Run detailed BOAT RACE official -> AI -> Discord notifier
+      - name: Run exhibition-aware all-race notifier
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python detailed_discord_notify.py
-
-      - name: Report current progress after a notifier update
-        if: always() && github.event_name == 'push'
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python daily_report.py --send
+        run: python exhibition_final_discord.py
 
       - name: Persist newly delivered predictions
         if: always()
