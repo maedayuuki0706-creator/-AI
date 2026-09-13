@@ -230,26 +230,31 @@ def report_messages(report):
              '回収率＝確定分の公式払戻・返還÷確定分投票額。結果待ちは率に含めず、全返還・特払いは的中率から除外。']
     if report['excluded_deliveries']:
         lines.append(f"締切後・時刻不明の配信 {report['excluded_deliveries']}件は実績から除外。")
-    messages = ['\n'.join(lines)]
-    venue_lines = []
-    for jcd, stats in report['venues'].items():
-        venue_lines.append(f"{base.VENUES.get(jcd, jcd)}：予想{stats['predicted_races']}R / 仮{stats['bet_points']}点・{stats['bet_units']}口 / 確定回収{stats['return_yen']:,}円 / 損益{stats['profit_yen']:+,}円 / 的中{percent(stats['hit_rate'])} / 回収率{percent(stats['roi'])}")
+    messages = ['\\n'.join(lines)]
+    grouped = defaultdict(list)
+    for race in report['races']:
+        grouped[race['jcd']].append(race)
+    for jcd, stats in sorted(report['venues'].items()):
+        venue = base.VENUES.get(jcd, jcd)
+        card_lines = [f"📍 **{venue}｜予想・結果まとめ**（{day[4:6]}/{day[6:]}・{label}）",
+                      f"予想 {stats['predicted_races']}R / 仮想 {stats['bet_points']}点・{stats['bet_units']}口（{stats['bet_units'] * 100:,}円）",
+                      f"確定回収 {stats['return_yen']:,}円 / 損益 {stats['profit_yen']:+,}円 / 的中率 {percent(stats['hit_rate'])} / 回収率 {percent(stats['roi'])}", '']
+        for race in sorted(grouped.get(jcd, []), key=lambda x: x['rno']):
+            status = {'pending': '結果待ち', 'void': '返還', 'special': '特払い', 'settled': '確定'}.get(race['status'], race['status'])
+            hit = '🎯的中' if race['virtual_hit'] else ('✅予想内' if race['prediction_hit'] else '—')
+            picks = '・'.join(race['picks'][:3])
+            if len(race['picks']) > 3:
+                picks += f" 他{len(race['picks']) - 3}点"
+            card_lines.append(f"{race['rno']}R｜{status}｜{hit}｜{picks or '買い目なし'}｜投{race['stake_yen']:,}円→回{race['return_yen']:,}円")
+        messages.append('\\n'.join(card_lines))
     if report['missing_predictions']:
         missing = defaultdict(list)
         for key in report['missing_predictions']:
             jcd, rno = key.split(':')
             missing[jcd].append(int(rno))
-        venue_lines += ['\n予想未記録（集計対象外）：' + ' / '.join(f"{base.VENUES.get(jcd, jcd)} {','.join(map(str, sorted(races)))}R" for jcd, races in sorted(missing.items()))]
-    header = f"**{day[4:6]}/{day[6:]} 場別まとめ**"
-    current = header
-    for line in venue_lines:
-        if len((current + '\n' + line).encode('utf-16-le')) // 2 > 1850:
-            messages.append(current)
-            current = header
-        current += '\n' + line
-    if current != header:
-        messages.append(current)
-    messages[-1] += '\n公式結果：' + base.official_url('index', day)
+        messages.append('⚠️ **予想未記録（集計対象外）**\\n' + ' / '.join(f"{base.VENUES.get(jcd, jcd)} {','.join(map(str, sorted(races)))}R" for jcd, races in sorted(missing.items())))
+    messages[-1] += '\\n公式結果：' + base.official_url('index', day)
+
     return messages
 
 
