@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/discord_notify.yml"
+      - "detailed_discord_notify.py"
+      - "direct_discord_notify.py"
+      - "morning_all_races_discord.py"
+      - "virtual_betting.py"
+      - "notification_policy.json"
 
 permissions:
   contents: write
