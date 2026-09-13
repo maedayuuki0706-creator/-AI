@@ -297,6 +297,13 @@ def load_policy() -> dict:
     return json.loads(Path('notification_policy.json').read_text(encoding='utf-8'))
 
 
+def valid_six_boats(analysis, policy):
+    if not policy.get('require_six_boats', True):
+        return True
+    boats = analysis.get('inputs') or []
+    return len(boats) == 6 and {b.get('lane') for b in boats} == set(range(1,7))
+
+
 def required_venue(policy,day,jcd):
     required = policy.get('all_races',{}).get(day,[])
     return '*' in required or jcd in required
@@ -412,6 +419,9 @@ def run_once(now: datetime | None=None, *, force_test=False,dry_run=False) -> in
                 analysis=future.result()
                 if not analysis:
                     failures+=1;print(f'Waiting for six valid racers: {jcd} {rno}R');continue
+                if not valid_six_boats(analysis, policy):
+                    print(f'Excluded without six boats: {jcd} {rno}R')
+                    continue
                 required=required_venue(policy,day,jcd)
                 if not required and not selected_by_ai(analysis,policy):continue
                 current=now if dry_run else datetime.now(JST)

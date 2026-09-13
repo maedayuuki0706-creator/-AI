@@ -182,6 +182,9 @@ def run_once(now: datetime | None = None) -> int:
                 print(f"morning analysis failed {key[0]} {key[1]}R: {type(exc).__name__}")
                 continue
             if analysis:
+                if len(analysis.get("inputs") or []) != 6:
+                    print(f"morning excluded without six boats: {key[0]} {key[1]}R")
+                    continue
                 analyses[key] = analysis
 
     if not analyses:
