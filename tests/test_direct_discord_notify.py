@@ -48,6 +48,19 @@ class DeliveryTests(unittest.TestCase):
         self.assertNotIn('exhibition_st',preview['boats'][1])
         pending=n.parse_beforeinfo((FIXTURES/'beforeinfo-20260913-08-1.html').read_text())
         self.assertEqual(pending['exhibition_count'],0)
+    def test_unrecorded_average_st_does_not_shift_other_fields(self):
+        raw=(FIXTURES/'racelist-20260913-08-1.html').read_text()
+        with patch.object(n,'fetch',return_value=raw):
+            original=n.parse_racelist_boats('20260913','08',1)
+        import re
+        changed=re.sub(r'(L0\s*<br\s*/?>\s*)(?:0\.\d+)', r'\1-', raw, count=1)
+        self.assertNotEqual(raw, changed)
+        with patch.object(n,'fetch',return_value=changed):
+            boats=n.parse_racelist_boats('20260913','08',1)
+        self.assertEqual(len(boats),6)
+        self.assertIsNone(boats[0]['avg_st'])
+        self.assertEqual(boats[0]['win_rate'],original[0]['win_rate'])
+        self.assertEqual(boats[0]['motor_top2_rate'],original[0]['motor_top2_rate'])
     def test_previous_day_form_does_not_leak_same_day_or_other_venue(self):
         boats=[{'lane':5,'racer_id':'4208'}]
         self.assertGreater(previous_form('20260913','08',boats)[5]['score_delta'],0)

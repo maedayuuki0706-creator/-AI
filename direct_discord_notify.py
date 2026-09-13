@@ -102,15 +102,28 @@ def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
         registration = re.search(r"(\d{4})\s*/\s*(A1|A2|B1|B2)\b", text)
         if not lane_match or not registration:
             continue
-        fl = re.search(r"F\s*(\d+)\s*\nL\s*(\d+)\s*\n", text)
+        cells = re.findall(r'<td\b[^>]*>(.*?)</td>', body, re.I | re.S)
+        if len(cells) < 8:
+            return []
+        start_text = textify(cells[3])
+        fl = re.search(r"F\s*(\d+)\s*\nL\s*(\d+)\s*\n", start_text)
         if not fl:
             return []
-        vals = re.findall(r"(?<![\d.])(?:\d+\.\d+|\d+)(?![\d.])", text[fl.end():])
-        if len(vals) < 13:
+        # Keep cell positions: a rookie's '-' average ST must not shift the
+        # national win rate into ST and invalidate all six racers.
+        vals = [start_text[fl.end():].strip()]
+        for cell in cells[4:8]:
+            values = textify(cell).splitlines()
+            if len(values) != 3:
+                return []
+            vals.extend(values)
+        if any(not re.fullmatch(r'(?:\d+(?:\.\d+)?|[-－―—])', value) for value in vals):
             return []
-        nums = list(map(float, vals[:13]))
+        nums = [float(value) if re.fullmatch(r'\d+(?:\.\d+)?', value) else None for value in vals]
         lane = int(lane_match[1])
-        if not (0 <= nums[0] <= 1 and 0 <= nums[1] <= 10 and all(0 <= nums[i] <= 100 for i in (2,3,5,6,8,9))):
+        if not ((nums[0] is None or 0 <= nums[0] <= 1)
+                and (nums[1] is None or 0 <= nums[1] <= 10)
+                and all(nums[i] is None or 0 <= nums[i] <= 100 for i in (2,3,5,6,8,9))):
             return []
         boats.append({
             "lane": lane, "course": lane, "predicted_course": lane,
@@ -119,7 +132,7 @@ def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
             "win_rate": nums[1], "top2_rate": nums[2], "top3_rate": nums[3],
             "local_win_rate": nums[4] if any(nums[4:7]) else None,
             "local_top2_rate": nums[5] if any(nums[4:7]) else None,
-            "motor_number": int(nums[7]), "motor_top2_rate": nums[8], "motor_top3_rate": nums[9],
+            "motor_number": int(nums[7]) if nums[7] is not None else None, "motor_top2_rate": nums[8], "motor_top3_rate": nums[9],
         })
     return sorted(boats, key=lambda x: x["lane"]) if {b["lane"] for b in boats} == set(range(1,7)) and len(boats)==6 else []
 
@@ -350,7 +363,9 @@ def make_analysis_message(day,jcd,rno,deadline,phase,analysis,rows,required):
     lines+=['','**判断材料（6艇）**']
     for lane in range(1,7):
         b=boats[lane];form=analysis['previous_form'].get(lane)
-        line=f"{lane} {b['name']}：全国勝率 {b['win_rate']:.2f} / モーター2連率 {b['motor_top2_rate']:.1f}% / 平均ST {b['avg_st']:.2f}"
+        def display(value, digits=2):
+            return f'{value:.{digits}f}' if value is not None else '未記録'
+        line=f"{lane} {b['name']}：全国勝率 {display(b['win_rate'])} / モーター2連率 {display(b['motor_top2_rate'],1)}% / 平均ST {display(b['avg_st'])}"
         if b.get('flying'):line+=' / F持ち'
         if form:line+=' / 前日 '+ '・'.join(str(x)+'着' if isinstance(x,int) else str(x) for x in form['finishes'])
         if b.get('exhibition_time') is not None:line+=f" / 展示 {b['exhibition_time']:.2f}"
