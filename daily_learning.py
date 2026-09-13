@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 from zoneinfo import ZoneInfo
 from race_context import clean
+from daily_report import latest_predictions, RESULT_DIR, race_key
 
 JST = ZoneInfo("Asia/Tokyo")
 BASE = "https://www.boatrace.jp/owpc/pc/race"
@@ -78,7 +79,7 @@ def evaluate_prediction(row: dict, result: list[int]) -> dict:
     main = row.get("main") or []
     cover = row.get("cover") or []
     # Only combinations actually displayed in Discord count as delivered picks.
-    all_picks = list(dict.fromkeys(main + cover))
+    all_picks = list(dict.fromkeys(main + cover + (row.get("outsiders") or [])))
     top_pick = all_picks[0] if all_picks else None
     top_first = int(top_pick.split("-")[0]) if isinstance(top_pick, str) and re.match(r"^[1-6]-", top_pick) else None
     return {
@@ -97,7 +98,7 @@ def aggregate(rows: list[dict]) -> dict:
     latest = {}
     for row in rows:
         key = (row.get("day"), row.get("jcd"), row.get("rno"))
-        if key not in latest or row.get("phase", "final") == "final":
+        if key not in latest or (row.get('sent_at', ''), row.get('phase', 'final') == 'final') >= (latest[key].get('sent_at', ''), latest[key].get('phase', 'final') == 'final'):
             latest[key] = row
     rows = list(latest.values())
     total = len(rows)
@@ -141,28 +142,30 @@ def aggregate(rows: list[dict]) -> dict:
 
 def main() -> int:
     predictions = load_jsonl(LOG_PATH)
-    evaluated = load_jsonl(RESULTS_PATH)
-    done = {f"{r.get('day')}:{r.get('jcd')}:{r.get('rno')}:{r.get('phase', 'final')}" for r in evaluated}
-    new_count = 0
-    for row in predictions:
-        key = f"{row.get('day')}:{row.get('jcd')}:{row.get('rno')}:{row.get('phase', 'final')}"
-        if key in done:
-            continue
-        try:
-            raw = fetch(official_result_url(str(row["day"]), str(row["jcd"]), int(row["rno"])))
-            order = parse_finish_order(raw)
-        except Exception:
-            order = []
-        if not order:
-            continue
-        result = evaluate_prediction(row, order)
-        append_jsonl(RESULTS_PATH, result)
-        evaluated.append(result)
-        done.add(key)
-        new_count += 1
+    evaluated = []
+    previous = {(r.get('day'), race_key(r), r.get('sent_at')): r for r in load_jsonl(RESULTS_PATH)}
+    for day in sorted({r.get('day') for r in predictions if r.get('day')}):
+        chosen, _ = latest_predictions(predictions, day)
+        path = RESULT_DIR / f'{day}.json'
+        official = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {}
+        for key, row in chosen.items():
+            result = official.get(key, {})
+            combos = list(result.get('payouts', {})) if result.get('status') == 'settled' else []
+            # A dead heat has multiple winning combinations. Match all of them.
+            if combos:
+                observations = [evaluate_prediction(row, list(map(int, combo.split('-')))) for combo in combos]
+                record = observations[0]
+                for name in ('main_hit', 'cover_hit', 'any_hit', 'winner_read_hit'):
+                    record[name] = any(x[name] for x in observations)
+                record['official_results'] = combos
+                evaluated.append(record)
+            elif not result and (day, key, row.get('sent_at')) in previous:
+                evaluated.append(previous[(day, key, row.get('sent_at'))])
+    RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    RESULTS_PATH.write_text(''.join(json.dumps(r, ensure_ascii=False, sort_keys=True) + '\n' for r in evaluated), encoding='utf-8')
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     STATE_PATH.write_text(json.dumps(aggregate(evaluated), ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"daily learning complete: new={new_count}, total={len(evaluated)}")
+    print(f"daily learning complete: independent_pre_close_races={len(evaluated)}")
     return 0
 
 

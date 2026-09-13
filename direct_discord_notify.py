@@ -285,7 +285,8 @@ def load_policy() -> dict:
 
 
 def required_venue(policy,day,jcd):
-    return jcd in policy.get('all_races',{}).get(day,[])
+    required = policy.get('all_races',{}).get(day,[])
+    return '*' in required or jcd in required
 
 
 def due_phase(policy,now,jcd,deadline,delivered,rno):
@@ -295,7 +296,7 @@ def due_phase(policy,now,jcd,deadline,delivered,rno):
     if lead<=policy['final_max_lead_minutes']:
         return None if (day,jcd,rno,'final') in delivered else 'final'
     if required_venue(policy,day,jcd) and now.hour>=policy['preliminary_start_hour_jst']:
-        return None if (day,jcd,rno,'preliminary') in delivered else 'preliminary'
+        return None if any((day,jcd,rno,p) in delivered for p in ('morning','preliminary','final')) else 'preliminary'
     return None
 
 
@@ -333,7 +334,7 @@ def make_analysis_message(day,jcd,rno,deadline,phase,analysis,rows,required):
     label='朝の暫定予想' if phase=='preliminary' else '直前更新' if required else 'AI選別'
     lines=[f'🚤 **競艇AIナビ｜{label}**',f'**{day[4:6]}/{day[6:8]} {VENUES[jcd]} {rno}R**　締切 **{deadline}**',
         f"評価：{analysis['grade'] or '展示待ち'} / 展示 {preview['exhibition_count']}/6艇"]
-    if required:lines.append('常滑・全レース配信枠（見送り判断も含む）')
+    if required:lines.append('全レース配信枠（見送り判断も含む）')
     summary=formation_summary([p['combination'] for p in rows[:3]], [p['combination'] for p in rows[3:]])
     lines+=['', *formation_lines(summary)]
     lines+=['','**AI展開の想定**']
@@ -376,7 +377,7 @@ def run_once(now: datetime | None=None, *, force_test=False,dry_run=False) -> in
     policy=load_policy();day=now.strftime('%Y%m%d')
     if now.hour<8 or now.hour>=22:
         print('Outside race notification hours');return 0
-    venues=set(discover_venues(day))|set(policy.get('all_races',{}).get(day,[]))
+    venues=set(discover_venues(day))|(set(policy.get('all_races',{}).get(day,[]))-{'*'})
     delivered=load_deliveries();targets=[];failures=0
     with ThreadPoolExecutor(max_workers=4) as pool:
         jobs={pool.submit(deadlines,day,jcd):jcd for jcd in venues}
@@ -400,6 +401,12 @@ def run_once(now: datetime | None=None, *, force_test=False,dry_run=False) -> in
                 if not required and not selected_by_ai(analysis,policy):continue
                 current=now if dry_run else datetime.now(JST)
                 if current.strftime('%Y%m%d')!=day or minutes_until(current,deadline)<policy['final_min_lead_minutes']:continue
+                if phase == 'final' and analysis['preview']['exhibition_count'] < 6:
+                    # Keep retrying for the actual exhibition instead of using
+                    # up the final delivery slot on another provisional card.
+                    if any((day,jcd,rno,p) in delivered for p in ('morning','preliminary')):
+                        continue
+                    phase = 'preliminary'
                 rows=displayed_picks(analysis,required)
                 message=make_analysis_message(day,jcd,rno,deadline,phase,analysis,rows,required)
                 if dry_run:

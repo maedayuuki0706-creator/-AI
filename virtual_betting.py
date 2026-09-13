@@ -97,9 +97,8 @@ def compact_virtual_text(allocation):
     if allocation.get("status") != "bet":
         return f"仮想投票：見送り 0口（{allocation.get('reason', '条件未達')}）"
     items = [f"{b['combination']}@{b['odds']:.1f}×{b['units']}口" for b in allocation["bets"]]
-    profit = allocation["min_return_units"] - allocation["total_units"]
     return (
         "仮想投票：" + " / ".join(items)
-        + f"｜計{allocation['total_units']}口 → 最低払戻{allocation['min_return_units']:.1f}口相当"
-        + f"（最低+{profit:.1f}口）"
+        + f"｜{len(items)}点・計{allocation['total_units']}口（{allocation['total_units'] * 100:,}円）"
+        + f"｜的中時の払戻目安{allocation['min_return_units']:.1f}口〜（表示オッズ時点）"
     )

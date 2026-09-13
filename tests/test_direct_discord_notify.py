@@ -18,7 +18,7 @@ class DeliveryTests(unittest.TestCase):
         now=datetime(2026,9,13,8,15,tzinfo=n.JST)
         for race in range(1,13):
             self.assertEqual(n.due_phase(self.policy,now,'08','10:43',set(),race),'preliminary')
-        self.assertIsNone(n.due_phase(self.policy,now,'24','10:43',set(),1))
+        self.assertEqual(n.due_phase(self.policy,now,'24','10:43',set(),1),'preliminary')
         self.assertIsNone(n.due_phase(self.policy,now.replace(day=14),'08','10:43',set(),1))
     def test_delays_duplicates_and_closed_races(self):
         now=datetime(2026,9,13,10,30,tzinfo=n.JST)
