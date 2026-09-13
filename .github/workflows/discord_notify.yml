@@ -39,13 +39,22 @@ jobs:
           python-version: "3.12"
 
       - name: Deliver predictions and race status notices
+        if: ${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Send 2026-09-13 prediction summary')) }}
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '600' || '0' }}
         run: python notification_runner.py
 
+      - name: Send grouped 2026-09-13 prediction summary
+        if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Send 2026-09-13 prediction summary') }}
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SUMMARY_ONLY: "1"
+          SUMMARY_DAY: "20260913"
+        run: python notification_runner.py
+
       - name: Persist newly delivered predictions
-        if: always()
+        if: always() && github.event_name != 'push'
         run: |
           mkdir -p data/race_cards data/official_results data/daily_reports
           if [ -z "$(git status --porcelain data/)" ]; then
