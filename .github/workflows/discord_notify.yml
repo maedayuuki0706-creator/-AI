@@ -15,6 +15,7 @@ on:
       - "notification_policy.json"
       - "race_notices.py"
       - "notification_runner.py"
+      - "prediction_recap.py"
 
 permissions:
   contents: write
@@ -54,7 +55,7 @@ jobs:
         run: python notification_runner.py
 
       - name: Persist newly delivered predictions
-        if: always() && github.event_name != 'push'
+        if: always()
         run: |
           mkdir -p data/race_cards data/official_results data/daily_reports
           if [ -z "$(git status --porcelain data/)" ]; then

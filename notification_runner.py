@@ -37,82 +37,9 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
     return result
 
 
-def send_webhook(content: str) -> None:
-    url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
-    if not url:
-        raise RuntimeError("DISCORD_WEBHOOK_URL is missing")
-    payload = json.dumps({"content": content, "allowed_mentions": {"parse": []}}, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=20) as response:
-        response.read()
-
-
 def resend_prediction_summary(day: str = "20260913") -> int:
-    """Send the latest logged prediction for every race, grouped one message per venue."""
-    if not LOG_PATH.exists():
-        raise RuntimeError(f"Prediction log not found: {LOG_PATH}")
-
-    latest = {}
-    with LOG_PATH.open("r", encoding="utf-8") as fh:
-        for line in fh:
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if str(row.get("day")) != day:
-                continue
-            jcd = str(row.get("jcd", "")).zfill(2)
-            rno = int(row.get("rno", 0) or 0)
-            if jcd not in VENUES or not 1 <= rno <= 12:
-                continue
-            key = (jcd, rno)
-            sent_at = str(row.get("sent_at", ""))
-            if key not in latest or sent_at > str(latest[key].get("sent_at", "")):
-                latest[key] = row
-
-    grouped = defaultdict(list)
-    for (jcd, rno), row in latest.items():
-        grouped[jcd].append((rno, row))
-
-    sent = 0
-    for jcd in sorted(grouped, key=lambda x: int(x)):
-        lines = [f"━━━━━━━━━━━━━━━━━━", f"【{VENUES[jcd]}】", f"━━━━━━━━━━━━━━━━━━", ""]
-        for rno, row in sorted(grouped[jcd], key=lambda x: x[0]):
-            main = row.get("main") or row.get("all_picks", [])[:3]
-            cover = row.get("cover") or row.get("all_picks", [])[3:6]
-            lines += [f"■ {rno}R", "【本線】"]
-            lines += [str(p) for p in main]
-            lines += ["", "【抑え】"]
-            lines += [str(p) for p in cover]
-            lines += ["", "━━━━━━━━━━━━━━━━━━", ""]
-
-        content = "\n".join(lines).strip()
-        # Discord allows 2000 chars per message. Split only at race boundaries.
-        if len(content) <= 2000:
-            send_webhook(content)
-            sent += 1
-            continue
-
-        chunks = []
-        current = [f"【{VENUES[jcd]}】"]
-        for block in "\n".join(lines[3:]).split("━━━━━━━━━━━━━━━━━━\n"):
-            block = block.strip()
-            if not block:
-                continue
-            candidate = "\n━━━━━━━━━━━━━━━━━━\n".join(current + [block])
-            if len(candidate) > 1950 and len(current) > 1:
-                chunks.append("\n━━━━━━━━━━━━━━━━━━\n".join(current))
-                current = [f"【{VENUES[jcd]}】", block]
-            else:
-                current.append(block)
-        if len(current) > 1:
-            chunks.append("\n━━━━━━━━━━━━━━━━━━\n".join(current))
-        for chunk in chunks:
-            send_webhook(chunk)
-            sent += 1
-
-    print(f"Resent {len(latest)} races in {sent} Discord message(s) for {day}", flush=True)
-    return 0
+    from prediction_recap import main
+    return main(day)
 
 
 if __name__ == '__main__':
