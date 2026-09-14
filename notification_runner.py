@@ -7,6 +7,9 @@ import urllib.request
 from collections import defaultdict
 from pathlib import Path
 
+if os.getenv("SELECTED_DISCORD_WEBHOOK_URL") and not os.getenv("DISCORD_SELECTED_WEBHOOK_URL"):
+    os.environ["DISCORD_SELECTED_WEBHOOK_URL"] = os.environ["SELECTED_DISCORD_WEBHOOK_URL"]
+
 import detailed_discord_notify as app
 
 VENUES = {
