@@ -1,5 +1,4 @@
-# corrected totals
-name: Boat AI 12:30 Interim Report
+name: Boat AI Interim Report
 on:
   push:
     branches: [main]
@@ -8,7 +7,7 @@ permissions:
   contents: write
 jobs:
   send:
-    if: ${{ startsWith(github.event.head_commit.message, 'Send 20260914 1230 interim report') }}
+    if: ${{ startsWith(github.event.head_commit.message, 'Send interim report') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,13 +19,13 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
         run: python interim_report.py
-      - name: Persist report acknowledgement
+      - name: Persist report acknowledgement and refreshed results
         if: always()
         run: |
-          if [ -z "$(git status --porcelain data/interim_report_deliveries.jsonl)" ]; then exit 0; fi
+          if [ -z "$(git status --porcelain data/interim_report_deliveries.jsonl data/official_results)" ]; then exit 0; fi
           git config user.name boat-ai-learning-bot
           git config user.email actions@users.noreply.github.com
-          git add data/interim_report_deliveries.jsonl
-          git commit -m 'Record 20260914 1230 interim report acknowledgement'
+          git add data/interim_report_deliveries.jsonl data/official_results
+          git commit -m 'Record interim report acknowledgement'
           git pull --rebase origin main
           git push origin HEAD:main
