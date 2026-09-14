@@ -30,11 +30,20 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Settle virtual plans and send daily Discord report
+      - name: Settle results, build 3000 yen simulation, and send daily Discord report
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
-        run: python daily_report.py --send
+        run: |
+          REPORT_DAY="$(TZ=Asia/Tokyo date +%Y%m%d)"
+          HOUR="$(TZ=Asia/Tokyo date +%H)"
+          if [ "$HOUR" -lt 6 ]; then
+            REPORT_DAY="$(TZ=Asia/Tokyo date -d yesterday +%Y%m%d)"
+          fi
+          echo "Daily report target: $REPORT_DAY"
+          python daily_report.py --day "$REPORT_DAY"
+          python stake_simulation_3000.py --day "$REPORT_DAY"
+          python daily_report.py --day "$REPORT_DAY" --saved-results --send
 
       - name: Compare predictions with official results and update learning state
         if: always()
