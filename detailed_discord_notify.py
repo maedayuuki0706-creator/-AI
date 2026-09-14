@@ -7,6 +7,11 @@ betting allocations to the normal race messages.
 Live prediction cards use a variable 6-14 point width. The original six picks
 remain the core; extra points are used mainly to widen second/third-place ties
 so near-miss races caused by a missing supporting boat are covered more often.
+
+From 2026-09-15, the notifier also emits two additive streams without reducing
+normal coverage:
+- selected-race alerts for strong A/B final predictions with a meaningful EV edge
+- special longshot alerts for 100x+ core bets that still have model/EV support
 """
 import sys
 
@@ -131,6 +136,94 @@ def analysis_message_with_virtual(day, jcd, rno, deadline, phase, analysis, rows
     return message + extra
 
 
+def _record_bets(record):
+    return list(record.get("virtual_bets") or [])
+
+
+def _selected_bets(record):
+    """EV-backed bets strong enough to justify the separate selected-race feed."""
+    return [
+        bet for bet in _record_bets(record)
+        if float(bet.get("expected_value") or 0) >= 1.15
+        and float(bet.get("probability") or 0) >= 0.015
+    ]
+
+
+def _is_selected_record(record):
+    return (
+        record.get("phase") == "final"
+        and bool(record.get("exhibition"))
+        and record.get("grade") in {"A", "B"}
+        and bool(_selected_bets(record))
+    )
+
+
+def _selected_message(record):
+    heads = record.get("heads") or {}
+    ranked = sorted(heads.items(), key=lambda item: float(item[1]), reverse=True)
+    top_text = ""
+    if ranked:
+        top_text = f"\n頭評価：{ranked[0][0]}号艇 {float(ranked[0][1]) * 100:.1f}%"
+        if len(ranked) > 1:
+            top_text += f" / 対抗{ranked[1][0]}号艇 {float(ranked[1][1]) * 100:.1f}%"
+    bets = _selected_bets(record)
+    ev_text = " / ".join(
+        f"{b['combination']} {float(b.get('odds') or 0):.1f}倍 EV{float(b.get('expected_value') or 0):.2f}"
+        for b in bets[:3]
+    )
+    main = " / ".join(record.get("main") or []) or "-"
+    cover = " / ".join((record.get("cover") or [])[:6]) or "-"
+    return (
+        f"🔥 **厳選予想｜{record.get('venue')} {record.get('rno')}R**\n"
+        f"締切 **{record.get('deadline')}** / 評価 **{record.get('grade')}** / 展示反映済み"
+        f"{top_text}\n"
+        f"◎ 本線：{main}\n"
+        f"○ 押さえ：{cover}\n"
+        f"選定理由：A/B評価＋展示確定＋確率/EV条件クリア\n"
+        f"EV候補：{ev_text}"
+    )
+
+
+def _longshot_bets(record):
+    """Longshots must already be in the six core bets; no extra spray is added."""
+    return [
+        bet for bet in _record_bets(record)
+        if float(bet.get("odds") or 0) >= 100.0
+        and float(bet.get("expected_value") or 0) >= 1.25
+        and float(bet.get("probability") or 0) >= 0.010
+    ]
+
+
+def _longshot_message(record):
+    bets = _longshot_bets(record)
+    if not bets:
+        return None
+
+    grouped = {}
+    for bet in bets:
+        combo = str(bet.get("combination") or "")
+        parts = combo.split("-")
+        if len(parts) != 3:
+            continue
+        grouped.setdefault(f"{parts[0]}-{parts[1]}", []).append(bet)
+
+    lines = [
+        f"🚨 **万舟警報｜{record.get('venue')} {record.get('rno')}R** 🚨",
+        f"締切 **{record.get('deadline')}** / 評価 {record.get('grade') or '混戦'} / 展示反映済み",
+    ]
+    for prefix, rows in grouped.items():
+        if len(rows) >= 2:
+            lines.append(f"**{prefix}-○○**")
+        else:
+            lines.append(f"**{rows[0]['combination']}**")
+        lines.append("候補：" + " / ".join(
+            f"{b['combination']}（{float(b.get('odds') or 0):.1f}倍・EV{float(b.get('expected_value') or 0):.2f}）"
+            for b in rows
+        ))
+    lines.append("根拠：通常の本線を削らず、コア買い目の中で100倍超＋確率/EV条件を満たした時だけ発令。")
+    return "\n".join(lines)
+
+
 def log_prediction_with_virtual(record):
     key = (record.get("day"), str(record.get("jcd")), int(record.get("rno", 0)), record.get("phase", "final"))
     allocation = _VIRTUAL.get(key)
@@ -143,13 +236,36 @@ def log_prediction_with_virtual(record):
         record["virtual_unit_yen"] = 100
         record["virtual_selection_rule"] = "latest_pre_deadline_per_race"
         record["prediction_point_policy"] = "variable_6_to_14_tie_expansion"
+
+    # Persist the normal all-race prediction first. Extra streams are additive;
+    # their failure must never cause the normal prediction to be retried/duplicated.
     _ORIGINAL_LOG_PREDICTION(record)
+
+    if record.get("phase") != "final":
+        return
+    try:
+        if _is_selected_record(record):
+            base.send_discord(_selected_message(record))
+    except Exception as exc:
+        print(f"selected alert failed {record.get('jcd')} {record.get('rno')}R: {type(exc).__name__}")
+    try:
+        longshot = _longshot_message(record)
+        if longshot:
+            base.send_discord(longshot)
+    except Exception as exc:
+        print(f"longshot alert failed {record.get('jcd')} {record.get('rno')}R: {type(exc).__name__}")
+
+
+def _all_races_every_day(policy, day, jcd):
+    """Keep near-deadline final updates active for every venue every day."""
+    return True
 
 
 def main():
     base.displayed_picks = displayed_picks_variable
     base.make_analysis_message = analysis_message_with_virtual
     base.log_prediction = log_prediction_with_virtual
+    base.required_venue = _all_races_every_day
     # Finish time-sensitive updates before retrying the remaining full card.
     result = base.main()
     if "--test" not in sys.argv and "--dry-run" not in sys.argv:
