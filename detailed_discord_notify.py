@@ -175,9 +175,9 @@ def _selected_message(record):
 
 def _send_selected_discord(content):
     """Send selected-race alerts only to the dedicated Discord channel."""
-    selected_url = os.getenv("SELECTED_DISCORD_WEBHOOK_URL", "").strip()
+    selected_url = os.getenv("DISCORD_SELECTED_WEBHOOK_URL", "").strip()
     if not selected_url:
-        raise RuntimeError("SELECTED_DISCORD_WEBHOOK_URL is missing")
+        raise RuntimeError("DISCORD_SELECTED_WEBHOOK_URL is missing")
 
     original = os.environ.get("DISCORD_WEBHOOK_URL")
     os.environ["DISCORD_WEBHOOK_URL"] = selected_url
