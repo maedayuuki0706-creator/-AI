@@ -11,6 +11,9 @@ if os.getenv("SELECTED_DISCORD_WEBHOOK_URL") and not os.getenv("DISCORD_SELECTED
     os.environ["DISCORD_SELECTED_WEBHOOK_URL"] = os.environ["SELECTED_DISCORD_WEBHOOK_URL"]
 
 import detailed_discord_notify as app
+import selection_scoring
+
+selection_scoring.install(app)
 
 VENUES = {
     "01":"桐生","02":"戸田","03":"江戸川","04":"平和島","05":"多摩川","06":"浜名湖",
