@@ -1,0 +1,29 @@
+name: Tsu 12R Case Study
+on:
+  push:
+    branches: [main]
+    paths:
+      - case_study_tsu12.py
+      - .github/workflows/case_study_tsu12.yml
+permissions:
+  contents: write
+jobs:
+  analyze:
+    if: ${{ startsWith(github.event.head_commit.message, 'Run Tsu 12R case study') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Analyze Tsu 12R
+        run: python case_study_tsu12.py
+      - name: Persist case study
+        run: |
+          git config user.name boat-ai-learning-bot
+          git config user.email actions@users.noreply.github.com
+          git add data/case_studies/20260914_tsu12.json
+          git commit -m 'Record Tsu 12R case study' || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
