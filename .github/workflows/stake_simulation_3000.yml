@@ -1,0 +1,27 @@
+name: Boat AI 3000 Yen Stake Simulation
+on:
+  push:
+    branches: [main]
+    paths: [stake_simulation_3000.py, .github/workflows/stake_simulation_3000.yml]
+permissions:
+  contents: write
+jobs:
+  simulate:
+    if: ${{ startsWith(github.event.head_commit.message, 'Run stake simulation 3000') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Simulate 3000 yen per settled race
+        run: python stake_simulation_3000.py
+      - name: Persist simulation result
+        run: |
+          if [ -z "$(git status --porcelain data/stake_simulations)" ]; then exit 0; fi
+          git config user.name boat-ai-learning-bot
+          git config user.email actions@users.noreply.github.com
+          git add data/stake_simulations
+          git commit -m 'Store 3000 yen stake simulation result'
+          git pull --rebase origin main
+          git push origin HEAD:main
