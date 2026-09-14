@@ -31,12 +31,10 @@ def allocate_dutch(picks: list[str], odds: dict[str, float]) -> tuple[dict[str, 
 
     if complete:
         for _ in range(remaining):
-            # Add the next 100 yen to the ticket with the smallest current gross return.
             target = min(picks, key=lambda p: (units[p] * odds[p], odds[p], p))
             units[target] += 1
         return units, "final_official_odds_dutch"
 
-    # Conservative fallback: keep all picks, then spread extra units as evenly as possible.
     ordered = sorted(picks)
     for i in range(remaining):
         units[ordered[i % len(ordered)]] += 1
@@ -57,14 +55,20 @@ def main() -> None:
     predictions = dr.read_jsonl(base.LOG_PATH)
     chosen, _ = dr.latest_predictions(predictions, DAY)
     results = json.loads(RESULT_PATH.read_text(encoding="utf-8"))
+    settled_keys = [key for key, result in results.items() if result.get("status") == "settled" and key in chosen]
 
-    # Freeze the same result snapshot that exists in the repository when this run starts.
-    settled_keys = [key for key, row in results.items() if row.get("status") == "settled" and key in chosen]
+    # Allocation only affects the return on races whose winning ticket was disclosed.
+    # Losing races are always -3000 yen, so skip their odds HTTP request entirely.
+    hit_keys = []
+    for key in settled_keys:
+        winners = set((results[key].get("payouts") or {}).keys())
+        if winners & set(dr.disclosed_picks(chosen[key])):
+            hit_keys.append(key)
 
     odds_by_key: dict[str, dict[str, float]] = {}
     odds_errors: dict[str, str] = {}
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = {pool.submit(fetch_odds, key): key for key in settled_keys}
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        futures = {pool.submit(fetch_odds, key): key for key in hit_keys}
         for future in as_completed(futures):
             key, odds, error = future.result()
             if odds:
@@ -81,19 +85,29 @@ def main() -> None:
         row = chosen[key]
         result = results[key]
         picks = dr.disclosed_picks(row)
-        odds = odds_by_key.get(key, {})
-        units, mode = allocate_dutch(picks, odds)
-        mode_counts[mode] += 1
-        missing_pick_odds += sum(1 for p in picks if p not in odds)
+        winners = set((result.get("payouts") or {}).keys())
+        prediction_hit = bool(winners & set(picks))
 
+        if prediction_hit:
+            odds = odds_by_key.get(key, {})
+            units, mode = allocate_dutch(picks, odds)
+            missing_pick_odds += sum(1 for p in picks if p not in odds)
+        else:
+            # Allocation cannot change a losing race's return; use any valid 30-unit spread.
+            units = {p: 1 for p in picks}
+            ordered = sorted(picks)
+            for i in range(TOTAL_UNITS - len(picks)):
+                units[ordered[i % len(ordered)]] += 1
+            mode = "not_needed_miss"
+
+        mode_counts[mode] += 1
         stake = sum(units.values()) * UNIT_YEN
         returned = sum(units.get(combo, 0) * payout for combo, payout in (result.get("payouts") or {}).items())
         winning = [combo for combo in (result.get("payouts") or {}) if units.get(combo, 0) > 0]
-        hit = bool(winning)
 
         total_stake += stake
         total_return += returned
-        hits += int(hit)
+        hits += int(bool(winning))
         rows.append({
             "key": key,
             "venue": row.get("venue"),
@@ -116,7 +130,7 @@ def main() -> None:
         "budget_per_race_yen": BUDGET_YEN,
         "unit_yen": UNIT_YEN,
         "allocation_rule": "all disclosed picks receive at least 100 yen; remaining units greedily equalize gross returns using final official trifecta odds",
-        "important_note": "Full send-time odds were not stored for every disclosed pick, so this backtest uses final official odds for allocation. It is an approximation of pre-race dutching, not an exact historical execution simulation.",
+        "important_note": "Full send-time odds were not stored for every disclosed pick, so this backtest uses final official odds for allocation on hit races. It is an approximation of pre-race dutching, not an exact historical execution simulation.",
         "confirmed_races": len(rows),
         "hits": hits,
         "hit_rate": hits / len(rows) * 100 if rows else None,
