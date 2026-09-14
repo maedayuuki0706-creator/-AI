@@ -33,6 +33,47 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Verify separate report channel
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from direct_discord_notify import UA
+
+          def channel_for(name):
+              url = os.environ.get(name, '').strip()
+              if not url:
+                  raise SystemExit(f'{name} is not configured')
+              parsed = urllib.parse.urlsplit(url)
+              if (parsed.scheme != 'https'
+                      or parsed.netloc not in {'discord.com', 'discordapp.com', 'ptb.discord.com', 'canary.discord.com'}
+                      or not re.fullmatch(r'/api(?:/v\d+)?/webhooks/\d+/[^/]+/?', parsed.path)):
+                  raise SystemExit(f'{name} is not a Discord webhook URL')
+              request = urllib.request.Request(url, headers={'User-Agent': UA})
+              try:
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      channel = str(json.load(response).get('channel_id', ''))
+              except urllib.error.HTTPError as exc:
+                  raise SystemExit(f'{name}: Discord HTTP {exc.code}') from None
+              except Exception as exc:
+                  raise SystemExit(f'{name}: connection failed ({type(exc).__name__})') from None
+              if not channel.isdigit():
+                  raise SystemExit(f'{name}: Discord returned no channel ID')
+              return channel
+
+          report_channel = channel_for('DISCORD_REPORT_WEBHOOK_URL')
+          prediction_channel = channel_for('DISCORD_WEBHOOK_URL')
+          if report_channel == prediction_channel:
+              raise SystemExit('Report and prediction webhooks point to the same channel')
+          print('Report channel verified: distinct from predictions')
+          PY
       - name: Send reviewed daily report
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
