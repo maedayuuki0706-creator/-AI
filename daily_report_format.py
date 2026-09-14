@@ -1,5 +1,7 @@
 """Readable daily review: one overview and one complete message per venue."""
 from datetime import datetime
+import json
+from pathlib import Path
 
 from discord_formation import formation_summary
 import direct_discord_notify as base
@@ -20,6 +22,30 @@ def money(stats):
 
 def hit_text(stats):
     return f"{stats['virtual_hits']}/{stats['virtual_hit_samples']}R＝{percent(stats['hit_rate'])}"
+
+
+def stake_simulation_field(day):
+    path = Path(f'data/stake_simulations/{day}_3000.json')
+    if not path.exists():
+        return None
+    try:
+        sim = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    races = int(sim.get('confirmed_races') or 0)
+    hits = int(sim.get('hits') or 0)
+    budget = int(sim.get('budget_per_race_yen') or 3000)
+    stake = int(sim.get('total_stake_yen') or 0)
+    returned = int(sim.get('total_return_yen') or 0)
+    profit = int(sim.get('profit_yen') or 0)
+    roi = sim.get('roi')
+    hit_rate = sim.get('hit_rate')
+    note = '※配信時の全買い目オッズが未保存のため、現状は最終公式オッズを使った参考バックテスト。'
+    value = (f"1R総額 {budget:,}円／全買い目を残して資金分配\n"
+             f"対象 {races}R／的中 {hits}/{races}R＝{percent(hit_rate)}\n"
+             f"総投資 {stake:,}円 → 払戻 {returned:,}円\n"
+             f"**収支 {profit:+,}円／回収率 {percent(roi)}**\n{note}")
+    return {'name': '💰 1R3,000円 資金分配シミュレーション', 'value': value, 'inline': False}
 
 
 def prediction_lines(race):
@@ -110,6 +136,9 @@ def report_payloads(report):
         {'name': '記録された評価別', 'value': '\n'.join(grade_lines) or '対象なし', 'inline': False},
         {'name': '改善に向けた確認事項', 'value': issue, 'inline': False},
         {'name': '予想配信記録なし（集計外）', 'value': missing_text, 'inline': False}]
+    simulation = stake_simulation_field(day)
+    if simulation:
+        fields.append(simulation)
     overview = (f"{date}｜{label}\n開催{report['expected_races']}R／予想記録{actual['predicted_races']}R／記録なし{len(report['missing_predictions'])}R\n"
                 f"結果確認 {actual['resolved_races']}R／結果待ち {actual['pending_races']}R\n"
                 f"全予想の照合：{uniform['prediction_hits']}/{uniform['prediction_samples']}R。下の的中率は全点返還等を除く。\n"
