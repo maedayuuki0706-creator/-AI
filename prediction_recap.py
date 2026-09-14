@@ -74,8 +74,15 @@ def build_recaps(day, rows, card, notices):
         venue = base.VENUES[jcd]
         fields = [race_field(rno, latest.get(f'{jcd}:{rno}'), statuses.get(f'{jcd}:{rno}')) for rno in range(1, 13)]
         count = sum(f'{jcd}:{rno}' in latest for rno in range(1, 13))
-        embed = {'title': f'{venue}｜{day[:4]}/{day[4:6]}/{day[6:8]} 配信予想まとめ',
-                 'description': f'予想記録 {count}/12レース。締切前の最新配信を掲載。\n本線・抑え・穴は当時の区分。フォーメーションは重複を除いた点数です。',
+        phase_counts = {
+            '直前更新': sum(1 for rno in range(1, 13) if latest.get(f'{jcd}:{rno}', {}).get('phase') == 'final'),
+            '暫定予想': sum(1 for rno in range(1, 13) if latest.get(f'{jcd}:{rno}', {}).get('phase') != 'final' and latest.get(f'{jcd}:{rno}')),
+        }
+        embed = {'title': f'{venue}｜{day[:4]}/{day[4:6]}/{day[6:8]} 中間予想まとめ',
+                 'description': (f'中間まとめ｜予想記録 {count}/12レース\n'
+                                 f'直前更新 {phase_counts["直前更新"]}R・暫定予想 {phase_counts["暫定予想"]}R。'
+                                 '展示・直前情報の反映状況は各レースの表示を確認してください。\n'
+                                 '本線・抑え・穴は当時の区分。フォーメーションは重複を除いた点数です。'),
                  'color': 0x176B87, 'fields': fields,
                  'footer': {'text': '送信ログから再構成した振り返り用の一覧です。'}}
         total = sum(utf16_len(embed[k]) for k in ('title', 'description')) + utf16_len(embed['footer']['text'])
