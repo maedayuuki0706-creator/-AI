@@ -40,12 +40,23 @@ def stake_simulation_field(day):
     profit = int(sim.get('profit_yen') or 0)
     roi = sim.get('roi')
     hit_rate = sim.get('hit_rate')
-    note = '※配信時の全買い目オッズが未保存のため、現状は最終公式オッズを使った参考バックテスト。'
-    value = (f"1R総額 {budget:,}円／全買い目を残して資金分配\n"
+    recorded = int(sim.get('recorded_send_time_plan_races') or 0)
+    complete_odds = int(sim.get('complete_send_odds_races') or 0)
+    profitable_hits = int(sim.get('profitable_hits') or 0)
+    break_even_hits = int(sim.get('break_even_hits') or 0)
+    torigami_hits = int(sim.get('torigami_hits') or 0)
+    if races and recorded == races:
+        note = '※全対象で配信時に記録した3,000円配分をそのまま結果照合。後出しで配分変更なし。'
+    else:
+        note = f'※配信時配分の記録 {recorded}/{races}R。未記録分は旧方式の参考値。'
+    if recorded:
+        note += f' 買い目オッズ完全取得 {complete_odds}/{recorded}R。'
+    value = (f"1R総額 {budget:,}円／全買い目を残して資金配分\n"
              f"対象 {races}R／的中 {hits}/{races}R＝{percent(hit_rate)}\n"
+             f"的中内訳：プラス {profitable_hits}R／トリガミ {torigami_hits}R／元返し {break_even_hits}R\n"
              f"総投資 {stake:,}円 → 払戻 {returned:,}円\n"
              f"**収支 {profit:+,}円／回収率 {percent(roi)}**\n{note}")
-    return {'name': '💰 1R3,000円 資金分配シミュレーション', 'value': value, 'inline': False}
+    return {'name': '💰 1R3,000円 配信時オッズ資金分配', 'value': value, 'inline': False}
 
 
 def prediction_lines(race):
