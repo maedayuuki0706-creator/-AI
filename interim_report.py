@@ -9,7 +9,7 @@ from prediction_recap import post_confirmed, report_destination_key
 
 # This file is intentionally safe to re-run.  Each run refreshes only races whose
 # deadlines have passed and reports settled 3連単 results available at that moment.
-REQUEST_ID = "20260914-1430"
+REQUEST_ID = "20260914-1700"
 
 
 def _winning_combos(result):
