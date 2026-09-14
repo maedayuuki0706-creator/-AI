@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -9,12 +10,9 @@ from pathlib import Path
 import daily_report as dr
 import direct_discord_notify as base
 
-DAY = "20260914"
 BUDGET_YEN = 3000
 UNIT_YEN = 100
 TOTAL_UNITS = BUDGET_YEN // UNIT_YEN
-RESULT_PATH = Path(f"data/official_results/{DAY}.json")
-OUTPUT_PATH = Path(f"data/stake_simulations/{DAY}_3000.json")
 
 
 def allocate_dutch(picks: list[str], odds: dict[str, float]) -> tuple[dict[str, int], str]:
@@ -41,24 +39,27 @@ def allocate_dutch(picks: list[str], odds: dict[str, float]) -> tuple[dict[str, 
     return units, "equal_fallback_missing_odds"
 
 
-def fetch_odds(key: str) -> tuple[str, dict[str, float] | None, str | None]:
+def fetch_odds(day: str, key: str) -> tuple[str, dict[str, float] | None, str | None]:
     jcd, rno = key.split(":")
     try:
-        raw = base.fetch(base.official_url("odds3t", DAY, jcd, int(rno)))
+        raw = base.fetch(base.official_url("odds3t", day, jcd, int(rno)))
         odds = base.parse_odds(raw)
         return key, odds, None if odds else "empty_odds"
     except Exception as exc:
         return key, None, f"{type(exc).__name__}: {exc}"
 
 
-def main() -> None:
+def build_simulation(day: str) -> dict:
+    result_path = Path(f"data/official_results/{day}.json")
+    output_path = Path(f"data/stake_simulations/{day}_3000.json")
+    if not result_path.exists():
+        raise FileNotFoundError(result_path)
+
     predictions = dr.read_jsonl(base.LOG_PATH)
-    chosen, _ = dr.latest_predictions(predictions, DAY)
-    results = json.loads(RESULT_PATH.read_text(encoding="utf-8"))
+    chosen, _ = dr.latest_predictions(predictions, day)
+    results = json.loads(result_path.read_text(encoding="utf-8"))
     settled_keys = [key for key, result in results.items() if result.get("status") == "settled" and key in chosen]
 
-    # Allocation only affects the return on races whose winning ticket was disclosed.
-    # Losing races are always -3000 yen, so skip their odds HTTP request entirely.
     hit_keys = []
     for key in settled_keys:
         winners = set((results[key].get("payouts") or {}).keys())
@@ -68,7 +69,7 @@ def main() -> None:
     odds_by_key: dict[str, dict[str, float]] = {}
     odds_errors: dict[str, str] = {}
     with ThreadPoolExecutor(max_workers=16) as pool:
-        futures = {pool.submit(fetch_odds, key): key for key in hit_keys}
+        futures = {pool.submit(fetch_odds, day, key): key for key in hit_keys}
         for future in as_completed(futures):
             key, odds, error = future.result()
             if odds:
@@ -93,7 +94,6 @@ def main() -> None:
             units, mode = allocate_dutch(picks, odds)
             missing_pick_odds += sum(1 for p in picks if p not in odds)
         else:
-            # Allocation cannot change a losing race's return; use any valid 30-unit spread.
             units = {p: 1 for p in picks}
             ordered = sorted(picks)
             for i in range(TOTAL_UNITS - len(picks)):
@@ -125,7 +125,7 @@ def main() -> None:
         })
 
     out = {
-        "day": DAY,
+        "day": day,
         "generated_at": datetime.now(base.JST).isoformat(),
         "budget_per_race_yen": BUDGET_YEN,
         "unit_yen": UNIT_YEN,
@@ -143,8 +143,17 @@ def main() -> None:
         "missing_pick_odds": missing_pick_odds,
         "races": rows,
     }
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(out, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return out
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--day", default=datetime.now(base.JST).strftime("%Y%m%d"))
+    args = parser.parse_args()
+    datetime.strptime(args.day, "%Y%m%d")
+    out = build_simulation(args.day)
     print(json.dumps({k: out[k] for k in ("confirmed_races", "hits", "hit_rate", "total_stake_yen", "total_return_yen", "profit_yen", "roi", "allocation_mode_counts", "missing_pick_odds")}, ensure_ascii=False, sort_keys=True))
 
 
