@@ -46,8 +46,8 @@ jobs:
           NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '600' || '0' }}
         run: python notification_runner.py
 
-      - name: Send grouped 2026-09-13 prediction summary
-        if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Send 2026-09-13 prediction summary') }}
+      - name: Send grouped 2026-09-14 prediction summary
+        if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary') }}
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
