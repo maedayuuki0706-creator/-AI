@@ -17,6 +17,9 @@ on:
       - "race_notices.py"
       - "notification_runner.py"
       - "prediction_recap.py"
+      - "hit_alerts.py"
+      - "selection_scoring.py"
+      - "stake_tracking.py"
 
 permissions:
   contents: write
@@ -45,6 +48,7 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
+          DISCORD_HIT_WEBHOOK_URL: ${{ secrets.DISCORD_HIT_WEBHOOK_URL }}
           NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '600' || '0' }}
         run: python notification_runner.py
 
@@ -54,6 +58,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
           SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
+          DISCORD_HIT_WEBHOOK_URL: ${{ secrets.DISCORD_HIT_WEBHOOK_URL }}
           SUMMARY_ONLY: "1"
           SUMMARY_DAY: "20260914"
         run: python notification_runner.py
