@@ -8,6 +8,8 @@ from collections import defaultdict
 from pathlib import Path
 
 import detailed_discord_notify as app
+import notification_audit as audit
+from persist_notification_state import checkpoint
 
 VENUES = {
     "01":"桐生","02":"戸田","03":"江戸川","04":"平和島","05":"多摩川","06":"浜名湖",
@@ -23,17 +25,22 @@ def race_hours():
 
 
 def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.sleep, is_open=race_hours):
-    end = clock() + max(0, min(int(watch_seconds), 600))
+    end = clock() + max(0, min(int(watch_seconds), 1800))
     result = 0
     while is_open():
         try:
-            result = attempt()
+            result = max(result, int(attempt() or 0))
         except Exception as exc:
             print(f'Notification pass failed: {type(exc).__name__}', flush=True)
+            audit.emit('analysis_failed',stage='runner',error_type=type(exc).__name__)
             result = 1
-        if end - clock() < 210:
+        try:
+            checkpoint(required=True)
+        except Exception:
+            result = 1
+        if end - clock() < 180:
             break
-        pause(60)
+        pause(30)
     return result
 
 

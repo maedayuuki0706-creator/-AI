@@ -28,11 +28,14 @@ from prediction_engine import analyze_race
 from race_context import previous_form
 from discord_formation import formation_summary, formation_lines
 from race_notices import withdrawal_lanes, notice_message, read_notices, record_notice
+import notification_audit as audit
+import notification_delivery as delivery
 
 JST = ZoneInfo("Asia/Tokyo")
 BASE = "https://www.boatrace.jp/owpc/pc/race"
 UA = "Boat-AI-Navi/3.2 (+direct-discord-notifier)"
 LOG_PATH = Path("data/prediction_log.jsonl")
+CARD_DIR = Path("data/race_cards")
 VENUES = {
     "01":"桐生","02":"戸田","03":"江戸川","04":"平和島","05":"多摩川","06":"浜名湖",
     "07":"蒲郡","08":"常滑","09":"津","10":"三国","11":"びわこ","12":"住之江",
@@ -208,12 +211,14 @@ def analyze_official(day: str, jcd: str, rno: int) -> dict | None:
         return None
     try:
         preview=parse_beforeinfo(fetch(official_url('beforeinfo',day,jcd,rno)))
-    except Exception:
-        preview={"boats":{},"exhibition_count":0,"entry_observed":False,"wind_speed":None,"wave_cm":None}
+    except Exception as exc:
+        preview={"boats":{},"exhibition_count":0,"entry_observed":False,"wind_speed":None,"wave_cm":None,"fetch_error":type(exc).__name__}
+    data_errors=[]
     try:
         odds=parse_odds(fetch(official_url('odds3t',day,jcd,rno)))
-    except Exception:
+    except Exception as exc:
         odds={}
+        data_errors.append({'source':'odds3t','error_type':type(exc).__name__})
     form=previous_form(day,jcd,boats)
     for boat in boats:
         boat.update(preview['boats'].get(boat['lane'],{}))
@@ -224,7 +229,9 @@ def analyze_official(day: str, jcd: str, rno: int) -> dict | None:
     ranking=sorted(heads,key=heads.get,reverse=True)
     top,gap=heads[ranking[0]],heads[ranking[0]]-heads[ranking[1]]
     grade=None if preview['exhibition_count']<6 else 'A' if top>=.45 and gap>=.20 else 'B' if top>=.30 and gap>=.08 else 'C'
-    result.update(inputs=boats,preview=preview,heads=heads,grade=grade,previous_form=form)
+    if preview.get('fetch_error'):
+        data_errors.append({'source':'beforeinfo','error_type':preview['fetch_error']})
+    result.update(inputs=boats,preview=preview,heads=heads,grade=grade,previous_form=form,data_errors=data_errors)
     return result
 
 
@@ -260,18 +267,14 @@ def beforeinfo_available(day: str, jcd: str, rno: int) -> bool:
         return False
 
 
-def send_discord(content: str) -> None:
-    url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+def send_discord(content: str, *, can_send=None) -> dict:
+    url=os.getenv('DISCORD_WEBHOOK_URL','').strip()
     if not url:
-        raise RuntimeError("DISCORD_WEBHOOK_URL is missing")
-    payload = json.dumps({"content": content, "allowed_mentions": {"parse": []}}, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(url, data=payload, headers={"Content-Type":"application/json","User-Agent":UA}, method="POST")
-    with urllib.request.urlopen(req, timeout=20) as r:
-        if r.status not in (200, 204):
-            raise RuntimeError(f"Discord HTTP {r.status}")
+        raise delivery.SendRejected('DISCORD_WEBHOOK_URL is missing')
+    return delivery.post_json(url,{'content':content,'allowed_mentions':{'parse':[]}},can_send=can_send)
 
 
-def load_deliveries() -> set[tuple]:
+def load_deliveries(*, recover=False) -> set[tuple]:
     existing=set()
     if LOG_PATH.exists():
         for line in LOG_PATH.read_text(encoding='utf-8').splitlines():
@@ -280,10 +283,19 @@ def load_deliveries() -> set[tuple]:
                 existing.add((row['day'],row['jcd'],int(row['rno']),row.get('phase','final')))
             except (ValueError,KeyError,TypeError):
                 continue
-    return existing
+    return delivery.recover_predictions(log_prediction,existing) if recover else existing
+
+
+def enrich_prediction(record):
+    return record
 
 
 def log_prediction(record: dict) -> None:
+    if record.get('message_id') and LOG_PATH.exists():
+        for line in LOG_PATH.read_text(encoding='utf-8').splitlines():
+            old=json.loads(line)
+            if (old.get('message_id'),old.get('jcd'),old.get('rno'),old.get('phase')) == (record['message_id'],record.get('jcd'),record.get('rno'),record.get('phase')):
+                return
     LOG_PATH.parent.mkdir(parents=True,exist_ok=True)
     with LOG_PATH.open('a',encoding='utf-8') as f:
         f.write(json.dumps(record,ensure_ascii=False,sort_keys=True)+'\n')
@@ -331,10 +343,13 @@ def send_race_notice(day, jcd, rno, deadline, kind, reason, *, now=None, dry_run
     if dry_run:
         print(message)
         return True
-    send_discord(message)
-    record_notice({'day': day, 'jcd': jcd, 'venue': VENUES.get(jcd, jcd), 'rno': int(rno),
-                   'deadline': deadline, 'status': kind, 'reason': reason,
-                   'sent_at': datetime.now(JST).isoformat(), 'record_type': 'race_status'})
+    def write_notice(row):
+        if not any((r.get('day'),r.get('jcd'),r.get('rno'),r.get('status'))==key for r in read_notices()):
+            record_notice(row)
+    delivery.deliver(message,[{'day':day,'jcd':jcd,'venue':VENUES.get(jcd,jcd),'rno':int(rno),
+                              'deadline':deadline,'status':kind,'phase':'status:'+kind,'reason':reason,
+                              'record_type':'race_status'}],sender=send_discord,writer=write_notice,
+                     can_send=lambda: before_cutoff(day,deadline,load_policy()))
     print(f'sent status {jcd} {rno}R {kind}')
     return True
 
@@ -370,6 +385,22 @@ def due_phase(policy,now,jcd,deadline,delivered,rno):
     if required_venue(policy,day,jcd) and now.hour>=policy['preliminary_start_hour_jst']:
         return None if any((day,jcd,rno,p) in delivered for p in ('morning','preliminary','final')) else 'preliminary'
     return None
+
+
+def before_cutoff(day,deadline,policy,current=None):
+    current=current or datetime.now(JST)
+    return current.strftime('%Y%m%d')==day and minutes_until(current,deadline)>=policy['final_min_lead_minutes']
+
+
+def selection_reason(policy,now,jcd,deadline,delivered,rno):
+    key=(now.strftime('%Y%m%d'),jcd,rno,'final')
+    if key in delivered:
+        return 'already_sent_final'
+    if not before_cutoff(key[0],deadline,policy,now):
+        return 'deadline_before_selection'
+    if any(key[:3]+(p,) in delivered for p in ('morning','preliminary')):
+        return 'awaiting_final_window'
+    return 'not_yet_due'
 
 
 def selected_by_ai(analysis,policy):
@@ -444,82 +475,139 @@ def make_analysis_message(day,jcd,rno,deadline,phase,analysis,rows,required):
 
 def run_once(now: datetime | None=None, *, force_test=False,dry_run=False) -> int:
     now=(now or datetime.now(JST)).astimezone(JST)
+    current_time=lambda: now if dry_run else datetime.now(JST)
+    trace=(lambda *args,**kwargs:None) if dry_run else audit.emit
     fetch.cache_clear()
     if force_test:
         if not dry_run:send_discord('✅ **競艇AIナビ 通知テスト**\n'+now.isoformat())
         return 0
     policy=load_policy();day=now.strftime('%Y%m%d')
     if now.hour<8 or now.hour>=22:
-        print('Outside race notification hours');return 0
+        trace('skip_reason',day=day,reason='outside_race_hours')
+        return 0
+    trace('pass_started',day=day)
     venues=set(discover_venues(day))|(set(policy.get('all_races',{}).get(day,[]))-{'*'})
-    delivered=load_deliveries();targets=[];failures=0
+    delivered=load_deliveries(recover=not dry_run);targets=[];failures=0
+    card={'day':day,'checked_at':current_time().isoformat(),'complete':bool(venues),'races':{}}
     with ThreadPoolExecutor(max_workers=4) as pool:
         jobs={pool.submit(deadlines,day,jcd):jcd for jcd in venues}
         for future in as_completed(jobs):
             jcd=jobs[future]
-            try:times=future.result()
-            except Exception:failures+=1;continue
-            for rno,deadline in enumerate(times,1):
-                phase=due_phase(policy,now,jcd,deadline,delivered,rno)
-                if phase:targets.append((jcd,rno,deadline,phase))
-    sent=0
+            try:
+                times=future.result()
+            except Exception as exc:
+                times=[];failures+=1
+                trace('analysis_failed',day=day,jcd=jcd,stage='schedule',error_type=type(exc).__name__)
+            card['complete']=card['complete'] and len(times)==12
+            for rno in range(1,13):
+                deadline=times[rno-1] if rno<=len(times) else None
+                card['races'][f'{jcd}:{rno}']={'jcd':jcd,'rno':rno,'deadline':deadline}
+                if deadline is None:
+                    trace('skip_reason',day=day,jcd=jcd,rno=rno,reason='schedule_missing')
+                    continue
+                selected_at=current_time()
+                phase=due_phase(policy,selected_at,jcd,deadline,delivered,rno)
+                if phase:
+                    targets.append((jcd,rno,deadline,phase))
+                else:
+                    trace('skip_reason',day=day,jcd=jcd,rno=rno,phase='final',deadline=deadline,
+                          reason=selection_reason(policy,selected_at,jcd,deadline,delivered,rno))
+    if not dry_run:
+        card_path=CARD_DIR / (day+'.json')
+        if card_path.exists():
+            old=json.loads(card_path.read_text())
+            for key,row in old.get('races',{}).items():
+                if not card['races'].get(key,{}).get('deadline'):
+                    card['races'][key]=row
+        delivery.save(card_path,card)
+    # Keep final checks ahead of a large morning card; retry deferred races on the next pass.
+    targets.sort(key=lambda t:(t[3]!='final',t[2],t[0],t[1]))
+    limit=12
+    for jcd,rno,deadline,phase in targets[limit:]:
+        trace('skip_reason',day=day,jcd=jcd,rno=rno,phase=phase,deadline=deadline,reason='batch_deferred')
+    targets=targets[:limit];sent=0
+    def analyze_target(target):
+        jcd,rno,deadline,phase=target
+        fields=dict(day=day,jcd=jcd,rno=rno,phase=phase,deadline=deadline)
+        if not before_cutoff(day,deadline,policy,current_time()):
+            raise delivery.DeadlinePassed('Analysis cutoff passed')
+        trace('target_selected',**fields);trace('analysis_started',**fields)
+        return analyze_official(day,jcd,rno)
     with ThreadPoolExecutor(max_workers=4) as pool:
-        jobs={pool.submit(analyze_official,day,jcd,rno):(jcd,rno,deadline,phase) for jcd,rno,deadline,phase in targets}
-        for future in as_completed(jobs):
-            jcd,rno,deadline,phase=jobs[future]
+        jobs={pool.submit(analyze_target,target):target for target in targets}
+        for future,target in jobs.items():
+            jcd,rno,deadline,phase=target
+            fields=dict(day=day,jcd=jcd,rno=rno,phase=phase,deadline=deadline)
             try:
                 analysis=future.result()
-            except Exception as e:
-                failures += 1
-                print(f'Official analysis failed {jcd} {rno}R: {type(e).__name__}')
+            except delivery.DeadlinePassed:
+                trace('skip_reason',**fields,reason='deadline_before_analysis')
+                continue
+            except Exception as exc:
+                failures+=1
+                trace('analysis_failed',**fields,stage='prediction',error_type=type(exc).__name__)
                 try:
                     send_race_notice(day,jcd,rno,deadline,'unavailable','公式データを取得できません。欠場の確定情報ではありません。',now=now,dry_run=dry_run)
                 except Exception as notice_error:
-                    print(f'Status delivery failed {jcd} {rno}R: {type(notice_error).__name__}')
+                    trace('notice_failed',**fields,error_type=type(notice_error).__name__)
                 continue
             try:
-                if not analysis or not valid_six_boats(analysis, policy):
-                    kind, reason = unavailable_race_status(day,jcd,rno)
+                trace('analysis_succeeded',**fields,exhibition_count=(analysis or {}).get('preview',{}).get('exhibition_count'),
+                      boat_count=len((analysis or {}).get('inputs',[])))
+                for error in (analysis or {}).get('data_errors',[]):
+                    trace('analysis_failed',**fields,stage='optional_data',**error)
+                if not before_cutoff(day,deadline,policy,current_time()):
+                    trace('skip_reason',**fields,reason='deadline_after_analysis')
+                    continue
+                if not analysis or not valid_six_boats(analysis,policy):
+                    kind,reason=unavailable_race_status(day,jcd,rno)
+                    trace('skip_reason',**fields,reason=kind)
                     send_race_notice(day,jcd,rno,deadline,kind,reason,now=now,dry_run=dry_run)
-                    print(f'Excluded race: {jcd} {rno}R {kind}')
                     continue
                 required=required_venue(policy,day,jcd)
-                current=now if dry_run else datetime.now(JST)
-                if current.strftime('%Y%m%d')!=day or minutes_until(current,deadline)<policy['final_min_lead_minutes']:continue
-                waiting = list(analysis.get('delivery_wait_reasons') or [])
-                if phase == 'final' and analysis['preview']['exhibition_count'] < 6:
-                    waiting.append(f"展示データ {analysis['preview']['exhibition_count']}/6艇。そろうまで判断保留です。")
+                waiting=list(analysis.get('delivery_wait_reasons') or [])
+                count=analysis['preview']['exhibition_count']
+                if phase=='final' and count<6:
+                    waiting.append(f'展示データ {count}/6艇。そろうまで判断保留です。')
                 if waiting:
+                    trace('skip_reason',**fields,reason='exhibition_pending',exhibition_count=count,
+                          fetch_error=analysis['preview'].get('fetch_error'))
                     send_race_notice(day,jcd,rno,deadline,'waiting','／'.join(dict.fromkeys(waiting)),now=now,dry_run=dry_run)
                     continue
                 if not required and not selected_by_ai(analysis,policy):
+                    trace('skip_reason',**fields,reason='ai_filter')
                     send_race_notice(day,jcd,rno,deadline,'pass',ai_skip_reason(analysis,policy),now=now,dry_run=dry_run)
                     continue
                 rows=displayed_picks(analysis,required)
                 message=make_analysis_message(day,jcd,rno,deadline,phase,analysis,rows,required)
                 if dry_run:
                     print(message+'\n');continue
-                send_discord(message)
                 combos=[p['combination'] for p in rows]
                 summary=formation_summary(combos[:3],combos[3:])
-                log_prediction({'day':day,'jcd':jcd,'venue':VENUES[jcd],'rno':rno,'deadline':deadline,
-                    'phase':phase,'sent_at':current.isoformat(),'source':'独自AI・前日参考補正','model_version':analysis['model_version'],
-                    'grade':analysis['grade'],'exhibition':analysis['preview']['exhibition_count']==6,
+                record=enrich_prediction({'day':day,'jcd':jcd,'venue':VENUES[jcd],'rno':rno,'deadline':deadline,
+                    'phase':phase,'source':'独自AI・前日参考補正','model_version':analysis['model_version'],
+                    'grade':analysis['grade'],'exhibition':count==6,
                     'main':combos[:3],'cover':combos[3:],'all_picks':combos,'heads':analysis['heads'],
                     'message_format':'formation-v1','point_count':summary['point_count'],'formation_sections':summary['sections'],
                     'previous_form':analysis['previous_form']})
-                delivered.add((day,jcd,rno,phase));sent+=1
-                print(f'sent {jcd} {rno}R {phase}')
-            except Exception as e:
-                failures+=1;print(f'Notification failed {jcd} {rno}R: {type(e).__name__}')
-    print(f'completed targets={len(targets)} sent={sent} failures={failures} dry_run={dry_run}')
+                sent+=int(delivery.deliver(message,[record],sender=send_discord,writer=log_prediction,
+                                          can_send=lambda:before_cutoff(day,deadline,policy)))
+                delivered.add((day,jcd,rno,phase))
+            except delivery.DeadlinePassed:
+                trace('skip_reason',**fields,reason='deadline_before_send')
+            except Exception as exc:
+                failures+=1;trace('notification_failed',**fields,error_type=type(exc).__name__)
+    trace('pass_completed',day=day,targets=len(targets),sent=sent,failures=failures,dry_run=dry_run)
+    print(f'completed targets={len(targets)} sent={sent} failures={failures} dry_run={dry_run}',flush=True)
     return 1 if failures else 0
 
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--test',action='store_true');parser.add_argument('--dry-run',action='store_true');args=parser.parse_args()
     try:return run_once(force_test=args.test,dry_run=args.dry_run)
-    except Exception as e:print(f'Notifier error: {type(e).__name__}');return 1
+    except Exception as e:
+        if not args.dry_run:audit.emit('analysis_failed',stage='pass',error_type=type(e).__name__)
+        print(f'Notifier error: {type(e).__name__}',flush=True);return 1
 
 
 if __name__=='__main__':

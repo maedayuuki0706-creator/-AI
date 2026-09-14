@@ -1,5 +1,4 @@
 name: Boat AI Discord Notify
-# current recap trigger
 
 on:
   schedule:
@@ -17,18 +16,25 @@ on:
       - "race_notices.py"
       - "notification_runner.py"
       - "prediction_recap.py"
+      - "notification_audit.py"
+      - "notification_delivery.py"
+      - "persist_notification_state.py"
 
 permissions:
   contents: write
 
 concurrency:
-  group: boat-ai-state-${{ github.sha }}
+  # One live monitor across commits; recaps have their own serial queue.
+  group: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary') && 'boat-ai-recaps' || 'boat-ai-notifications' }}
   cancel-in-progress: false
 
 jobs:
   notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 40
+    env:
+      PYTHONUNBUFFERED: "1"
+      NOTIFICATION_CHECKPOINT: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,12 +46,20 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Verify delivery and persistence safeguards
+        env:
+          NOTIFICATION_CHECKPOINT: "0"
+        run: python -m unittest discover -s tests -q
+
+      - name: Record checked-out code revision
+        run: echo "NOTIFICATION_CODE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
       - name: Deliver predictions and race status notices
         if: ${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary')) }}
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '600' || '0' }}
-        run: python notification_runner.py
+          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '1800' || '0' }}
+        run: python -u notification_runner.py
 
       - name: Send grouped 2026-09-14 prediction summary
         if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary') }}
@@ -54,19 +68,22 @@ jobs:
           DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
           SUMMARY_ONLY: "1"
           SUMMARY_DAY: "20260914"
-        run: python notification_runner.py
+        run: python -u notification_runner.py
 
       - name: Persist newly delivered predictions
         if: always()
-        run: |
-          mkdir -p data/race_cards data/official_results data/daily_reports
-          if [ -z "$(git status --porcelain data/)" ]; then
-            echo "No new prediction log"
-            exit 0
-          fi
-          git config user.name "boat-ai-learning-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add data/
-          git commit -m "Log delivered race predictions" || exit 0
-          git pull --rebase origin main
-          git push origin HEAD:main
+        run: python -u persist_notification_state.py
+
+      - name: Preserve notification evidence even when repository persistence fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notification-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            data/notification_audit/
+            data/notification_outbox/
+            data/prediction_log.jsonl
+            data/race_status_log.jsonl
+            data/prediction_recap_deliveries.jsonl

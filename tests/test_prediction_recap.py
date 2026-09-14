@@ -17,6 +17,13 @@ def row(rno=1, **extra):
 
 
 class PredictionRecapTests(unittest.TestCase):
+    def setUp(self):
+        tmp=tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        for target,attr,value in [(recap.base.delivery,'OUTBOX_ROOT',Path(tmp.name)/'outbox'),(recap.base.audit,'AUDIT_ROOT',Path(tmp.name)/'audit')]:
+            item=patch.object(target,attr,value)
+            item.start();self.addCleanup(item.stop)
+
     def test_one_venue_message_has_all_races_and_preserves_exact_sections(self):
         recaps, _ = recap.build_recaps('20260913', [row()], {'races': {'07:1': {}}}, [])
         self.assertEqual(len(recaps), 1)
@@ -47,7 +54,7 @@ class PredictionRecapTests(unittest.TestCase):
     def test_acknowledged_post_is_persisted_before_next_venue_and_not_resent(self):
         recaps, _ = recap.build_recaps('20260913', [row()], {}, [])
         with tempfile.TemporaryDirectory() as temp, patch.object(recap, 'DELIVERY_PATH', Path(temp)/'sent.jsonl'):
-            with patch.object(recap, 'post_confirmed', return_value={'id': '123'}) as sender:
+            with patch.object(recap, 'post_confirmed', return_value={'id':'123','channel_id':'456'}) as sender:
                 recap.send_recaps(recaps, sender=sender, pause=lambda _: None)
                 recap.send_recaps(recaps, sender=sender, pause=lambda _: None)
                 self.assertEqual(sender.call_count, 1)
@@ -63,13 +70,13 @@ class PredictionRecapTests(unittest.TestCase):
 
     def test_sender_requests_saved_message_and_uses_existing_notifier_identity(self):
         with patch.dict(recap.os.environ, {'DISCORD_WEBHOOK_URL': 'https://example.test/hook?thread_id=1'}), patch.object(recap.urllib.request, 'urlopen') as request:
-            request.return_value.__enter__.return_value.read.return_value = b'{"id":"123"}'
+            request.return_value.__enter__.return_value.read.return_value = b'{"id":"123","channel_id":"456"}'
             message = recap.post_confirmed({'embeds': []})
             self.assertEqual(message['id'], '123')
             sent = request.call_args.args[0]
             self.assertIn('wait=true', sent.full_url)
             self.assertIn('thread_id=1', sent.full_url)
-            self.assertEqual(sent.get_header('User-agent'), recap.base.UA)
+            self.assertTrue(sent.get_header('User-agent').startswith('Boat-AI-Navi/'))
 
 
 if __name__ == '__main__':

@@ -24,6 +24,9 @@ class RaceNoticeTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         root = Path(self.tmp.name)
+        for target,attr,value in [(base.delivery,'OUTBOX_ROOT',root/'outbox'),(base.audit,'AUDIT_ROOT',root/'audit'),(base,'CARD_DIR',root/'cards')]:
+            item=patch.object(target,attr,value)
+            item.start();self.addCleanup(item.stop)
         self.now = datetime(2026, 9, 13, 19, 20, tzinfo=base.JST)
         self.notice_patch = patch.object(notices, 'NOTICE_PATH', root / 'status.jsonl')
         self.notice_patch.start()
@@ -51,7 +54,7 @@ class RaceNoticeTests(unittest.TestCase):
             parse.assert_not_called()
 
     def test_acknowledged_notice_is_not_resent_or_counted_as_forecast(self):
-        with patch.object(base, 'datetime') as clock, patch.object(base, 'send_discord') as send:
+        with patch.object(base, 'datetime') as clock, patch.object(base, 'send_discord',return_value={'id':'123','channel_id':'456'}) as send:
             clock.now.return_value = self.now
             for _ in range(2):
                 base.send_race_notice('20260913', '20', 10, '19:40', 'withdrawn', '6号艇が欠場。')
@@ -68,7 +71,7 @@ class RaceNoticeTests(unittest.TestCase):
         self.assertEqual(notices.read_notices(), [])
 
     def test_closed_race_is_not_posted_and_dry_run_is_read_only(self):
-        with patch.object(base, 'datetime') as clock, patch.object(base, 'send_discord') as send:
+        with patch.object(base, 'datetime') as clock, patch.object(base, 'send_discord',return_value={'id':'123','channel_id':'456'}) as send:
             clock.now.return_value = self.now
             self.assertFalse(base.send_race_notice('20260913', '20', 10, '19:21', 'withdrawn', ''))
             with contextlib.redirect_stdout(io.StringIO()):
@@ -80,7 +83,7 @@ class RaceNoticeTests(unittest.TestCase):
         analysis = {'inputs': [{'lane': lane} for lane in range(1, 7)], 'preview': {'exhibition_count': 0}}
         existing = {('20260913', '20', 1, 'morning')}
         policy = base.load_policy()
-        with patch.object(base, 'datetime') as clock, patch.object(base, 'fetch'), patch.object(base, 'discover_venues', return_value=['20']), patch.object(base, 'deadlines', return_value=['19:40']), patch.object(base, 'load_deliveries', return_value=existing), patch.object(base, 'analyze_official', return_value=analysis), patch.object(base, 'make_analysis_message', return_value='final forecast'), patch.object(base, 'displayed_picks', return_value=[{'combination': '1-2-3'}]), patch.object(base, 'send_discord') as send, contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(base, 'datetime') as clock, patch.object(base, 'fetch'), patch.object(base, 'discover_venues', return_value=['20']), patch.object(base, 'deadlines', return_value=['19:40']), patch.object(base, 'load_deliveries', return_value=existing), patch.object(base, 'analyze_official', return_value=analysis), patch.object(base, 'make_analysis_message', return_value='final forecast'), patch.object(base, 'displayed_picks', return_value=[{'combination': '1-2-3'}]), patch.object(base, 'send_discord',return_value={'id':'123','channel_id':'456'}) as send, contextlib.redirect_stdout(io.StringIO()):
             clock.now.return_value = self.now
             self.assertEqual(base.run_once(self.now), 0)
             self.assertIn('見送り推奨（データ待ち）', send.call_args.args[0])
@@ -92,7 +95,7 @@ class RaceNoticeTests(unittest.TestCase):
             self.assertEqual(json.loads(base.LOG_PATH.read_text())['phase'], 'final')
 
     def test_runner_posts_withdrawal_without_betting_and_continues(self):
-        with patch.object(base, 'datetime') as clock, patch.object(base, 'fetch', return_value=withdrawal_html()), patch.object(base, 'discover_venues', return_value=['20']), patch.object(base, 'deadlines', return_value=['19:40']), patch.object(base, 'analyze_official', return_value=None), patch.object(base, 'send_discord') as send, contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(base, 'datetime') as clock, patch.object(base, 'fetch', return_value=withdrawal_html()), patch.object(base, 'discover_venues', return_value=['20']), patch.object(base, 'deadlines', return_value=['19:40']), patch.object(base, 'analyze_official', return_value=None), patch.object(base, 'send_discord',return_value={'id':'123','channel_id':'456'}) as send, contextlib.redirect_stdout(io.StringIO()):
             clock.now.return_value = self.now
             self.assertEqual(base.run_once(self.now), 0)
             self.assertIn('若松 1レース\n欠場', send.call_args.args[0])
@@ -102,7 +105,7 @@ class RaceNoticeTests(unittest.TestCase):
         policy = {**base.load_policy(), 'all_races': {}}
         analysis = {'inputs': [{'lane': lane} for lane in range(1, 7)],
                     'preview': {'exhibition_count': 6, 'wind_speed': 0, 'wave_cm': 0}, 'grade': 'C', 'trifecta': []}
-        with patch.object(base, 'datetime') as clock, patch.object(base, 'fetch'), patch.object(base, 'load_policy', return_value=policy), patch.object(base, 'discover_venues', return_value=['20']), patch.object(base, 'deadlines', return_value=['19:40']), patch.object(base, 'analyze_official', return_value=analysis), patch.object(base, 'send_discord') as send, contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(base, 'datetime') as clock, patch.object(base, 'fetch'), patch.object(base, 'load_policy', return_value=policy), patch.object(base, 'discover_venues', return_value=['20']), patch.object(base, 'deadlines', return_value=['19:40']), patch.object(base, 'analyze_official', return_value=analysis), patch.object(base, 'send_discord',return_value={'id':'123','channel_id':'456'}) as send, contextlib.redirect_stdout(io.StringIO()):
             clock.now.return_value = self.now
             self.assertEqual(base.run_once(self.now), 0)
             self.assertIn('若松 1レース\n見送り推奨', send.call_args.args[0])
@@ -136,9 +139,9 @@ class RaceNoticeTests(unittest.TestCase):
             return codes.pop(0)
         def pause(seconds):
             elapsed[0] += seconds
-        self.assertEqual(notification_runner.run(240, attempt=attempt, clock=lambda: elapsed[0], pause=pause, is_open=lambda: True), 0)
+        self.assertEqual(notification_runner.run(210, attempt=attempt, clock=lambda: elapsed[0], pause=pause, is_open=lambda: True), 1)
         self.assertEqual(codes, [])
-        self.assertEqual(elapsed[0], 80)
+        self.assertEqual(elapsed[0], 50)
 
     def test_manual_run_once_and_outside_race_hours_no_post(self):
         with patch.object(notification_runner.app, 'main') as attempt:

@@ -1,7 +1,7 @@
 """Discord entry point for Boat AI Navi.
 
 The existing near-deadline notifier remains the stable core. This wrapper now
-also sends one all-race morning briefing per day and appends odds-aware virtual
+appends odds-aware virtual
 betting allocations to the normal race messages.
 
 Live prediction cards use a variable 6-14 point width. The original six picks
@@ -11,7 +11,6 @@ so near-miss races caused by a missing supporting boat are covered more often.
 import sys
 
 import direct_discord_notify as base
-import morning_all_races_discord as morning
 from virtual_betting import allocate_virtual_bets, compact_virtual_text
 
 
@@ -131,7 +130,9 @@ def analysis_message_with_virtual(day, jcd, rno, deadline, phase, analysis, rows
     return message + extra
 
 
-def log_prediction_with_virtual(record):
+def enrich_prediction_with_virtual(record):
+    if "virtual_bets" in record:
+        return record
     key = (record.get("day"), str(record.get("jcd")), int(record.get("rno", 0)), record.get("phase", "final"))
     allocation = _VIRTUAL.get(key)
     if allocation is not None:
@@ -143,18 +144,20 @@ def log_prediction_with_virtual(record):
         record["virtual_unit_yen"] = 100
         record["virtual_selection_rule"] = "latest_pre_deadline_per_race"
         record["prediction_point_policy"] = "variable_6_to_14_tie_expansion"
-    _ORIGINAL_LOG_PREDICTION(record)
+    return record
+
+
+def log_prediction_with_virtual(record):
+    _ORIGINAL_LOG_PREDICTION(enrich_prediction_with_virtual(record))
 
 
 def main():
     base.displayed_picks = displayed_picks_variable
     base.make_analysis_message = analysis_message_with_virtual
     base.log_prediction = log_prediction_with_virtual
-    # Finish time-sensitive updates before retrying the remaining full card.
-    result = base.main()
-    if "--test" not in sys.argv and "--dry-run" not in sys.argv:
-        morning.run_once()
-    return result
+    base.enrich_prediction = enrich_prediction_with_virtual
+    # The core already handles all required preliminaries. Avoid a second whole-card scan.
+    return base.main()
 
 
 if __name__ == "__main__":

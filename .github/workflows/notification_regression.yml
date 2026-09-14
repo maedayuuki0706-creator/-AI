@@ -1,0 +1,33 @@
+name: Notification delivery regression
+on:
+  push:
+    branches: ["codex/notification-audit-20260914"]
+  pull_request:
+    paths:
+      - "*discord*.py"
+      - "notification_*.py"
+      - "persist_notification_state.py"
+      - "tests/**"
+      - ".github/workflows/discord_notify.yml"
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NOTIFICATION_CHECKPOINT: "0"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Python
+        run: python -m compileall -q .
+      - name: Run delivery, concurrency and existing regression tests without sending
+        run: python -m unittest discover -s tests -q
+      - name: Ensure tests never changed operational data
+        run: |
+          git diff --exit-code -- data/
+          test -z "$(git ls-files --others --exclude-standard -- data/)"

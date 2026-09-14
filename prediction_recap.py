@@ -131,34 +131,11 @@ def report_destination_key():
     return 'reports:' + hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:20]
 
 
-def post_confirmed(payload):
-    url = report_webhook_url()
+def post_confirmed(payload, *, can_send=None):
+    url=report_webhook_url()
     if not url:
-        raise RuntimeError('Discord connection is not configured')
-    parts = urllib.parse.urlsplit(url)
-    query = dict(urllib.parse.parse_qsl(parts.query))
-    query['wait'] = 'true'
-    target = urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(query)))
-    request = urllib.request.Request(target, data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
-                                    headers={'Content-Type': 'application/json', 'User-Agent': base.UA}, method='POST')
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(request, timeout=20) as response:
-                message = json.loads(response.read())
-            if not str(message.get('id', '')).isdigit():
-                raise RuntimeError('Discord acknowledgement has no message ID')
-            return message
-        except urllib.error.HTTPError as exc:
-            if exc.code == 429 and attempt < 2:
-                try:
-                    delay = float(json.loads(exc.read()).get('retry_after', 1))
-                except (ValueError, TypeError):
-                    delay = 1
-                if 0 <= delay <= 30:
-                    time.sleep(delay + .25)
-                    continue
-            raise RuntimeError(f'Discord HTTP {exc.code}') from None
-    raise RuntimeError('Discord rate limit did not recover')
+        raise base.delivery.SendRejected('Discord connection is not configured')
+    return base.delivery.post_json(url,payload,can_send=can_send)
 
 
 def send_recaps(recaps, *, sender=post_confirmed, pause=time.sleep):
@@ -170,11 +147,15 @@ def send_recaps(recaps, *, sender=post_confirmed, pause=time.sleep):
         key = (recap['day'], recap['jcd'], recap['digest'], destination)
         if key in delivered:
             continue
-        message = sender(recap['payload'])
-        record_notice({'day': recap['day'], 'jcd': recap['jcd'], 'venue': recap['venue'],
-                       'digest': recap['digest'], 'message_id': message['id'], 'destination': destination,
-                       'predicted_races': recap['predicted_races'], 'message_count': 1,
-                       'confirmed_at': datetime.now(base.JST).isoformat()}, path=DELIVERY_PATH)
+        record={'day':recap['day'],'jcd':recap['jcd'],'venue':recap['venue'],
+                'digest':recap['digest'],'destination':destination,'record_type':'prediction_recap',
+                'predicted_races':recap['predicted_races'],'message_count':1}
+        def write_record(row):
+            if not any((r.get('day'),r.get('jcd'),r.get('digest'),r.get('destination','predictions'))==key
+                       for r in read_rows(DELIVERY_PATH)):
+                record_notice({**row,'confirmed_at':row['sent_at']},path=DELIVERY_PATH)
+        base.delivery.deliver(json.dumps(recap['payload'],ensure_ascii=False,sort_keys=True),[record],
+                              sender=lambda content,**kw:sender(json.loads(content)),writer=write_record)
         delivered.add(key)
         sent += 1
         print(f"Recap confirmed {recap['jcd']} {recap['venue']} races={recap['predicted_races']}/12", flush=True)
