@@ -9,7 +9,7 @@ from prediction_recap import post_confirmed, report_destination_key
 
 # This file is intentionally safe to re-run.  Each run refreshes only races whose
 # deadlines have passed and reports settled 3連単 results available at that moment.
-REQUEST_ID = "20260914-1700"
+REQUEST_ID = "20260914-final"
 
 
 def _winning_combos(result):
@@ -122,7 +122,6 @@ def build_payload():
     for venue in preferred_order:
         rows = venue_rows.get(venue, [])
         if not rows:
-            # Still show the venue if today's prediction log contains it.
             sent = sum(1 for r in chosen.values() if r.get("venue") == venue)
             if sent:
                 lines.append(f"**{venue}**　配信 {sent}R｜結果待ち")
