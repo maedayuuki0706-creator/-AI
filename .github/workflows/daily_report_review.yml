@@ -12,6 +12,7 @@ on:
     paths:
       - "daily_report.py"
       - "daily_report_format.py"
+      - "stake_simulation_3000.py"
       - ".github/workflows/daily_report_review.yml"
 
 permissions:
@@ -74,6 +75,10 @@ jobs:
               raise SystemExit('Report and prediction webhooks point to the same channel')
           print('Report channel verified: distinct from predictions')
           PY
+      - name: Build 3000 yen stake simulation
+        env:
+          REPORT_DAY: ${{ github.event_name == 'workflow_dispatch' && inputs.day || '20260913' }}
+        run: python stake_simulation_3000.py --day "$REPORT_DAY"
       - name: Send reviewed daily report
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
