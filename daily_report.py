@@ -155,6 +155,8 @@ def settle(row, result):
            'return_yen': 0, 'refund_yen': 0, 'virtual_hit': False, 'hit_eligible': False,
            'prediction_hit': bool(set(disclosed_picks(row)) & set(result.get('payouts', {}))),
            'official': result}
+    out.update(main=row.get('main') or [], cover=row.get('cover') or [], outsiders=row.get('outsiders') or [],
+               grade=row.get('grade'), deadline=row.get('deadline'))
     if plan is None or result['status'] == 'pending':
         return out
     for combo, units in plan.items():
@@ -197,18 +199,49 @@ def totals(rows):
 
 def build_report(day, predictions, results, card):
     chosen, excluded = latest_predictions(predictions, day)
-    rows = [settle(row, results.get(key, {'status': 'pending', 'payouts': {}, 'refund_lanes': []}))
-            for key, row in sorted(chosen.items())]
+    rows, uniform_rows = [], []
+    section_rows = defaultdict(list)
+    for key, row in sorted(chosen.items()):
+        result = results.get(key, {'status': 'pending', 'payouts': {}, 'refund_lanes': []})
+        actual = settle(row, result)
+        def flat(picks):
+            return settle({**row, 'main': picks, 'cover': [], 'outsiders': [],
+                           'virtual_bets': [{'combination': pick, 'units': 1} for pick in picks],
+                           'virtual_total_units': len(picks)}, result)
+        uniform = flat(disclosed_picks(row))
+        uniform_rows.append(uniform)
+        actual['uniform'] = {k: uniform[k] for k in ('stake_yen', 'return_yen', 'refund_yen', 'hit_eligible', 'virtual_hit')}
+        actual['hit_sections'] = []
+        seen = set()
+        for section in ('main', 'cover', 'outsiders'):
+            picks = [p for p in unique_picks(row.get(section) or []) if p not in seen]
+            seen.update(picks)
+            if picks:
+                section_rows[section].append(flat(picks))
+            if set(picks) & set(result.get('payouts', {})):
+                actual['hit_sections'].append(section)
+        rows.append(actual)
     expected = card.get('races', {})
     missing = sorted(set(expected) - set(chosen))
     groups = defaultdict(list)
     for row in rows:
         groups[row['jcd']].append(row)
+    venue_stats = {key: totals(value) for key, value in sorted(groups.items())}
+    for key in venue_stats:
+        venue_stats[key]['uniform'] = totals([r for r in uniform_rows if r['jcd'] == key])
+    comparisons = {}
+    for dimension in ('phase', 'grade', 'points'):
+        segments = defaultdict(list)
+        for actual, uniform in zip(rows, uniform_rows):
+            value = str(len(actual['picks'])) if dimension == 'points' else str(actual.get(dimension) or '未記録')
+            segments[value].append(uniform)
+        comparisons[dimension] = {key: totals(value) for key, value in segments.items()}
     return {'day': day, 'unit_yen': UNIT_YEN, 'selection_rule': 'latest_pre_deadline_per_race',
             'coverage_verified': card.get('complete', False), 'expected_races': len(expected),
             'missing_predictions': missing, 'excluded_deliveries': len(excluded),
             'excluded_races': sorted({race_key(r) for r in excluded if 'jcd' in r and 'rno' in r}),
-            'totals': totals(rows), 'venues': {key: totals(value) for key, value in sorted(groups.items())},
+            'totals': totals(rows), 'uniform_totals': totals(uniform_rows), 'venues': venue_stats,
+            'section_totals': {key: totals(value) for key, value in section_rows.items()}, 'comparisons': comparisons,
             'races': rows}
 
 
@@ -217,62 +250,28 @@ def percent(value):
 
 
 def report_messages(report):
-    day, t = report['day'], report['totals']
-    label = '暫定' if t['pending_races'] or not report['coverage_verified'] else '確定'
-    prediction_rate = t['prediction_hits'] / t['prediction_samples'] * 100 if t['prediction_samples'] else None
-    lines = [f"📊 **競艇AIナビ｜{day[:4]}/{day[4:6]}/{day[6:]} 日次まとめ（{label}）**",
-             f"締切前の予想 {t['predicted_races']}R / 開催 {report['expected_races']}R（開催確認{'済' if report['coverage_verified'] else '未完了'}）",
-             f"結果確認 {t['resolved_races']}R / 結果待ち {t['pending_races']}R / 予想未記録 {len(report['missing_predictions'])}R",
-             f"**仮想投票：{t['bet_races']}R・{t['bet_points']}点・{t['bet_units']}口 / {t['total_stake_yen']:,}円**",
-             f"確定分 {t['settled_bet_races']}R：投票 {t['settled_stake_yen']:,}円 → 回収 {t['return_yen']:,}円（返還 {t['refund_yen']:,}円含む）",
-             f"**損益 {t['profit_yen']:+,}円 / 回収率 {percent(t['roi'])}**",
-             f"仮想投票の的中率：{t['virtual_hits']}/{t['virtual_hit_samples']}R = {percent(t['hit_rate'])}",
-             f"予想全点の的中率：{t['prediction_hits']}/{t['prediction_samples']}R = {percent(prediction_rate)}",
-             f"見送り {t['pass_races']}R / 配分未記録 {t['unrecorded_plans']}R",
-             '1口100円のシミュレーション。各Rは締切前の最新配信だけを採用し、更新分は差替え。',
-             '回収率＝確定分の公式払戻・返還÷確定分投票額。結果待ちは率に含めず、全返還・特払いは的中率から除外。']
-    if report['excluded_deliveries']:
-        lines.append(f"締切後・時刻不明・欠場の配信 {report['excluded_deliveries']}件は実績から除外。")
-    messages = ['\\n'.join(lines)]
-    grouped = defaultdict(list)
-    for race in report['races']:
-        grouped[race['jcd']].append(race)
-    for jcd, stats in sorted(report['venues'].items()):
-        venue = base.VENUES.get(jcd, jcd)
-        card_lines = [f"📍 **{venue}｜予想・結果まとめ**（{day[4:6]}/{day[6:]}・{label}）",
-                      f"予想 {stats['predicted_races']}R / 仮想 {stats['bet_points']}点・{stats['bet_units']}口（{stats['bet_units'] * 100:,}円）",
-                      f"確定回収 {stats['return_yen']:,}円 / 損益 {stats['profit_yen']:+,}円 / 的中率 {percent(stats['hit_rate'])} / 回収率 {percent(stats['roi'])}", '']
-        for race in sorted(grouped.get(jcd, []), key=lambda x: x['rno']):
-            status = {'pending': '結果待ち', 'void': '返還', 'special': '特払い', 'settled': '確定'}.get(race['status'], race['status'])
-            hit = '🎯的中' if race['virtual_hit'] else ('✅予想内' if race['prediction_hit'] else '—')
-            picks = '・'.join(race['picks'][:3])
-            if len(race['picks']) > 3:
-                picks += f" 他{len(race['picks']) - 3}点"
-            card_lines.append(f"{race['rno']}R｜{status}｜{hit}｜{picks or '買い目なし'}｜投{race['stake_yen']:,}円→回{race['return_yen']:,}円")
-        messages.append('\\n'.join(card_lines))
-    if report['missing_predictions']:
-        missing = defaultdict(list)
-        for key in report['missing_predictions']:
-            jcd, rno = key.split(':')
-            missing[jcd].append(int(rno))
-        messages.append('⚠️ **予想未記録（集計対象外）**\\n' + ' / '.join(f"{base.VENUES.get(jcd, jcd)} {','.join(map(str, sorted(races)))}R" for jcd, races in sorted(missing.items())))
-    messages[-1] += '\\n公式結果：' + base.official_url('index', day)
-
-    return messages
+    from daily_report_format import report_payloads, payload_text
+    return [payload_text(payload) for payload in report_payloads(report)]
 
 
 def send_report(report):
+    from daily_report_format import report_payloads
+    from prediction_recap import post_confirmed
     sent = {r.get('digest') for r in read_jsonl(SENT_PATH)}
     count = 0
-    for message in report_messages(report):
-        digest = hashlib.sha256(message.encode('utf-8')).hexdigest()
+    for payload in report_payloads(report):
+        digest = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
         if digest in sent:
             continue
-        base.send_discord(message)
-        append_jsonl(SENT_PATH, {'day': report['day'], 'digest': digest, 'sent_at': datetime.now(base.JST).isoformat()})
+        message = post_confirmed(payload)
+        venue = payload['embeds'][0]['title'].split('｜')[0]
+        append_jsonl(SENT_PATH, {'day': report['day'], 'digest': digest,
+                     'message_id': message['id'], 'venue': venue, 'format': 'venue-daily-v2',
+                     'sent_at': datetime.now(base.JST).isoformat()})
         sent.add(digest)
         count += 1
-        time.sleep(.65)
+        print(f"Daily report confirmed {report['day']} {venue}", flush=True)
+        time.sleep(1)
     return count
 
 
@@ -330,6 +329,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--day')
     parser.add_argument('--send', action='store_true')
+    parser.add_argument('--saved-results', action='store_true', help='Reformat already collected official results without another fetch')
     args = parser.parse_args()
     now = datetime.now(base.JST)
     day = args.day or (now - timedelta(days=1) if now.hour < 6 else now).strftime('%Y%m%d')
@@ -337,8 +337,13 @@ def main():
     base.fetch.cache_clear()
     predictions = read_jsonl(base.LOG_PATH)
     chosen, _ = latest_predictions(predictions, day)
-    card = collect_card(day)
-    report = build_report(day, predictions, collect_results(day, chosen), card)
+    if args.saved_results:
+        card = json.loads((CARD_DIR / f'{day}.json').read_text(encoding='utf-8'))
+        results = json.loads((RESULT_DIR / f'{day}.json').read_text(encoding='utf-8'))
+    else:
+        card = collect_card(day)
+        results = collect_results(day, chosen)
+    report = build_report(day, predictions, results, card)
     write_json(REPORT_DIR / f'{day}.json', report)
     (REPORT_DIR / f'{day}.md').write_text('\n\n'.join(report_messages(report)) + '\n', encoding='utf-8')
     sent = send_report(report) if args.send else 0

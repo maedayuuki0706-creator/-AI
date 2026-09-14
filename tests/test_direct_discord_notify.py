@@ -13,7 +13,8 @@ from daily_learning import aggregate, evaluate_prediction, parse_finish_order
 FIXTURES=Path(__file__).parent/'fixtures'
 
 class DeliveryTests(unittest.TestCase):
-    def setUp(self): self.policy=n.load_policy()
+    def setUp(self):
+        self.policy = {**n.load_policy(), 'all_races': {'20260913': ['*']}}
     def test_all_12_tokoname_preliminary_only_on_requested_day(self):
         now=datetime(2026,9,13,8,15,tzinfo=n.JST)
         for race in range(1,13):

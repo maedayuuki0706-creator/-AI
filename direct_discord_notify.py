@@ -404,11 +404,11 @@ def displayed_picks(analysis,required):
 def make_analysis_message(day,jcd,rno,deadline,phase,analysis,rows,required):
     preview=analysis['preview'];boats={b['lane']:b for b in analysis['inputs']}
     label='朝の暫定予想' if phase=='preliminary' else '直前更新' if required else 'AI選別'
-    lines=[f'🚤 **競艇AIナビ｜{label}**',f'**{day[4:6]}/{day[6:8]} {VENUES[jcd]} {rno}R**　締切 **{deadline}**',
+    lines=[f'🚤 **{VENUES[jcd]} {rno}レース｜{label}**',f'{day[4:6]}/{day[6:8]}　締切 **{deadline}**', '━━━━━━━━━━━━',
         f"評価：{analysis['grade'] or '展示待ち'} / 展示 {preview['exhibition_count']}/6艇"]
     if required:lines.append('全レース配信枠（見送り判断も含む）')
     summary=formation_summary([p['combination'] for p in rows[:3]], [p['combination'] for p in rows[3:]])
-    lines+=['', *formation_lines(summary)]
+    lines+=['━━━━━━━━━━━━', *formation_lines(summary), '━━━━━━━━━━━━']
     lines+=['','**AI展開の想定**']
     leader=max(analysis['heads'],key=analysis['heads'].get)
     course=boats[leader]['predicted_course']

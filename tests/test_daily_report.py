@@ -96,11 +96,11 @@ class SettlementTests(unittest.TestCase):
     def test_report_retry_resumes_after_acknowledged_chunk(self):
         report = r.build_report('20260913', [prediction()], {}, {'complete': True, 'races': {'08:1': {}}})
         with tempfile.TemporaryDirectory() as tmp, patch.object(r, 'SENT_PATH', Path(tmp) / 'sent.jsonl'), patch.object(r.time, 'sleep'):
-            with patch.object(base, 'send_discord', side_effect=[None, RuntimeError('temporary')]) as send:
+            with patch('prediction_recap.post_confirmed', side_effect=[{'id': '123'}, RuntimeError('temporary')]) as send:
                 with self.assertRaises(RuntimeError):
                     r.send_report(report)
                 self.assertEqual(send.call_count, 2)
-            with patch.object(base, 'send_discord') as send:
+            with patch('prediction_recap.post_confirmed', return_value={'id': '124'}) as send:
                 self.assertEqual(r.send_report(report), 1)
                 self.assertEqual(r.send_report(report), 0)
                 self.assertEqual(send.call_count, 1)
@@ -126,7 +126,7 @@ class DeliveryAccountingTests(unittest.TestCase):
 
     def test_today_all_tracks_and_no_second_initial_prediction(self):
         now = datetime(2026, 9, 13, 9, tzinfo=base.JST)
-        policy = base.load_policy()
+        policy = {**base.load_policy(), 'all_races': {'20260913': ['*']}}
         self.assertTrue(base.required_venue(policy, '20260913', '07'))
         self.assertIsNone(base.due_phase(policy, now, '07', '15:00', {('20260913', '07', 1, 'morning')}, 1))
         self.assertFalse(base.required_venue(policy, '20260914', '07'))
