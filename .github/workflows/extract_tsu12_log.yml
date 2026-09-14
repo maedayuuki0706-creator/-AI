@@ -1,0 +1,26 @@
+name: Fast Tsu 12R Log Extract
+on:
+  push:
+    branches: [main]
+    paths:
+      - extract_tsu12_log.py
+      - .github/workflows/extract_tsu12_log.yml
+permissions:
+  contents: write
+jobs:
+  extract:
+    if: ${{ startsWith(github.event.head_commit.message, 'Run fast Tsu 12R log extractor') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python extract_tsu12_log.py
+      - run: |
+          git config user.name boat-ai-learning-bot
+          git config user.email actions@users.noreply.github.com
+          git add data/case_studies/20260914_tsu12_log.json
+          git commit -m 'Record fast Tsu 12R log extract' || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
