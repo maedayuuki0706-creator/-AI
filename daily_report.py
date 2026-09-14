@@ -256,19 +256,21 @@ def report_messages(report):
 
 def send_report(report):
     from daily_report_format import report_payloads
-    from prediction_recap import post_confirmed
-    sent = {r.get('digest') for r in read_jsonl(SENT_PATH)}
+    from prediction_recap import post_confirmed, report_destination_key
+    destination = report_destination_key()
+    sent = {(r.get('digest'), r.get('destination', 'predictions')) for r in read_jsonl(SENT_PATH)}
     count = 0
     for payload in report_payloads(report):
         digest = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
-        if digest in sent:
+        key = (digest, destination)
+        if key in sent:
             continue
         message = post_confirmed(payload)
         venue = payload['embeds'][0]['title'].split('｜')[0]
         append_jsonl(SENT_PATH, {'day': report['day'], 'digest': digest,
-                     'message_id': message['id'], 'venue': venue, 'format': 'venue-daily-v2',
+                     'message_id': message['id'], 'venue': venue, 'format': 'venue-daily-v2', 'destination': destination,
                      'sent_at': datetime.now(base.JST).isoformat()})
-        sent.add(digest)
+        sent.add(key)
         count += 1
         print(f"Daily report confirmed {report['day']} {venue}", flush=True)
         time.sleep(1)

@@ -50,6 +50,7 @@ jobs:
         if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Send 2026-09-13 prediction summary') }}
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
           SUMMARY_ONLY: "1"
           SUMMARY_DAY: "20260913"
         run: python notification_runner.py

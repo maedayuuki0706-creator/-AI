@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -101,8 +102,30 @@ def save_recaps(day, recaps):
     (OUTPUT_DIR / f'{day}.md').write_text('\n'.join(lines), encoding='utf-8')
 
 
+def report_webhook_url():
+    return (os.getenv('DISCORD_REPORT_WEBHOOK_URL', '').strip()
+            or os.getenv('DISCORD_WEBHOOK_URL', '').strip())
+
+
+def report_destination_key():
+    """Keep old delivery journals valid and distinguish a new report target.
+
+    The journal contains only a digest of the public webhook ID and thread,
+    never the URL or its token. Rotating a token does not cause repeat posts.
+    """
+    url = report_webhook_url()
+    previous = os.getenv('DISCORD_WEBHOOK_URL', '').strip()
+    if not os.getenv('DISCORD_REPORT_WEBHOOK_URL', '').strip() or url == previous:
+        return 'predictions'
+    parsed = urllib.parse.urlsplit(url)
+    match = re.search(r'/webhooks/([^/]+)/', parsed.path)
+    identity = [parsed.hostname, match[1] if match else parsed.path,
+                dict(urllib.parse.parse_qsl(parsed.query)).get('thread_id')]
+    return 'reports:' + hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:20]
+
+
 def post_confirmed(payload):
-    url = os.getenv('DISCORD_WEBHOOK_URL', '').strip()
+    url = report_webhook_url()
     if not url:
         raise RuntimeError('Discord connection is not configured')
     parts = urllib.parse.urlsplit(url)
@@ -132,15 +155,17 @@ def post_confirmed(payload):
 
 
 def send_recaps(recaps, *, sender=post_confirmed, pause=time.sleep):
-    delivered = {(r.get('day'), r.get('jcd'), r.get('digest')) for r in read_rows(DELIVERY_PATH)}
+    destination = report_destination_key()
+    delivered = {(r.get('day'), r.get('jcd'), r.get('digest'), r.get('destination', 'predictions'))
+                 for r in read_rows(DELIVERY_PATH)}
     sent = 0
     for recap in recaps:
-        key = (recap['day'], recap['jcd'], recap['digest'])
+        key = (recap['day'], recap['jcd'], recap['digest'], destination)
         if key in delivered:
             continue
         message = sender(recap['payload'])
         record_notice({'day': recap['day'], 'jcd': recap['jcd'], 'venue': recap['venue'],
-                       'digest': recap['digest'], 'message_id': message['id'],
+                       'digest': recap['digest'], 'message_id': message['id'], 'destination': destination,
                        'predicted_races': recap['predicted_races'], 'message_count': 1,
                        'confirmed_at': datetime.now(base.JST).isoformat()}, path=DELIVERY_PATH)
         delivered.add(key)

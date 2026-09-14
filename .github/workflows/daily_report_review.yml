@@ -36,6 +36,7 @@ jobs:
       - name: Send reviewed daily report
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
           REPORT_DAY: ${{ github.event_name == 'workflow_dispatch' && inputs.day || '20260913' }}
         run: python daily_report.py --day "$REPORT_DAY" --saved-results --send
       - name: Persist acknowledged reports

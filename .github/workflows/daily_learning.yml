@@ -33,6 +33,7 @@ jobs:
       - name: Settle virtual plans and send daily Discord report
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
         run: python daily_report.py --send
 
       - name: Compare predictions with official results and update learning state
