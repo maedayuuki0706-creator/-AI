@@ -11,6 +11,7 @@ if os.getenv("SELECTED_DISCORD_WEBHOOK_URL") and not os.getenv("DISCORD_SELECTED
     os.environ["DISCORD_SELECTED_WEBHOOK_URL"] = os.environ["SELECTED_DISCORD_WEBHOOK_URL"]
 
 import detailed_discord_notify as app
+import hit_alerts
 import selection_scoring
 import stake_tracking
 
@@ -39,6 +40,10 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
         except Exception as exc:
             print(f'Notification pass failed: {type(exc).__name__}', flush=True)
             result = 1
+        try:
+            hit_alerts.check_and_send()
+        except Exception as exc:
+            print(f'Hit alert pass failed: {type(exc).__name__}', flush=True)
         if end - clock() < 210:
             break
         pause(60)
