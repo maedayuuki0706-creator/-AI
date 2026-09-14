@@ -19,6 +19,10 @@ VENUE_PROFILES: Dict[str, Dict[str, float]] = {
     "大村": {"1": 1.10, "2": 0.99, "3": 0.98, "4": 0.97, "5": 0.96, "6": 0.95},
     "芦屋": {"1": 1.08, "2": 1.00, "3": 0.99, "4": 0.98, "5": 0.97, "6": 0.96},
     "下関": {"1": 1.07, "2": 1.00, "3": 0.99, "4": 0.99, "5": 0.97, "6": 0.96},
+    # Recent official course data show Tokoname is materially more inside-favoring
+    # than Toda, so keep a conservative venue-specific boost rather than a
+    # blanket stronger No.1-lane rule for every venue.
+    "常滑": {"1": 1.08, "2": 1.00, "3": 0.99, "4": 0.99, "5": 0.97, "6": 0.95},
     "戸田": {"1": 0.90, "2": 1.03, "3": 1.04, "4": 1.04, "5": 1.02, "6": 1.00},
     "平和島": {"1": 0.92, "2": 1.02, "3": 1.03, "4": 1.03, "5": 1.01, "6": 0.99},
     "江戸川": {"1": 0.93, "2": 1.01, "3": 1.02, "4": 1.03, "5": 1.01, "6": 1.00},
@@ -29,8 +33,10 @@ VENUE_PROFILES: Dict[str, Dict[str, float]] = {
 }
 
 WEIGHTS = {
-    "racer": 0.22,
-    "course": 0.16,
+    # Course structure gets priority over raw racer strength. Venue profiles
+    # still decide how much that helps or hurts the inside at each stadium.
+    "racer": 0.16,
+    "course": 0.22,
     "start": 0.15,
     "motor": 0.15,
     "exhibition": 0.15,
@@ -264,7 +270,7 @@ def analyze_race(payload: Mapping[str, Any]) -> Dict[str, Any]:
     confidence = _clip(0.5 + (top_score - second_score) * 2.5)
 
     return {
-        "model_version": "kyoutei-navi-form-v1-unvalidated",
+        "model_version": "kyoutei-navi-course-v2-unvalidated",
         "venue": race.get("venue"),
         "boats": scored,
         "trifecta": trifectas,
