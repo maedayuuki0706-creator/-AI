@@ -1,0 +1,56 @@
+name: Selected Race Metrics
+
+on:
+  schedule:
+    # 00:40 JST: after the normal daily report has usually settled.
+    - cron: "40 15 * * *"
+  workflow_dispatch:
+    inputs:
+      day:
+        description: Race day in JST (YYYYMMDD)
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - "selected_metrics.py"
+      - ".github/workflows/selected_metrics.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: selected-race-metrics
+  cancel-in-progress: false
+
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build selected metrics
+        env:
+          INPUT_DAY: ${{ github.event_name == 'workflow_dispatch' && inputs.day || '' }}
+        run: |
+          if [ -n "$INPUT_DAY" ]; then
+            python selected_metrics.py --day "$INPUT_DAY"
+          else
+            python selected_metrics.py
+          fi
+      - name: Persist metrics
+        run: |
+          if [ -z "$(git status --porcelain data/selected_metrics/)" ]; then
+            echo "No selected metrics update"
+            exit 0
+          fi
+          git config user.name "boat-ai-learning-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/selected_metrics/
+          git commit -m "Update selected race metrics" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
