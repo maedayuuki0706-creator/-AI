@@ -51,10 +51,16 @@ def final_only_due_phase(policy, now, jcd, deadline, delivered, rno):
     return None
 
 
+def all_current_venues_required(policy, day, jcd):
+    """The live normal feed is an all-race feed every day, not a dated allow-list."""
+    return True
+
+
 # The user only wants the race prediction close to post time. Keep all-race final
 # coverage, selected alerts and hit alerts, but silence the morning all-race
 # briefing and preliminary prediction phase.
 app.base.due_phase = final_only_due_phase
+app.base.required_venue = all_current_venues_required
 app.morning.run_once = lambda: 0
 
 
