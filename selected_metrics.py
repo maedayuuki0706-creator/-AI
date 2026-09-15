@@ -32,6 +32,8 @@ def subset_summary(records: dict[str, dict], settled_by_key: dict[str, dict], th
     base = totals(settled)
     prediction_samples = int(base.get("prediction_samples") or 0)
     prediction_hits = int(base.get("prediction_hits") or 0)
+    flat_stake = sum(int((row.get("uniform") or {}).get("stake_yen") or 0) for row in settled)
+    flat_return = sum(int((row.get("uniform") or {}).get("return_yen") or 0) for row in settled)
     return {
         "threshold": threshold,
         "selected_races": len(selected),
@@ -39,6 +41,10 @@ def subset_summary(records: dict[str, dict], settled_by_key: dict[str, dict], th
         "prediction_hits": prediction_hits,
         "prediction_samples": prediction_samples,
         "prediction_hit_rate": (prediction_hits / prediction_samples * 100) if prediction_samples else None,
+        "flat_100_per_pick_stake_yen": flat_stake,
+        "flat_100_per_pick_return_yen": flat_return,
+        "flat_100_per_pick_profit_yen": flat_return - flat_stake,
+        "flat_100_per_pick_roi": (flat_return / flat_stake * 100) if flat_stake else None,
         "virtual_hits": base.get("virtual_hits"),
         "virtual_hit_samples": base.get("virtual_hit_samples"),
         "virtual_hit_rate": base.get("hit_rate"),
@@ -57,6 +63,8 @@ def subset_summary(records: dict[str, dict], settled_by_key: dict[str, dict], th
                 "virtual_hit": settled_by_key.get(key, {}).get("virtual_hit"),
                 "stake_yen": settled_by_key.get(key, {}).get("stake_yen"),
                 "return_yen": settled_by_key.get(key, {}).get("return_yen"),
+                "flat_stake_yen": (settled_by_key.get(key, {}).get("uniform") or {}).get("stake_yen"),
+                "flat_return_yen": (settled_by_key.get(key, {}).get("uniform") or {}).get("return_yen"),
             }
             for key, row in sorted(selected.items())
         ],
