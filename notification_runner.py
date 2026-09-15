@@ -65,7 +65,10 @@ def run_channel_smoke_test_once() -> bool:
 
 
 def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.sleep, is_open=race_hours):
-    end = clock() + max(0, min(int(watch_seconds), 600))
+    # Scheduled Actions can start late. Keep one serialized watcher alive long
+    # enough to make a second final-data pass when the first pass only sees
+    # "展示待ち", instead of depending on the next cron launch arriving on time.
+    end = clock() + max(0, min(int(watch_seconds), 840))
     result = 0
     while is_open():
         try:
