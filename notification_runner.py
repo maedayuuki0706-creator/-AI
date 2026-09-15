@@ -33,6 +33,24 @@ def race_hours():
     return 8 <= datetime.now(app.base.JST).hour < 22
 
 
+def final_only_due_phase(policy, now, jcd, deadline, delivered, rno):
+    """Only allow the final near-deadline prediction; suppress morning/preliminary cards."""
+    day = now.strftime('%Y%m%d')
+    lead = app.base.minutes_until(now, deadline)
+    if lead < policy['final_min_lead_minutes']:
+        return None
+    if lead <= policy['final_max_lead_minutes']:
+        return None if (day, jcd, rno, 'final') in delivered else 'final'
+    return None
+
+
+# The user only wants the race prediction close to post time. Keep all-race final
+# coverage, selected alerts, longshot alerts and hit alerts, but silence the
+# morning all-race briefing and preliminary prediction phase.
+app.base.due_phase = final_only_due_phase
+app.morning.run_once = lambda: 0
+
+
 def run_channel_smoke_test_once() -> bool:
     """Run only on this push and journal success so normal schedules stay silent."""
     if os.getenv("GITHUB_EVENT_NAME") != "push" or SMOKE_MARKER.exists():
