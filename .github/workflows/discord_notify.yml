@@ -24,14 +24,16 @@ on:
 permissions:
   contents: write
 
+# One notifier at a time. The old SHA-based group changed after every data
+# commit, which allowed overlapping watchers and still left schedule gaps.
 concurrency:
-  group: boat-ai-state-${{ github.sha }}
+  group: boat-ai-discord-notify-main
   cancel-in-progress: false
 
 jobs:
   notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -49,7 +51,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
           DISCORD_HIT_WEBHOOK_URL: ${{ secrets.DISCORD_HIT_WEBHOOK_URL }}
-          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '600' || '0' }}
+          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '840' || '0' }}
         run: python notification_runner.py
 
       - name: Send grouped 2026-09-14 prediction summary
