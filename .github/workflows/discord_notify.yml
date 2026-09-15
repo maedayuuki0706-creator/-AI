@@ -16,6 +16,7 @@ on:
       - "notification_policy.json"
       - "race_notices.py"
       - "notification_runner.py"
+      - "opportunity_alerts.py"
       - "prediction_recap.py"
       - "hit_alerts.py"
       - "selection_scoring.py"
@@ -51,6 +52,8 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
           DISCORD_HIT_WEBHOOK_URL: ${{ secrets.DISCORD_HIT_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}
+          DISCORD_WEBHOOK_LONGSHOT: ${{ secrets.DISCORD_WEBHOOK_LONGSHOT }}
           NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '840' || '0' }}
         run: python notification_runner.py
 
