@@ -18,6 +18,7 @@ on:
       - "notification_runner.py"
       - "opportunity_alerts.py"
       - "opportunity_scenario_commentary.py"
+      - "send_opportunity_daily_discord.py"
       - "backfill_suminoe_20260916.py"
       - "backfill_night12_20260916.py"
       - "prediction_recap.py"
@@ -50,7 +51,7 @@ jobs:
           python-version: "3.12"
 
       - name: Deliver predictions and race status notices
-        if: ${{ !(github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary') || startsWith(github.event.head_commit.message, 'Backfill missed Suminoe') || startsWith(github.event.head_commit.message, 'Backfill missed night 12R'))) }}
+        if: ${{ !(github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary') || startsWith(github.event.head_commit.message, 'Backfill missed Suminoe') || startsWith(github.event.head_commit.message, 'Backfill missed night 12R') || startsWith(github.event.head_commit.message, 'Send 20260916 mid-odds daily reports'))) }}
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
@@ -84,6 +85,13 @@ jobs:
           SUMMARY_ONLY: "1"
           SUMMARY_DAY: "20260914"
         run: python notification_runner.py
+
+      - name: Send 2026-09-16 mid-odds venue daily reports
+        if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Send 20260916 mid-odds daily reports') }}
+        env:
+          DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}
+          REPORT_DAY: "20260916"
+        run: python send_opportunity_daily_discord.py
 
       - name: Persist newly delivered predictions
         if: always()
