@@ -196,44 +196,56 @@ def install(app):
 
     def selected_message(record):
         score = int(record.get("selection_score") or 0)
-        title = "🔥🔥 **厳選くんの勝負レース【強厳選】" if score >= 85 else "🔥 **厳選くんの勝負レース"
+        strong = score >= 85
+        title = "🔥🔥 **厳選くんの勝負レース【強厳選】**" if strong else "🔥 **厳選くんの勝負レース**"
         intro = random.choice(GENSEN_KUN_LINES)
+
         heads = record.get("heads") or {}
         ranked = sorted(heads.items(), key=lambda item: float(item[1]), reverse=True)
-        top_text = ""
+        head_line = "取得なし"
         if ranked:
-            top_text = f"\n頭評価：{ranked[0][0]}号艇 {float(ranked[0][1]) * 100:.1f}%"
+            head_line = f"{ranked[0][0]}号艇 {float(ranked[0][1]) * 100:.1f}%"
             if len(ranked) > 1:
-                top_text += f" / 対抗{ranked[1][0]}号艇 {float(ranked[1][1]) * 100:.1f}%"
+                head_line += f" ｜ 対抗 {ranked[1][0]}号艇 {float(ranked[1][1]) * 100:.1f}%"
+
+        main = list(record.get("main") or [])
+        cover = list((record.get("cover") or [])[:6])
+        main_text = "\n".join(f"`{pick}`" for pick in main) or "なし"
+        cover_text = "\n".join(f"`{pick}`" for pick in cover) or "なし"
 
         selected_bets = [
             bet for bet in (record.get("virtual_bets") or [])
             if float(bet.get("expected_value") or 0) >= 1.15
             and float(bet.get("probability") or 0) >= 0.015
         ]
-        ev_text = " / ".join(
-            f"{bet['combination']} {float(bet.get('odds') or 0):.1f}倍 EV{float(bet.get('expected_value') or 0):.2f}"
+        ev_lines = [
+            f"・{bet['combination']}｜{float(bet.get('odds') or 0):.1f}倍｜EV {float(bet.get('expected_value') or 0):.2f}"
             for bet in selected_bets[:3]
-        ) or "仮想投票条件クリア"
+        ]
+        ev_text = "\n".join(ev_lines) if ev_lines else "・仮想投票条件クリア"
 
-        main = " / ".join(record.get("main") or []) or "-"
-        cover = " / ".join((record.get("cover") or [])[:6]) or "-"
         bd = record.get("selection_score_breakdown") or {}
-        breakdown_text = (
-            f"頭{bd.get('head', 0)}/25・相手{bd.get('support', 0)}/15・展示/ST{bd.get('exhibition_st', 0)}/15・"
-            f"選手/コース{bd.get('racer_course', 0)}/15・モーター{bd.get('motor', 0)}/10・"
-            f"EV{bd.get('ev', 0)}/15・条件{bd.get('conditions', 0)}/5"
+        detail = (
+            f"頭 {bd.get('head', 0)}/25 ｜ 相手 {bd.get('support', 0)}/15 ｜ 展示/ST {bd.get('exhibition_st', 0)}/15\n"
+            f"選手/コース {bd.get('racer_course', 0)}/15 ｜ モーター {bd.get('motor', 0)}/10 ｜ EV {bd.get('ev', 0)}/15"
         )
+
         return (
             f"{intro}\n\n"
-            f"{title}｜{record.get('venue')} {record.get('rno')}R**\n"
-            f"締切 **{record.get('deadline')}** / 評価 **{record.get('grade')}** / 総合スコア **{score}/100**"
-            f"{top_text}\n"
-            f"◎ 本線：{main}\n"
-            f"○ 押さえ：{cover}\n"
-            f"スコア内訳：{breakdown_text}\n"
-            f"選定理由：総合75点以上＋展示確定＋仮想投票条件クリア\n"
-            f"EV候補：{ev_text}"
+            f"{title}\n"
+            f"**【{record.get('venue')} {record.get('rno')}R】**\n"
+            f"⏰ 締切 **{record.get('deadline')}**　⭐ **{score}/100**　評価 **{record.get('grade')}**\n"
+            f"━━━━━━━━━━━━\n"
+            f"🎯 **本線**\n{main_text}\n\n"
+            f"🛡️ **押さえ**\n{cover_text}\n"
+            f"━━━━━━━━━━━━\n"
+            f"👀 **頭候補**\n{head_line}\n\n"
+            f"💡 **厳選ポイント**\n"
+            f"・総合スコア75点以上\n"
+            f"・展示6艇確認済み\n"
+            f"・仮想投票条件クリア\n\n"
+            f"📈 **期待値候補**\n{ev_text}\n\n"
+            f"📊 **評価メモ**\n{detail}"
         )
 
     def scored_log(record):
