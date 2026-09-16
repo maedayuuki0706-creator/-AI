@@ -10,7 +10,6 @@ def replace_once(path: Path, old: str, new: str):
 
 
 alerts = Path("opportunity_alerts.py")
-workflow = Path(".github/workflows/discord_notify.yml")
 
 replace_once(
     alerts,
@@ -28,11 +27,5 @@ old_loop = '''        sent_at = datetime.now(app.base.JST).isoformat()\n        
 
 new_loop = '''        sent_at = datetime.now(app.base.JST).isoformat()\n        for label, env_name in (\n            ("mid", "DISCORD_WEBHOOK_MID_ODDS"),\n            ("long", "DISCORD_WEBHOOK_LONGSHOT"),\n        ):\n            payload = cached[label]\n            selected_mid = label == "mid" and _is_selected_mid(payload)\n            target_env = "DISCORD_WEBHOOK_MID_ODDS_SELECTED" if selected_mid else env_name\n            message = _selected_mid_message(payload["message"]) if selected_mid else payload["message"]\n            try:\n                _send(target_env, message)\n                _append_log({\n                    "day": record.get("day"),\n                    "jcd": record.get("jcd"),\n                    "venue": record.get("venue"),\n                    "rno": record.get("rno"),\n                    "deadline": record.get("deadline"),\n                    "sent_at": sent_at,\n                    "stream": "mid_odds" if label == "mid" else "longshot",\n                    "selected": bool(selected_mid),\n                    "delivery_env": target_env,\n                    "score": payload["score"],\n                    "confidence": payload["confidence"],\n                    "score_breakdown": payload["breakdown"],\n                    "picks": payload["picks"],\n                    "point_count": len(payload["picks"]),\n                    "mode": payload["mode"],\n                    "score_version": payload["score_version"],\n                })\n'''
 replace_once(alerts, old_loop, new_loop)
-
-replace_once(
-    workflow,
-    '          DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}\n          DISCORD_WEBHOOK_LONGSHOT: ${{ secrets.DISCORD_WEBHOOK_LONGSHOT }}\n',
-    '          DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}\n          DISCORD_WEBHOOK_MID_ODDS_SELECTED: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS_SELECTED }}\n          DISCORD_WEBHOOK_LONGSHOT: ${{ secrets.DISCORD_WEBHOOK_LONGSHOT }}\n',
-)
 
 print("selected mid-odds routing patched")
