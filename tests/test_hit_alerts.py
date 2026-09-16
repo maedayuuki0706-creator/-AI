@@ -37,6 +37,46 @@ class HitAlertTests(unittest.TestCase):
         self.assertIn("13,790円", text)
         self.assertIn("3,000円資金配分", text)
 
+    def test_mid_odds_message_is_labeled(self):
+        row = {
+            "stream": "mid_odds",
+            "venue": "鳴門",
+            "rno": 7,
+            "score": 78,
+            "confidence": "A",
+            "point_count": 12,
+            "picks": [
+                {"combination": "5-1-3", "odds": 24.5},
+            ],
+        }
+        text = hit_alerts._opportunity_message(row, "5-1-3", 2450)
+        self.assertIn("中穴AI 的中速報", text)
+        self.assertIn("期待度 **78/100**", text)
+        self.assertIn("予想時オッズ：**24.5倍**", text)
+        self.assertIn("買い目：**12点**", text)
+
+    def test_longshot_message_marks_man_shu(self):
+        row = {
+            "stream": "longshot",
+            "venue": "唐津",
+            "rno": 7,
+            "score": 71,
+            "confidence": "B",
+            "point_count": 10,
+            "picks": [
+                {"combination": "5-3-2", "odds": 95.6},
+            ],
+        }
+        text = hit_alerts._opportunity_message(row, "5-3-2", 12560)
+        self.assertIn("穴AI 万舟的中速報", text)
+        self.assertIn("12,560円", text)
+
+    def test_stream_keys_do_not_collide(self):
+        row = {"day": "20260916", "jcd": "23", "rno": 7}
+        self.assertEqual(hit_alerts._stream_key(row, "normal"), "20260916:23:7")
+        self.assertEqual(hit_alerts._stream_key(row, "mid_odds"), "mid_odds:20260916:23:7")
+        self.assertEqual(hit_alerts._stream_key(row, "longshot"), "longshot:20260916:23:7")
+
 
 if __name__ == "__main__":
     unittest.main()
