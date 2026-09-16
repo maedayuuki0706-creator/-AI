@@ -5,6 +5,32 @@ the likely winner. This module separately scores how attractive the race is as
 a betting candidate, then uses 75+ for selected and 85+ for strong selected.
 """
 
+import random
+
+
+GENSEN_KUN_LINES = (
+    "僕が選んだ、今日の勝負レース！",
+    "いっぱい見た中から、僕はここを選んだよ！",
+    "条件が揃ったよ。僕の勝負レース！",
+    "このレース、僕は狙ってみたいな！",
+    "中穴狙いなら、僕はここ！",
+    "ここ、ちょっと気になる！僕の厳選レースだよ！",
+    "僕の目に止まったのはこのレース！",
+    "今日はここに注目してるよ！",
+    "これなら勝負してみたい！僕の一押し！",
+    "迷ったけど、最後に選んだのはここ！",
+    "僕ならこのレースから狙ってみるよ！",
+    "条件を見比べて、今日はここに決めた！",
+    "ちょっとワクワクする一戦。僕はここ！",
+    "このレース、僕は見逃したくないな！",
+    "ここは僕の出番かも！勝負候補に選んだよ！",
+    "たくさん見たけど、今日はこのレースが気になる！",
+    "僕の厳選チェックを通った一戦だよ！",
+    "ここなら狙ってみたい。僕の勝負レース！",
+    "今日の候補から、僕はこれを選んだよ！",
+    "よし、決めた！僕の勝負レースはここ！",
+)
+
 
 def _scale(value, low, high):
     try:
@@ -170,7 +196,8 @@ def install(app):
 
     def selected_message(record):
         score = int(record.get("selection_score") or 0)
-        prefix = "🔥🔥 **強厳選予想" if score >= 85 else "🔥 **厳選予想"
+        title = "🔥🔥 **厳選くんの勝負レース【強厳選】" if score >= 85 else "🔥 **厳選くんの勝負レース"
+        intro = random.choice(GENSEN_KUN_LINES)
         heads = record.get("heads") or {}
         ranked = sorted(heads.items(), key=lambda item: float(item[1]), reverse=True)
         top_text = ""
@@ -198,7 +225,8 @@ def install(app):
             f"EV{bd.get('ev', 0)}/15・条件{bd.get('conditions', 0)}/5"
         )
         return (
-            f"{prefix}｜{record.get('venue')} {record.get('rno')}R**\n"
+            f"{intro}\n\n"
+            f"{title}｜{record.get('venue')} {record.get('rno')}R**\n"
             f"締切 **{record.get('deadline')}** / 評価 **{record.get('grade')}** / 総合スコア **{score}/100**"
             f"{top_text}\n"
             f"◎ 本線：{main}\n"
