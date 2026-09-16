@@ -14,11 +14,13 @@ import channel_smoke_test
 import detailed_discord_notify as app
 import hit_alerts
 import opportunity_alerts
+import opportunity_scenario_commentary
 import selection_scoring
 import stake_tracking
 
 selection_scoring.install(app)
 stake_tracking.install(app)
+opportunity_scenario_commentary.install(opportunity_alerts)
 opportunity_alerts.install(app)
 
 # The old 万舟警報 is retired. Longshot ideas now go only through the dedicated
