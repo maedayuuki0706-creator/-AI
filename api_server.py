@@ -1,12 +1,16 @@
 """Standalone public web app + prediction API for 競艇AIナビ (stdlib only)."""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import re
 from urllib.parse import parse_qs, urlparse
 
+import daily_report as daily
+import direct_discord_notify as boat_source
 from prediction_engine_v2 import analyze_race_v2
 
 ROOT = Path(__file__).resolve().parent
@@ -52,6 +56,115 @@ def read_jsonl(path: Path) -> list[dict]:
     except OSError:
         pass
     return items
+
+
+def _opportunity_picks(row: dict) -> set[str]:
+    picks: set[str] = set()
+    for item in row.get("picks") or []:
+        if not isinstance(item, dict):
+            continue
+        combo = str(item.get("combination") or "").strip()
+        if re.fullmatch(r"[1-6]-[1-6]-[1-6]", combo):
+            picks.add(combo)
+    return picks
+
+
+def _load_official_result(day: str, jcd: str, rno: int) -> dict:
+    try:
+        raw = boat_source.fetch(boat_source.official_url("raceresult", day, jcd, rno))
+        return daily.parse_payout(raw)
+    except Exception:
+        return {"status": "pending", "payouts": {}, "refund_lanes": []}
+
+
+def build_opportunity_report(day: str) -> dict:
+    """Rejudge the independent 中穴AI/穴AI streams against official results."""
+    if not re.fullmatch(r"20\d{6}", day):
+        raise ValueError("day must be YYYYMMDD")
+
+    rows = read_jsonl(DATA_ROOT / "opportunity_alert_deliveries.jsonl")
+    chosen: dict[tuple[str, str, int], dict] = {}
+    for row in rows:
+        if str(row.get("day") or "") != day:
+            continue
+        stream = str(row.get("stream") or "")
+        if stream not in {"mid_odds", "longshot"}:
+            continue
+        jcd = str(row.get("jcd") or "").zfill(2)
+        try:
+            rno = int(row.get("rno") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not re.fullmatch(r"\d{2}", jcd) or not 1 <= rno <= 12:
+            continue
+        key = (stream, jcd, rno)
+        old = chosen.get(key)
+        if old is None or str(row.get("sent_at") or "") >= str(old.get("sent_at") or ""):
+            chosen[key] = row
+
+    race_keys = sorted({(jcd, rno) for _, jcd, rno in chosen})
+    results: dict[tuple[str, int], dict] = {}
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        futures = {
+            pool.submit(_load_official_result, day, jcd, rno): (jcd, rno)
+            for jcd, rno in race_keys
+        }
+        for future in as_completed(futures):
+            key = futures[future]
+            try:
+                results[key] = future.result()
+            except Exception:
+                results[key] = {"status": "pending", "payouts": {}, "refund_lanes": []}
+
+    by_venue: dict[str, dict] = {}
+    totals = {
+        "mid_odds": {"hits": 0, "logged": 0, "settled": 0},
+        "longshot": {"hits": 0, "logged": 0, "settled": 0},
+    }
+    details: list[dict] = []
+
+    for (stream, jcd, rno), row in sorted(chosen.items(), key=lambda item: (item[0][1], item[0][2], item[0][0])):
+        venue = str(row.get("venue") or boat_source.VENUES.get(jcd) or jcd)
+        venue_stats = by_venue.setdefault(venue, {
+            "jcd": jcd,
+            "mid_odds": {"hits": 0, "logged": 0, "settled": 0},
+            "longshot": {"hits": 0, "logged": 0, "settled": 0},
+        })
+        venue_stats[stream]["logged"] += 1
+        totals[stream]["logged"] += 1
+
+        result = results.get((jcd, rno)) or {"status": "pending", "payouts": {}}
+        hit = False
+        winner = None
+        payout = None
+        if result.get("status") == "settled":
+            venue_stats[stream]["settled"] += 1
+            totals[stream]["settled"] += 1
+            matches = [(combo, int(yen)) for combo, yen in (result.get("payouts") or {}).items() if combo in _opportunity_picks(row)]
+            if matches:
+                winner, payout = max(matches, key=lambda item: item[1])
+                hit = True
+                venue_stats[stream]["hits"] += 1
+                totals[stream]["hits"] += 1
+        details.append({
+            "stream": stream,
+            "jcd": jcd,
+            "venue": venue,
+            "rno": rno,
+            "status": result.get("status"),
+            "hit": hit,
+            "winner": winner,
+            "payout_per_100": payout,
+            "point_count": int(row.get("point_count") or len(_opportunity_picks(row))),
+        })
+
+    return {
+        "ok": True,
+        "day": day,
+        "venues": by_venue,
+        "totals": totals,
+        "details": details,
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -125,6 +238,17 @@ class Handler(BaseHTTPRequestHandler):
             items = read_jsonl(DATA_ROOT / "prediction_log.jsonl")
             items.reverse()
             self.send_json(200, {"items": items[:limit], "count": len(items)})
+            return
+
+        if path == "/api/opportunity-report":
+            query = parse_qs(parsed.query)
+            day = str(query.get("day", [""])[0]).strip()
+            try:
+                payload = build_opportunity_report(day)
+            except ValueError as exc:
+                self.send_json(400, {"ok": False, "error": str(exc)})
+                return
+            self.send_json(200, payload)
             return
 
         self.send_json(404, {"ok": False, "error": "not found"})
