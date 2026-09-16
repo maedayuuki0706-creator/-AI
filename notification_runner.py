@@ -39,7 +39,10 @@ OPPORTUNITY_SMOKE_MARKER = Path("data/opportunity_channel_smoke_test_20260916.js
 
 
 def race_hours():
-    return 8 <= datetime.now(app.base.JST).hour < 22
+    # Midnight BOAT RACE can run well past 22:00 (e.g. 12R around 22:45).
+    # Keep the watcher alive through 23:59 JST so late exhibitions, predictions
+    # and hit alerts are not dropped. The next calendar day is still quiet until 08:00.
+    return 8 <= datetime.now(app.base.JST).hour <= 23
 
 
 def final_only_due_phase(policy, now, jcd, deadline, delivered, rno):
