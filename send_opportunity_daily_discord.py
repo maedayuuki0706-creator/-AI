@@ -169,7 +169,7 @@ def main():
             f"全体 **{total_hits}/{total_races}R＝{rate:.1f}%**\n"
             f"上位：{top}\n\n"
             "各場ごとに、的中レース・配当・惜しい外れ方まで確認します。\n"
-            "穴AIは的中したレースだけ🚨形式で軽く掲載。"
+            "穴予想は的中レースのみ掲載。"
         )
         post_discord(overview)
         marker["overview"] = True
@@ -271,9 +271,13 @@ def main():
         lines += ["", f"**📝 メモ**\n{memo}"]
 
         if long_hits.get(jcd):
-            lines += ["", "**💣 穴AI｜的中だけ軽く**"]
+            lines += ["", "**💣 穴予想**"]
             for rno, winner, payout in sorted(long_hits[jcd]):
-                lines += [f"{venue} {rno}レース", f"{winner}　🚨{payout:,}円的中🎯🚨"]
+                lines += [
+                    f"【{venue} {rno}レース】",
+                    f"買い目：{winner}",
+                    f"払戻金：{payout:,}円的中🎯",
+                ]
 
         message = "\n".join(lines)
         if len(message) > 1950:

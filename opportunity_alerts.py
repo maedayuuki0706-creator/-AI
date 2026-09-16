@@ -1,4 +1,4 @@
-"""Independent calibration feeds for 中穴AI and 穴AI.
+"""Independent calibration feeds for 中穴AI and 穴予想.
 
 The normal prediction message and selection logic are left untouched. This
 module observes the same final analysis, scores mid-odds and longshot
@@ -297,7 +297,7 @@ def _reason_lines(analysis, picks, kind):
 
 def _message(venue, rno, deadline, analysis, picks, kind, score, breakdown):
     icon = "🔥" if kind == "mid" else "💣"
-    name = "中穴AI" if kind == "mid" else "穴AI"
+    name = "中穴AI" if kind == "mid" else "穴予想"
     main_count = min(len(picks), 4 if kind == "mid" else 3)
     main = picks[:main_count]
     cover = picks[main_count:]
@@ -393,7 +393,7 @@ def smoke_test():
     )
     _send(
         "DISCORD_WEBHOOK_LONGSHOT",
-        "💣 **穴AI 接続テスト**\n逃げ穴・1飛び穴を含む別ロジックの準備OK。\n" + now,
+        "💣 **穴予想 接続テスト**\n逃げ穴・1飛び穴を含む別ロジックの準備OK。\n" + now,
     )
 
 
