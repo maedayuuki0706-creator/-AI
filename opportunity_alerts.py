@@ -297,7 +297,7 @@ def _reason_lines(analysis, picks, kind):
 
 def _message(venue, rno, deadline, analysis, picks, kind, score, breakdown):
     icon = "🔥" if kind == "mid" else "💣"
-    name = "中穴AI" if kind == "mid" else "穴予想"
+    name = "中穴予想" if kind == "mid" else "穴予想"
     main_count = min(len(picks), 4 if kind == "mid" else 3)
     main = picks[:main_count]
     cover = picks[main_count:]
@@ -358,6 +358,29 @@ def _build_payload(venue, rno, deadline, analysis, kind):
         "mode": "calibration_all_races",
         "score_version": "opportunity-score-v1",
     }
+
+
+def _is_selected_mid(payload):
+    picks = payload.get("picks") or []
+    if int(payload.get("score") or 0) < 75:
+        return False
+    if not picks or len(picks) > 12:
+        return False
+    best_ev = 0.0
+    for row in picks:
+        ev = row.get("expected_value")
+        if ev is None:
+            ev = _num(row.get("odds")) * _num(row.get("probability"))
+        best_ev = max(best_ev, _num(ev))
+    return best_ev >= 1.05
+
+
+def _selected_mid_message(message):
+    return str(message).replace(
+        "🔥 **中穴予想｜",
+        "🚨 **厳選中穴予想｜",
+        1,
+    )
 
 
 def _send(env_name, content):
@@ -434,8 +457,11 @@ def install(app):
             ("long", "DISCORD_WEBHOOK_LONGSHOT"),
         ):
             payload = cached[label]
+            selected_mid = label == "mid" and _is_selected_mid(payload)
+            target_env = "DISCORD_WEBHOOK_MID_ODDS_SELECTED" if selected_mid else env_name
+            message = _selected_mid_message(payload["message"]) if selected_mid else payload["message"]
             try:
-                _send(env_name, payload["message"])
+                _send(target_env, message)
                 _append_log({
                     "day": record.get("day"),
                     "jcd": record.get("jcd"),
@@ -444,6 +470,8 @@ def install(app):
                     "deadline": record.get("deadline"),
                     "sent_at": sent_at,
                     "stream": "mid_odds" if label == "mid" else "longshot",
+                    "selected": bool(selected_mid),
+                    "delivery_env": target_env,
                     "score": payload["score"],
                     "confidence": payload["confidence"],
                     "score_breakdown": payload["breakdown"],
