@@ -17,6 +17,8 @@ import direct_discord_notify as base
 DELIVERY_PATH = Path("data/hit_alert_deliveries.jsonl")
 OPPORTUNITY_PATH = Path("data/opportunity_alert_deliveries.jsonl")
 UNIT_YEN = 100
+# 中穴/穴の的中速報は、この機能追加より前の終了レースを一斉送信しない。
+OPPORTUNITY_ALERT_START = datetime(2026, 9, 16, 13, 38, tzinfo=base.JST)
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -204,6 +206,12 @@ def _latest_opportunities(day: str) -> dict[tuple[str, str, int], dict]:
             continue
         stream = str(row.get("stream") or "")
         if stream not in {"mid_odds", "longshot"}:
+            continue
+        try:
+            close = datetime.strptime(day + " " + row["deadline"], "%Y%m%d %H:%M").replace(tzinfo=base.JST)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if close < OPPORTUNITY_ALERT_START:
             continue
         jcd = str(row.get("jcd")).zfill(2)
         rno = int(row.get("rno") or 0)
