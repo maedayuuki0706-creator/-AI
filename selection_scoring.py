@@ -210,11 +210,37 @@ def install(app):
 
         main = list(record.get("main") or [])
         cover = list((record.get("cover") or [])[:6])
-        main_text = "\n".join(f"`{pick}`" for pick in main) or "なし"
+        virtual_bets = list(record.get("virtual_bets") or [])
+        bets_by_combo = {
+            str(bet.get("combination")): bet
+            for bet in virtual_bets
+            if bet.get("combination")
+        }
+
+        # 強厳選だけ、本線の中から確率・EV・並び順（展開一致）を合わせて
+        # 1〜3点を「厚め」として自動抽出する。
+        thick = []
+        if strong and main:
+            ranked_main = []
+            denom = max(1, len(main) - 1)
+            for index, pick in enumerate(main):
+                bet = bets_by_combo.get(str(pick), {})
+                ev = float(bet.get("expected_value") or 0.0)
+                probability = float(bet.get("probability") or 0.0)
+                alignment = 1.0 - (index / denom)
+                thick_score = (ev * 0.55) + (probability * 10.0 * 0.30) + (alignment * 0.15)
+                ranked_main.append((thick_score, index, pick))
+            ranked_main.sort(key=lambda item: (-item[0], item[1]))
+            thick_count = 3 if score >= 92 else 2 if score >= 88 else 1
+            thick = [item[2] for item in ranked_main[:min(thick_count, len(ranked_main))]]
+
+        regular_main = [pick for pick in main if pick not in thick]
+        thick_text = "\n".join(f"`{pick}`" for pick in thick) or "なし"
+        main_text = "\n".join(f"`{pick}`" for pick in regular_main) or ("厚めに集約" if thick else "なし")
         cover_text = "\n".join(f"`{pick}`" for pick in cover) or "なし"
 
         selected_bets = [
-            bet for bet in (record.get("virtual_bets") or [])
+            bet for bet in virtual_bets
             if float(bet.get("expected_value") or 0) >= 1.15
             and float(bet.get("probability") or 0) >= 0.015
         ]
@@ -230,18 +256,26 @@ def install(app):
             f"選手/コース {bd.get('racer_course', 0)}/15 ｜ モーター {bd.get('motor', 0)}/10 ｜ EV {bd.get('ev', 0)}/15"
         )
 
+        thick_section = ""
+        if strong:
+            thick_section = f"💥 **厚め（{len(thick)}点）**\n{thick_text}\n\n"
+
+        point_heading = "💡 **強厳選になった理由**" if strong else "💡 **厳選ポイント**"
+        threshold_text = "・総合スコア85点以上" if strong else "・総合スコア75点以上"
+
         return (
             f"{intro}\n\n"
             f"{title}\n"
             f"**【{record.get('venue')} {record.get('rno')}R】**\n"
             f"⏰ 締切 **{record.get('deadline')}**　⭐ **{score}/100**　評価 **{record.get('grade')}**\n"
             f"━━━━━━━━━━━━\n"
-            f"🎯 **本線**\n{main_text}\n\n"
-            f"🛡️ **押さえ**\n{cover_text}\n"
+            f"{thick_section}"
+            f"🎯 **本線（{len(regular_main)}点）**\n{main_text}\n\n"
+            f"🛡️ **押さえ（{len(cover)}点）**\n{cover_text}\n"
             f"━━━━━━━━━━━━\n"
             f"👀 **頭候補**\n{head_line}\n\n"
-            f"💡 **厳選ポイント**\n"
-            f"・総合スコア75点以上\n"
+            f"{point_heading}\n"
+            f"{threshold_text}\n"
             f"・展示6艇確認済み\n"
             f"・仮想投票条件クリア\n\n"
             f"📈 **期待値候補**\n{ev_text}\n\n"
