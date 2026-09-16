@@ -16,12 +16,14 @@ import hit_alerts
 import opportunity_alerts
 import opportunity_scenario_commentary
 import selection_scoring
+import sokuhou_character
 import stake_tracking
 
 selection_scoring.install(app)
 stake_tracking.install(app)
 opportunity_scenario_commentary.install(opportunity_alerts)
 opportunity_alerts.install(app)
+sokuhou_character.install(hit_alerts)
 
 # The old 万舟警報 is retired. Longshot ideas now go only through the dedicated
 # 穴AI stream, while the normal prediction feed itself stays unchanged.
