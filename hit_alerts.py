@@ -123,7 +123,8 @@ def _settle_3000(row: dict, result: dict) -> dict | None:
 
 def _message(row: dict, winner: str, payout: int, result: dict) -> str:
     is_man = payout >= 10000
-    title = "🚨🎯 **万舟的中速報**" if is_man else "🎯 **的中速報**"
+    alert = "万舟的中速報" if is_man else "的中速報"
+    title = f"🚨🔵🎯 **【メイン予想】{alert}" if is_man else f"🔵🎯 **【メイン予想】{alert}"
     section = _hit_section(row, winner)
     grade = row.get("grade") or "-"
     score = row.get("selection_score")
@@ -131,6 +132,7 @@ def _message(row: dict, winner: str, payout: int, result: dict) -> str:
 
     lines = [
         f"{title}｜{row.get('venue')} {row.get('rno')}R**",
+        "カテゴリ：**メイン予想**",
         f"結果：**{winner}　{payout:,}円**",
         f"的中：**{section}** / 評価 **{grade}**{score_text}",
     ]
@@ -167,14 +169,18 @@ def _opportunity_picks(row: dict) -> set[str]:
 def _opportunity_message(row: dict, winner: str, payout: int) -> str:
     stream = str(row.get("stream") or "")
     if stream == "mid_odds":
-        icon = "🔥"
+        icon = "🟡🔥🎯"
+        label = "中穴"
         name = "中穴AI"
     else:
-        icon = "💣"
+        icon = "🔴💣🎯"
+        label = "穴"
         name = "穴AI"
 
     is_man = payout >= 10000
     alert = "万舟的中速報" if is_man else "的中速報"
+    if is_man:
+        icon = "🚨" + icon
     score = row.get("score")
     confidence = row.get("confidence") or "-"
     score_text = f"期待度 **{int(score)}/100** / 自信度 **{confidence}**" if score is not None else f"自信度 **{confidence}**"
@@ -189,7 +195,8 @@ def _opportunity_message(row: dict, winner: str, payout: int) -> str:
             break
 
     lines = [
-        f"{icon}🎯 **{name} {alert}｜{row.get('venue')} {row.get('rno')}R**",
+        f"{icon} **【{label}】{alert}｜{row.get('venue')} {row.get('rno')}R**",
+        f"カテゴリ：**{label}**",
         f"結果：**{winner}　{payout:,}円**",
         f"的中：**{name}** / {score_text}",
     ]
