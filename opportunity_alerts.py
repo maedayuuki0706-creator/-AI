@@ -12,6 +12,7 @@ import itertools
 import json
 import math
 import os
+import random
 from pathlib import Path
 import urllib.request
 
@@ -376,11 +377,19 @@ def _is_selected_mid(payload):
 
 
 def _selected_mid_message(message):
-    return str(message).replace(
+    intros = (
+        "中穴狙いの中でも、条件が揃った一戦を厳選。",
+        "今日はここ。中穴狙いで勝負したい一戦です。",
+        "期待値・展開ともに狙える中穴レースを厳選。",
+        "数ある中穴候補から、ひとつ上の勝負レースを選定。",
+        "中穴狙いなら、ここは押さえておきたい一戦。",
+    )
+    body = str(message).replace(
         "🔥 **中穴予想｜",
         "🚨 **厳選中穴予想｜",
         1,
     )
+    return f"{random.choice(intros)}\n\n{body}"
 
 
 def _send(env_name, content):
