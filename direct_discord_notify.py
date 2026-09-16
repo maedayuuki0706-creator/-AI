@@ -449,7 +449,10 @@ def run_once(now: datetime | None=None, *, force_test=False,dry_run=False) -> in
         if not dry_run:send_discord('✅ **競艇AIナビ 通知テスト**\n'+now.isoformat())
         return 0
     policy=load_policy();day=now.strftime('%Y%m%d')
-    if now.hour<8 or now.hour>=22:
+    # Midnight BOAT RACE can have late races after 22:00. Keep same-day
+    # notifications active through 23:59 JST; after midnight the <08:00 guard
+    # naturally keeps the next day quiet until racing hours resume.
+    if now.hour<8:
         print('Outside race notification hours');return 0
     venues=set(discover_venues(day))|(set(policy.get('all_races',{}).get(day,[]))-{'*'})
     delivered=load_deliveries();targets=[];failures=0
