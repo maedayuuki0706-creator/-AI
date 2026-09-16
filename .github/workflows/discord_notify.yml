@@ -54,7 +54,7 @@ jobs:
           DISCORD_HIT_WEBHOOK_URL: ${{ secrets.DISCORD_HIT_WEBHOOK_URL }}
           DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}
           DISCORD_WEBHOOK_LONGSHOT: ${{ secrets.DISCORD_WEBHOOK_LONGSHOT }}
-          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '840' || '0' }}
+          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '1080' || '0' }}
         run: python notification_runner.py
 
       - name: Send grouped 2026-09-14 prediction summary
