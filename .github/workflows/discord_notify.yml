@@ -19,6 +19,7 @@ on:
       - "opportunity_alerts.py"
       - "opportunity_scenario_commentary.py"
       - "backfill_suminoe_20260916.py"
+      - "backfill_night12_20260916.py"
       - "prediction_recap.py"
       - "hit_alerts.py"
       - "selection_scoring.py"
@@ -27,8 +28,8 @@ on:
 permissions:
   contents: write
 
-# One notifier at a time. The old SHA-based group changed after every data
-# commit, which allowed overlapping watchers and still left schedule gaps.
+# One notifier at a time. Keep each scheduled watcher shorter than the 5-minute
+# cron interval so queued stale runs do not delay near-deadline notifications.
 concurrency:
   group: boat-ai-discord-notify-main
   cancel-in-progress: false
@@ -49,14 +50,14 @@ jobs:
           python-version: "3.12"
 
       - name: Deliver predictions and race status notices
-        if: ${{ !(github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary') || startsWith(github.event.head_commit.message, 'Backfill missed Suminoe'))) }}
+        if: ${{ !(github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary') || startsWith(github.event.head_commit.message, 'Backfill missed Suminoe') || startsWith(github.event.head_commit.message, 'Backfill missed night 12R'))) }}
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
           DISCORD_HIT_WEBHOOK_URL: ${{ secrets.DISCORD_HIT_WEBHOOK_URL }}
           DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}
           DISCORD_WEBHOOK_LONGSHOT: ${{ secrets.DISCORD_WEBHOOK_LONGSHOT }}
-          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '1080' || '0' }}
+          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '240' || '0' }}
         run: python notification_runner.py
 
       - name: Send missed Suminoe 5-7R retrospective cards
@@ -65,6 +66,13 @@ jobs:
           DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}
           DISCORD_WEBHOOK_LONGSHOT: ${{ secrets.DISCORD_WEBHOOK_LONGSHOT }}
         run: python backfill_suminoe_20260916.py
+
+      - name: Send missed night 12R retrospective cards
+        if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Backfill missed night 12R') }}
+        env:
+          DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}
+          DISCORD_WEBHOOK_LONGSHOT: ${{ secrets.DISCORD_WEBHOOK_LONGSHOT }}
+        run: python backfill_night12_20260916.py
 
       - name: Send grouped 2026-09-14 prediction summary
         if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary') }}
