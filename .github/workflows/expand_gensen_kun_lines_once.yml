@@ -1,0 +1,40 @@
+name: Expand Gensen-kun Lines Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "expand_gensen_kun_lines_once.py"
+      - ".github/workflows/expand_gensen_kun_lines_once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Expand Gensen-kun lines
+        run: python expand_gensen_kun_lines_once.py
+
+      - name: Verify syntax
+        run: python -m py_compile opportunity_alerts.py
+
+      - name: Commit patched file
+        run: |
+          git config user.name "boat-ai-learning-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add opportunity_alerts.py
+          git commit -m "Expand Gensen-kun random intro lines" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
