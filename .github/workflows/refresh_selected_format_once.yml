@@ -1,0 +1,40 @@
+name: Refresh Selected Format Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "refresh_selected_format_once.py"
+      - ".github/workflows/refresh_selected_format_once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Refresh selected format
+        run: python refresh_selected_format_once.py
+
+      - name: Verify syntax
+        run: python -m py_compile selection_scoring.py
+
+      - name: Commit patched file
+        run: |
+          git config user.name "boat-ai-learning-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add selection_scoring.py
+          git commit -m "Improve selected prediction Discord format" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
