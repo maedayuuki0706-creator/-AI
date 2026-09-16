@@ -96,10 +96,11 @@ def run_opportunity_smoke_test_once() -> bool:
 
 
 def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.sleep, is_open=race_hours):
-    # Scheduled Actions can start late. Keep one serialized watcher alive long
-    # enough to make a second final-data pass when the first pass only sees
-    # "展示待ち", instead of depending on the next cron launch arriving on time.
-    end = clock() + max(0, min(int(watch_seconds), 840))
+    # GitHub's scheduled launch can be delayed. Once a notifier starts, keep it
+    # alive for the full requested window so a race whose exhibition appears a
+    # few minutes later is not lost in the gap before the next cron run.
+    duration = max(0, min(int(watch_seconds), 1080))
+    end = clock() + duration
     result = 0
     while is_open():
         try:
@@ -111,9 +112,10 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
             hit_alerts.check_and_send()
         except Exception as exc:
             print(f'Hit alert pass failed: {type(exc).__name__}', flush=True)
-        if end - clock() < 210:
+        remaining = end - clock()
+        if duration == 0 or remaining <= 0:
             break
-        pause(60)
+        pause(min(60, max(1, remaining)))
     return result
 
 
