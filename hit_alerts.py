@@ -63,6 +63,34 @@ def _sent_keys(day: str) -> set[str]:
     }
 
 
+def _venue_hit_count(day: str, venue: str, stream: str) -> int:
+    """Count already delivered hits for this venue/category today."""
+    seen = set()
+    for row in _read_jsonl(DELIVERY_PATH):
+        if row.get("day") != day or row.get("status") != "sent":
+            continue
+        if str(row.get("venue") or "") != str(venue or ""):
+            continue
+        # Old main-prediction delivery rows predate the explicit stream field.
+        row_stream = str(row.get("stream") or "normal")
+        if row_stream != stream:
+            continue
+        key = str(row.get("key") or "")
+        if key and key not in seen:
+            seen.add(key)
+    return len(seen)
+
+
+def _current_venue_tally(row: dict, stream: str) -> int:
+    # The alert is formatted before its delivery record is appended, so include
+    # the current hit here. Duplicate alerts are already blocked by _sent_keys.
+    return _venue_hit_count(
+        str(row.get("day") or ""),
+        str(row.get("venue") or ""),
+        stream,
+    ) + 1
+
+
 def _send_hit_channel(content: str) -> None:
     hit_url = os.getenv("DISCORD_HIT_WEBHOOK_URL", "").strip()
     if not hit_url:
@@ -129,10 +157,12 @@ def _message(row: dict, winner: str, payout: int, result: dict) -> str:
     grade = row.get("grade") or "-"
     score = row.get("selection_score")
     score_text = f" / 総合スコア **{int(score)}/100**" if score is not None else ""
+    tally = _current_venue_tally(row, "normal")
 
     lines = [
         f"{title}｜{row.get('venue')} {row.get('rno')}R**",
         "カテゴリ：**メイン予想**",
+        f"本日：**{tally}/12的中🎯**",
         f"結果：**{winner}　{payout:,}円**",
         f"的中：**{section}** / 評価 **{grade}**{score_text}",
     ]
@@ -184,6 +214,7 @@ def _opportunity_message(row: dict, winner: str, payout: int) -> str:
     score = row.get("score")
     confidence = row.get("confidence") or "-"
     score_text = f"期待度 **{int(score)}/100** / 自信度 **{confidence}**" if score is not None else f"自信度 **{confidence}**"
+    tally = _current_venue_tally(row, stream)
 
     predicted_odds = None
     for pick in row.get("picks") or []:
@@ -197,6 +228,7 @@ def _opportunity_message(row: dict, winner: str, payout: int) -> str:
     lines = [
         f"{icon} **【{label}】{alert}｜{row.get('venue')} {row.get('rno')}R**",
         f"カテゴリ：**{label}**",
+        f"本日：**{tally}/12的中🎯**",
         f"結果：**{winner}　{payout:,}円**",
         f"的中：**{name}** / {score_text}",
     ]
