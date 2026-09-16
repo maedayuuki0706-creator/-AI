@@ -40,7 +40,15 @@ jobs:
               "content": "🚨 **厳選中穴予想｜接続テスト**\n新しい配信元の接続OKです👌",
               "allowed_mentions": {"parse": []},
           }, ensure_ascii=False).encode("utf-8")
-          req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
+          req = urllib.request.Request(
+              url,
+              data=body,
+              headers={
+                  "Content-Type": "application/json",
+                  "User-Agent": "Boat-AI-Navi/opportunity-v1",
+              },
+              method="POST",
+          )
           with urllib.request.urlopen(req, timeout=20) as res:
               if res.status not in (200, 204):
                   raise RuntimeError(f"Discord HTTP {res.status}")
