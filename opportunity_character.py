@@ -161,6 +161,20 @@ def _upset_expectation(analysis):
     return score, parts
 
 
+def _upset_level(score):
+    """Convert the internal 0-100 volatility score to a user-facing five-level label."""
+    score = max(0, min(100, int(round(_num(score)))))
+    if score >= 80:
+        return "Lv5｜大荒れ警戒"
+    if score >= 60:
+        return "Lv4｜波乱気配"
+    if score >= 40:
+        return "Lv3｜混戦気味"
+    if score >= 20:
+        return "Lv2｜落ち着き気味"
+    return "Lv1｜かなり穏やか"
+
+
 def _replace_metric_display(message, analysis, picks, score):
     composite = _composite_odds(picks)
     upset, _ = _upset_expectation(analysis)
@@ -174,7 +188,7 @@ def _replace_metric_display(message, analysis, picks, score):
         if line.startswith("期待度 **"):
             out.extend((
                 f"📊 **合成倍率 {composite_text}**",
-                f"🌊 **荒れ期待度 {upset}/100**",
+                f"🌊 **荒れ期待度 {_upset_level(upset)}**",
                 f"🎯 **狙い指数 {int(score or 0)}/100**",
             ))
             inserted = True
@@ -194,7 +208,7 @@ def _replace_metric_display(message, analysis, picks, score):
     if not inserted:
         metrics = [
             f"📊 **合成倍率 {composite_text}**",
-            f"🌊 **荒れ期待度 {upset}/100**",
+            f"🌊 **荒れ期待度 {_upset_level(upset)}**",
             f"🎯 **狙い指数 {int(score or 0)}/100**",
         ]
         insert_at = 1 if out else 0
@@ -300,13 +314,15 @@ def install(opportunity_alerts_module):
         upset, upset_parts = _upset_expectation(analysis)
         payload["composite_odds"] = composite
         payload["upset_expectation"] = upset
+        payload["upset_level"] = _upset_level(upset)
         payload["upset_breakdown"] = upset_parts
         stream = "mid_odds" if kind == "mid" else "longshot"
         _METRIC_CACHE[(str(venue), int(rno), stream)] = {
             "composite_odds": composite,
             "upset_expectation": upset,
+            "upset_level": _upset_level(upset),
             "upset_breakdown": upset_parts,
-            "metric_version": "opportunity-three-metrics-v1",
+            "metric_version": "opportunity-three-metrics-v2",
         }
         return payload
 
