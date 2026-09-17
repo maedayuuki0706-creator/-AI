@@ -1,0 +1,56 @@
+name: Mid Odds Precision Review
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "mid_precision_review.py"
+      - ".github/workflows/mid_precision_review.yml"
+      - "data/opportunity_postmortems/*.json"
+  schedule:
+    - cron: "35 15 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mid-precision-review-main
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build latest available precision review
+        run: |
+          DAY=$(ls data/opportunity_postmortems/*.json 2>/dev/null | sed -E 's#.*([0-9]{8})\.json#\1#' | sort | tail -1)
+          if [ -z "$DAY" ]; then
+            echo "No opportunity postmortem found"
+            exit 0
+          fi
+          echo "Review day: $DAY"
+          python mid_precision_review.py --day "$DAY"
+
+      - name: Persist review
+        run: |
+          if [ -z "$(git status --porcelain data/mid_precision_reviews/)" ]; then
+            echo "No review changes"
+            exit 0
+          fi
+          git config user.name "boat-ai-learning-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/mid_precision_reviews/
+          git commit -m "Store mid odds precision review" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
