@@ -26,8 +26,6 @@ opportunity_scenario_commentary.install(opportunity_alerts)
 opportunity_alerts.install(app)
 sokuhou_character.install(hit_alerts)
 
-# The old 万舟警報 is retired. Longshot ideas now go only through the dedicated
-# 穴AI stream, while the normal prediction feed itself stays unchanged.
 app._longshot_message = lambda record: None
 
 VENUES = {
@@ -44,9 +42,6 @@ _FULL_ANALYZE_OFFICIAL = app.base.analyze_official
 
 
 def race_hours():
-    # Midnight BOAT RACE can run well past 22:00 (e.g. 12R around 22:45).
-    # Keep the watcher alive through 23:59 JST so late exhibitions, predictions
-    # and hit alerts are not dropped. The next calendar day is still quiet until 08:00.
     return 8 <= datetime.now(app.base.JST).hour <= 23
 
 
@@ -65,12 +60,7 @@ def _jsonl_rows(path: Path):
 
 
 def sticky_discover_venues(day: str) -> list[str]:
-    """Never forget a venue already seen today if live discovery briefly drops it.
-
-    GitHub scheduled runs can be delayed, and the BOAT RACE index can transiently
-    omit a venue. A race that was previously marked 'waiting' must still be retried
-    after exhibition data appears instead of disappearing from the next pass.
-    """
+    """Never forget a venue already seen today if live discovery briefly drops it."""
     found = set()
     try:
         found.update(_LIVE_DISCOVER_VENUES(day))
@@ -90,15 +80,18 @@ def sticky_discover_venues(day: str) -> list[str]:
             if jcd in VENUES:
                 found.add(jcd)
 
+    # Omura is a midnight venue today. If the official index is transiently stale,
+    # explicitly keep 24 in the live set whenever its same-day racelist exists.
+    try:
+        if app.base.deadlines(day, "24"):
+            found.add("24")
+    except Exception:
+        pass
     return sorted(found)
 
 
 def fast_live_analysis(day: str, jcd: str, rno: int):
-    """Avoid expensive odds/form work while a final race is still exhibition-waiting.
-
-    Waiting races only need six-boat validity plus the exhibition count. Once all
-    six exhibition rows exist, fall through to the full model exactly as before.
-    """
+    """Avoid expensive odds/form work while a final race is still exhibition-waiting."""
     try:
         racelist_raw = app.base.fetch(app.base.official_url("racelist", day, jcd, rno))
         if app.base.withdrawal_lanes(racelist_raw):
@@ -106,42 +99,30 @@ def fast_live_analysis(day: str, jcd: str, rno: int):
         boats = app.base.parse_racelist_boats(day, jcd, rno)
         if len(boats) != 6:
             return _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
-        preview = app.base.parse_beforeinfo(
-            app.base.fetch(app.base.official_url("beforeinfo", day, jcd, rno))
-        )
+        preview = app.base.parse_beforeinfo(app.base.fetch(app.base.official_url("beforeinfo", day, jcd, rno)))
         if preview.get("exhibition_count", 0) < 6:
             for boat in boats:
                 boat.update(preview.get("boats", {}).get(boat["lane"], {}))
-            return {
-                "inputs": boats,
-                "preview": preview,
-                "delivery_wait_reasons": [],
-            }
+            return {"inputs": boats, "preview": preview, "delivery_wait_reasons": []}
     except Exception:
-        # The full analyser retains the existing unavailable/withdrawal handling.
         return _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
     return _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
 
 
 def final_only_due_phase(policy, now, jcd, deadline, delivered, rno):
-    """Only allow the final near-deadline prediction; suppress morning/preliminary cards."""
     day = now.strftime('%Y%m%d')
     lead = app.base.minutes_until(now, deadline)
     if lead < policy['final_min_lead_minutes']:
         return None
     if lead <= policy['final_max_lead_minutes']:
-        return None if (day, jcd,rno,'final') in delivered else 'final'
+        return None if (day, jcd, rno, 'final') in delivered else 'final'
     return None
 
 
 def all_current_venues_required(policy, day, jcd):
-    """The live normal feed is an all-race feed every day, not a dated allow-list."""
     return True
 
 
-# The user only wants the race prediction close to post time. Keep all-race final
-# coverage, selected alerts and hit alerts, but silence the morning all-race
-# briefing and preliminary prediction phase.
 app.base.discover_venues = sticky_discover_venues
 app.base.analyze_official = fast_live_analysis
 app.base.due_phase = final_only_due_phase
@@ -150,20 +131,15 @@ app.morning.run_once = lambda: 0
 
 
 def run_channel_smoke_test_once() -> bool:
-    """Run only on this push and journal success so normal schedules stay silent."""
     if os.getenv("GITHUB_EVENT_NAME") != "push" or SMOKE_MARKER.exists():
         return False
     channel_smoke_test.main()
     SMOKE_MARKER.parent.mkdir(parents=True, exist_ok=True)
-    SMOKE_MARKER.write_text(
-        json.dumps({"sent_at": datetime.now(app.base.JST).isoformat(), "selected": True, "hit": True}, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    SMOKE_MARKER.write_text(json.dumps({"sent_at": datetime.now(app.base.JST).isoformat(), "selected": True, "hit": True}, ensure_ascii=False) + "\n", encoding="utf-8")
     return True
 
 
 def run_opportunity_smoke_test_once() -> bool:
-    """Verify the new 中穴AI and 穴AI webhooks once, without touching normal prediction."""
     if os.getenv("GITHUB_EVENT_NAME") != "push" or OPPORTUNITY_SMOKE_MARKER.exists():
         return False
     try:
@@ -172,18 +148,12 @@ def run_opportunity_smoke_test_once() -> bool:
         print(f'Opportunity channel smoke test failed: {type(exc).__name__}', flush=True)
         return False
     OPPORTUNITY_SMOKE_MARKER.parent.mkdir(parents=True, exist_ok=True)
-    OPPORTUNITY_SMOKE_MARKER.write_text(
-        json.dumps({"sent_at": datetime.now(app.base.JST).isoformat(), "mid_odds": True, "longshot": True}, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    OPPORTUNITY_SMOKE_MARKER.write_text(json.dumps({"sent_at": datetime.now(app.base.JST).isoformat(), "mid_odds": True, "longshot": True}, ensure_ascii=False) + "\n", encoding="utf-8")
     print('Opportunity channel smoke test sent', flush=True)
     return True
 
 
 def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.sleep, is_open=race_hours):
-    # GitHub's scheduled launch can be delayed. Once a notifier starts, keep it
-    # alive for the full requested window so a race whose exhibition appears a
-    # few minutes later is not lost in the gap before the next cron run.
     duration = max(0, min(int(watch_seconds), 1080))
     end = clock() + duration
     result = 0
@@ -200,7 +170,9 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
         remaining = end - clock()
         if duration == 0 or remaining <= 0:
             break
-        pause(min(60, max(1, remaining)))
+        # Recheck every 30 seconds. This is important for midnight races where
+        # complete exhibition data can appear only a few minutes before deadline.
+        pause(min(30, max(1, remaining)))
     return result
 
 
