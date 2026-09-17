@@ -1,0 +1,54 @@
+name: Boat AI Motor Learning
+
+on:
+  schedule:
+    # 00:55 and 01:25 JST: official same-day results should be settled.
+    - cron: "55 15 * * *"
+    - cron: "25 16 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "motor_learning.py"
+      - "data/motor_cycles.json"
+      - ".github/workflows/motor_learning.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: boat-ai-motor-learning
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Collect new motor evidence
+        run: |
+          REPORT_DAY="$(TZ=Asia/Tokyo date +%Y%m%d)"
+          python motor_learning.py --day "$REPORT_DAY"
+
+      - name: Persist motor learning data
+        run: |
+          if [ -z "$(git status --porcelain data/motor_learning/)" ]; then
+            echo "No motor learning updates"
+            exit 0
+          fi
+          git config user.name "boat-ai-learning-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/motor_learning/
+          git commit -m "Update new motor learning data" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
