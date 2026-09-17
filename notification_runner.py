@@ -15,6 +15,7 @@ import detailed_discord_notify as app
 import hit_alerts
 import hit_alerts_fast
 import opportunity_alerts
+import opportunity_character
 import opportunity_scenario_commentary
 import selection_scoring
 import sokuhou_character
@@ -23,6 +24,7 @@ import stake_tracking
 selection_scoring.install(app)
 stake_tracking.install(app)
 opportunity_scenario_commentary.install(opportunity_alerts)
+opportunity_character.install(opportunity_alerts)
 opportunity_alerts.install(app)
 sokuhou_character.install(hit_alerts)
 
