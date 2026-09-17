@@ -1,0 +1,21 @@
+name: Mid Value Selection Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mid_value_selection.py"
+      - "opportunity_alerts.py"
+      - "opportunity_character.py"
+      - "notification_runner.py"
+      - "tests/test_mid_value_selection.py"
+      - ".github/workflows/mid_value_selection_tests.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run focused mid-value tests
+        run: python3 -m unittest tests.test_mid_value_selection -v
