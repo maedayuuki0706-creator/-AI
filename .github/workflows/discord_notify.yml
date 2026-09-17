@@ -1,5 +1,5 @@
 name: Boat AI Discord Notify
-# current recap trigger
+# continuous race-day watcher: bridge delayed GitHub schedule launches
 
 on:
   schedule:
@@ -29,8 +29,8 @@ on:
 permissions:
   contents: write
 
-# One notifier at a time. Keep each scheduled watcher shorter than the 5-minute
-# cron interval so queued stale runs do not delay near-deadline notifications.
+# Keep one watcher alive long enough to bridge GitHub schedule delays.
+# New scheduled runs may queue; they must never cancel the active notifier.
 concurrency:
   group: boat-ai-discord-notify-main
   cancel-in-progress: false
@@ -59,7 +59,7 @@ jobs:
           DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}
           DISCORD_WEBHOOK_MID_ODDS_SELECTED: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS_SELECTED }}
           DISCORD_WEBHOOK_LONGSHOT: ${{ secrets.DISCORD_WEBHOOK_LONGSHOT }}
-          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '240' || '0' }}
+          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '1080' || '1080' }}
         run: python notification_runner.py
 
       - name: Send missed Suminoe 5-7R retrospective cards
