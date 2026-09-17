@@ -1,0 +1,52 @@
+name: Opportunity AI Postmortem
+
+on:
+  schedule:
+    # 00:20 JST, after the previous day's official results are normally settled.
+    - cron: "20 15 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "opportunity_postmortem.py"
+      - ".github/workflows/opportunity_postmortem.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: opportunity-postmortem-main
+  cancel-in-progress: false
+
+jobs:
+  postmortem:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build previous-day mid-odds and longshot postmortem
+        run: |
+          DAY=$(TZ=Asia/Tokyo date -d 'yesterday' +%Y%m%d)
+          echo "Postmortem day: $DAY"
+          python opportunity_postmortem.py --day "$DAY"
+
+      - name: Persist postmortem
+        run: |
+          if [ -z "$(git status --porcelain data/opportunity_postmortems/)" ]; then
+            echo "No postmortem changes"
+            exit 0
+          fi
+          git config user.name "boat-ai-learning-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/opportunity_postmortems/
+          git commit -m "Store opportunity AI postmortem" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
