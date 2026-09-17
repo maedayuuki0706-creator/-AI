@@ -12,6 +12,7 @@ if os.getenv("SELECTED_DISCORD_WEBHOOK_URL") and not os.getenv("DISCORD_SELECTED
 
 import channel_smoke_test
 import detailed_discord_notify as app
+import bridge_learning
 import hit_alerts
 import hit_alerts_fast
 import opportunity_alerts
@@ -21,6 +22,7 @@ import selection_scoring
 import sokuhou_character
 import stake_tracking
 
+bridge_learning.install(app)
 selection_scoring.install(app)
 stake_tracking.install(app)
 opportunity_scenario_commentary.install(opportunity_alerts)
