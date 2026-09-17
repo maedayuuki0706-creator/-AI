@@ -16,6 +16,8 @@ on:
       - "notification_policy.json"
       - "race_notices.py"
       - "notification_runner.py"
+      - "bridge_learning.py"
+      - "daily_learning.py"
       - "opportunity_alerts.py"
       - "opportunity_scenario_commentary.py"
       - "send_opportunity_daily_discord.py"
@@ -49,6 +51,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Refresh near-miss learning state
+        if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Refresh near-miss learning state') }}
+        run: python daily_learning.py
 
       - name: Deliver predictions and race status notices
         if: ${{ !(github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary') || startsWith(github.event.head_commit.message, 'Backfill missed Suminoe') || startsWith(github.event.head_commit.message, 'Backfill missed night 12R') || startsWith(github.event.head_commit.message, 'Send 20260916 mid-odds daily reports'))) }}
