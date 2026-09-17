@@ -16,8 +16,11 @@ on:
       - "notification_policy.json"
       - "race_notices.py"
       - "notification_runner.py"
+      - "delivery_guard.py"
+      - "delivery_guard_runner.py"
       - "bridge_learning.py"
       - "daily_learning.py"
+      - "mid_value_selection.py"
       - "opportunity_alerts.py"
       - "opportunity_character.py"
       - "opportunity_scenario_commentary.py"
@@ -42,7 +45,7 @@ concurrency:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,8 +70,8 @@ jobs:
           DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}
           DISCORD_WEBHOOK_MID_ODDS_SELECTED: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS_SELECTED }}
           DISCORD_WEBHOOK_LONGSHOT: ${{ secrets.DISCORD_WEBHOOK_LONGSHOT }}
-          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '1080' || '1080' }}
-        run: python notification_runner.py
+          NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '1380' || '1380' }}
+        run: python delivery_guard_runner.py
 
       - name: Send missed Suminoe 5-7R retrospective cards
         if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Backfill missed Suminoe') }}
