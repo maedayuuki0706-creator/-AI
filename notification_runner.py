@@ -15,6 +15,7 @@ import detailed_discord_notify as app
 import bridge_learning
 import hit_alerts
 import hit_alerts_fast
+import mid_value_selection
 import opportunity_alerts
 import opportunity_character
 import opportunity_scenario_commentary
@@ -31,6 +32,9 @@ selection_scoring.install(app)
 stake_tracking.install(app)
 opportunity_scenario_commentary.install(opportunity_alerts)
 opportunity_character.install(opportunity_alerts)
+# Middle-odds selection stays evidence-first: market price can widen the usable
+# range, but odds splitting/favourite rank never creates a bet by itself.
+mid_value_selection.install(opportunity_alerts)
 opportunity_alerts.install(app)
 sokuhou_character.install(hit_alerts)
 
