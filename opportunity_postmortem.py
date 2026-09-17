@@ -6,7 +6,7 @@ writes machine-readable + markdown reports for later threshold tuning.
 """
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import datetime
 import argparse
 import json
@@ -168,6 +168,59 @@ def _stats(rows: list[dict]) -> dict:
     }
 
 
+def _manshu_stats(rows: list[dict]) -> dict:
+    sample = [r for r in rows if r["stream"] == "longshot" and int(r["payout"]) >= 10000]
+    n = len(sample)
+    exact = sum(1 for r in sample if r["hit"])
+    prefix = sum(1 for r in sample if not r["hit"] and r["prefix_match"])
+    same_three = sum(1 for r in sample if not r["hit"] and r["same_three_order_miss"])
+    head = sum(1 for r in sample if r["head_match"])
+    two_boats = sum(1 for r in sample if int(r.get("max_boat_overlap") or 0) >= 2)
+    strong = sum(
+        1 for r in sample
+        if r["hit"] or r["prefix_match"] or r["same_three_order_miss"]
+    )
+    categories = Counter()
+    for r in sample:
+        if r["hit"]:
+            categories["exact"] += 1
+        elif r["prefix_match"]:
+            categories["prefix_right_third_miss"] += 1
+        elif r["same_three_order_miss"]:
+            categories["same_three_wrong_order"] += 1
+        elif r["head_match"]:
+            categories["head_only"] += 1
+        elif int(r.get("max_boat_overlap") or 0) >= 2:
+            categories["two_boats_overlap"] += 1
+        else:
+            categories["weak_or_wrong"] += 1
+    detail = sorted(sample, key=lambda r: int(r["payout"]), reverse=True)
+    return {
+        "races": n,
+        "exact_hits": exact,
+        "exact_hit_rate": round(exact / n * 100, 1) if n else 0.0,
+        "prefix_misses": prefix,
+        "same_three_order_misses": same_three,
+        "head_covered": head,
+        "head_coverage_rate": round(head / n * 100, 1) if n else 0.0,
+        "two_boats_or_more": two_boats,
+        "two_boats_or_more_rate": round(two_boats / n * 100, 1) if n else 0.0,
+        "strong_approach": strong,
+        "strong_approach_rate": round(strong / n * 100, 1) if n else 0.0,
+        "categories": dict(categories),
+        "races_detail": [
+            {
+                "venue": r["venue"], "rno": r["rno"], "winner": r["winner"],
+                "payout": r["payout"], "score": r["score"], "label": r["label"],
+                "hit": r["hit"], "prefix_match": r["prefix_match"],
+                "same_three_order_miss": r["same_three_order_miss"],
+                "head_match": r["head_match"], "max_boat_overlap": r["max_boat_overlap"],
+            }
+            for r in detail
+        ],
+    }
+
+
 def build(day: str) -> dict:
     result_path = RESULT_DIR / f"{day}.json"
     if not result_path.exists():
@@ -207,7 +260,6 @@ def build(day: str) -> dict:
     selected_mid = [r for r in rows if r["stream"] == "mid_odds" and r.get("selected")]
     by_stream["mid_odds"]["selected_only"] = _stats(selected_mid)
 
-    # Useful near-miss shortlist: prioritize exact prefix, then same-three, then head+target-band.
     priority = {
         "prefix_right_third_miss": 4,
         "same_three_order_miss": 3,
@@ -223,8 +275,9 @@ def build(day: str) -> dict:
     return {
         "day": day,
         "generated_at": datetime.now().astimezone().isoformat(),
-        "version": "opportunity-postmortem-v1",
+        "version": "opportunity-postmortem-v2-manshu",
         "summary": by_stream,
+        "manshu": _manshu_stats(rows),
         "near_misses": near[:30],
         "rows": rows,
     }
@@ -254,8 +307,26 @@ def markdown(report: dict) -> str:
                 lines.append(f"- {band}: {b['hits']}/{b['races']}R = {b['hit_rate']:.1f}% / ROI {_pct(b['roi'])}")
         if stream == "mid_odds":
             sel = s["selected_only"]
-            lines += ["", f"### 厳選中穴だけ", f"- {sel['hits']}/{sel['races']}R = {sel['hit_rate']:.1f}% / ROI {_pct(sel['roi_all_picks_100'])}"]
+            lines += ["", "### 厳選中穴だけ", f"- {sel['hits']}/{sel['races']}R = {sel['hit_rate']:.1f}% / ROI {_pct(sel['roi_all_picks_100'])}"]
         lines.append("")
+
+    m = report["manshu"]
+    lines += [
+        "## 万舟に対する穴AIのアプローチ",
+        f"- 万舟 {m['races']}R / 完全的中 {m['exact_hits']}R = {m['exact_hit_rate']:.1f}%",
+        f"- 1・2着まで一致→3着抜け {m['prefix_misses']}R",
+        f"- 同じ3艇まで拾って順番違い {m['same_three_order_misses']}R",
+        f"- 勝ち艇を頭候補に置けた {m['head_covered']}/{m['races']}R = {m['head_coverage_rate']:.1f}%",
+        f"- 結果3艇のうち2艇以上を同一買い目で拾えた {m['two_boats_or_more']}/{m['races']}R = {m['two_boats_or_more_rate']:.1f}%",
+        f"- 強いアプローチ（的中・1/2着一致・同3艇） {m['strong_approach']}/{m['races']}R = {m['strong_approach_rate']:.1f}%",
+        "",
+        "### 万舟一覧（高配当順）",
+    ]
+    for r in m["races_detail"]:
+        lines.append(
+            f"- {r['venue']} {r['rno']}R｜{r['winner']} {r['payout']:,}円｜score {r['score']}｜{r['label']}"
+        )
+    lines.append("")
 
     lines += ["## 惜しい外れ（学習優先）", ""]
     for r in report["near_misses"][:20]:
@@ -268,6 +339,7 @@ def markdown(report: dict) -> str:
         "## 学習方針",
         "- 中穴は、狙い配当帯に入ったレースでの『頭一致』『1・2着一致』『同じ3艇』を分けて追う。",
         "- 穴は、的中率だけでなく『50倍以上を読めたか』『万舟で頭まで読めたか』を別指標にする。",
+        "- 万舟は完全的中だけで評価せず、1・2着一致や同じ3艇まで寄せられたレースを買い目構造の学習対象にする。",
         "- 点数をむやみに増やさず、prefix / same-three の惜しい外れが多い時だけ既存点の入替候補にする。",
         "- 1日だけで閾値は変更せず、スコア帯別成績を数日蓄積してから調整する。",
     ]
