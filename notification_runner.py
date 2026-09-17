@@ -38,6 +38,7 @@ VENUES = {
 LOG_PATH = Path("data/prediction_log.jsonl")
 SMOKE_MARKER = Path("data/channel_smoke_test_20260915.json")
 OPPORTUNITY_SMOKE_MARKER = Path("data/opportunity_channel_smoke_test_20260916.json")
+_LIVE_DISCOVER_VENUES = app.base.discover_venues
 
 
 def race_hours():
@@ -45,6 +46,49 @@ def race_hours():
     # Keep the watcher alive through 23:59 JST so late exhibitions, predictions
     # and hit alerts are not dropped. The next calendar day is still quiet until 08:00.
     return 8 <= datetime.now(app.base.JST).hour <= 23
+
+
+def _jsonl_rows(path: Path):
+    if not path.exists():
+        return []
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def sticky_discover_venues(day: str) -> list[str]:
+    """Never forget a venue already seen today if live discovery briefly drops it.
+
+    GitHub scheduled runs can be delayed, and the BOAT RACE index can transiently
+    omit a venue. A race that was previously marked 'waiting' must still be retried
+    after exhibition data appears instead of disappearing from the next pass.
+    """
+    found = set()
+    try:
+        found.update(_LIVE_DISCOVER_VENUES(day))
+    except Exception as exc:
+        print(f'Live venue discovery failed: {type(exc).__name__}', flush=True)
+
+    for row in _jsonl_rows(LOG_PATH):
+        if str(row.get("day") or "") == day:
+            jcd = str(row.get("jcd") or "").zfill(2)
+            if jcd in VENUES:
+                found.add(jcd)
+
+    notice_path = Path("data/race_status_log.jsonl")
+    for row in _jsonl_rows(notice_path):
+        if str(row.get("day") or "") == day:
+            jcd = str(row.get("jcd") or "").zfill(2)
+            if jcd in VENUES:
+                found.add(jcd)
+
+    return sorted(found)
 
 
 def final_only_due_phase(policy, now, jcd, deadline, delivered, rno):
@@ -66,6 +110,7 @@ def all_current_venues_required(policy, day, jcd):
 # The user only wants the race prediction close to post time. Keep all-race final
 # coverage, selected alerts and hit alerts, but silence the morning all-race
 # briefing and preliminary prediction phase.
+app.base.discover_venues = sticky_discover_venues
 app.base.due_phase = final_only_due_phase
 app.base.required_venue = all_current_venues_required
 app.morning.run_once = lambda: 0
