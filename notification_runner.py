@@ -39,6 +39,7 @@ LOG_PATH = Path("data/prediction_log.jsonl")
 SMOKE_MARKER = Path("data/channel_smoke_test_20260915.json")
 OPPORTUNITY_SMOKE_MARKER = Path("data/opportunity_channel_smoke_test_20260916.json")
 _LIVE_DISCOVER_VENUES = app.base.discover_venues
+# Manual retry marker: 2026-09-17 Naruto 5R
 
 
 def race_hours():
@@ -98,7 +99,7 @@ def final_only_due_phase(policy, now, jcd, deadline, delivered, rno):
     if lead < policy['final_min_lead_minutes']:
         return None
     if lead <= policy['final_max_lead_minutes']:
-        return None if (day, jcd, rno, 'final') in delivered else 'final'
+        return None if (day, jcd,rno,'final') in delivered else 'final'
     return None
 
 
