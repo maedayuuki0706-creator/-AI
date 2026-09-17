@@ -21,8 +21,12 @@ import opportunity_scenario_commentary
 import selection_scoring
 import sokuhou_character
 import stake_tracking
+import water_affinity
 
 bridge_learning.install(app)
+# Install before selection scoring so same-day venue form can be logged and may
+# add only a tiny confidence bonus after a race already clears the 75 border.
+water_affinity.install(app)
 selection_scoring.install(app)
 stake_tracking.install(app)
 opportunity_scenario_commentary.install(opportunity_alerts)
@@ -114,12 +118,12 @@ def fast_live_analysis(day: str, jcd: str, rno: int):
 
 
 def final_only_due_phase(policy, now, jcd, deadline, delivered, rno):
-    day = now.strftime('%Y%m%d')
-    lead = app.base.minutes_until(now, deadline)
-    if lead < policy['final_min_lead_minutes']:
+    day=now.strftime('%Y%m%d')
+    lead=app.base.minutes_until(now,deadline)
+    if lead<policy['final_min_lead_minutes']:
         return None
-    if lead <= policy['final_max_lead_minutes']:
-        return None if (day, jcd, rno, 'final') in delivered else 'final'
+    if lead<=policy['final_max_lead_minutes']:
+        return None if (day,jcd,rno,'final') in delivered else 'final'
     return None
 
 
