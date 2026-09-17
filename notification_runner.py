@@ -13,6 +13,7 @@ if os.getenv("SELECTED_DISCORD_WEBHOOK_URL") and not os.getenv("DISCORD_SELECTED
 import channel_smoke_test
 import detailed_discord_notify as app
 import hit_alerts
+import hit_alerts_fast
 import opportunity_alerts
 import opportunity_scenario_commentary
 import selection_scoring
@@ -39,7 +40,7 @@ LOG_PATH = Path("data/prediction_log.jsonl")
 SMOKE_MARKER = Path("data/channel_smoke_test_20260915.json")
 OPPORTUNITY_SMOKE_MARKER = Path("data/opportunity_channel_smoke_test_20260916.json")
 _LIVE_DISCOVER_VENUES = app.base.discover_venues
-# Manual retry marker: 2026-09-17 Naruto 5R
+_FULL_ANALYZE_OFFICIAL = app.base.analyze_official
 
 
 def race_hours():
@@ -92,6 +93,36 @@ def sticky_discover_venues(day: str) -> list[str]:
     return sorted(found)
 
 
+def fast_live_analysis(day: str, jcd: str, rno: int):
+    """Avoid expensive odds/form work while a final race is still exhibition-waiting.
+
+    Waiting races only need six-boat validity plus the exhibition count. Once all
+    six exhibition rows exist, fall through to the full model exactly as before.
+    """
+    try:
+        racelist_raw = app.base.fetch(app.base.official_url("racelist", day, jcd, rno))
+        if app.base.withdrawal_lanes(racelist_raw):
+            return _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
+        boats = app.base.parse_racelist_boats(day, jcd, rno)
+        if len(boats) != 6:
+            return _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
+        preview = app.base.parse_beforeinfo(
+            app.base.fetch(app.base.official_url("beforeinfo", day, jcd, rno))
+        )
+        if preview.get("exhibition_count", 0) < 6:
+            for boat in boats:
+                boat.update(preview.get("boats", {}).get(boat["lane"], {}))
+            return {
+                "inputs": boats,
+                "preview": preview,
+                "delivery_wait_reasons": [],
+            }
+    except Exception:
+        # The full analyser retains the existing unavailable/withdrawal handling.
+        return _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
+    return _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
+
+
 def final_only_due_phase(policy, now, jcd, deadline, delivered, rno):
     """Only allow the final near-deadline prediction; suppress morning/preliminary cards."""
     day = now.strftime('%Y%m%d')
@@ -112,6 +143,7 @@ def all_current_venues_required(policy, day, jcd):
 # coverage, selected alerts and hit alerts, but silence the morning all-race
 # briefing and preliminary prediction phase.
 app.base.discover_venues = sticky_discover_venues
+app.base.analyze_official = fast_live_analysis
 app.base.due_phase = final_only_due_phase
 app.base.required_venue = all_current_venues_required
 app.morning.run_once = lambda: 0
@@ -162,7 +194,7 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
             print(f'Notification pass failed: {type(exc).__name__}', flush=True)
             result = 1
         try:
-            hit_alerts.check_and_send()
+            hit_alerts_fast.check_and_send()
         except Exception as exc:
             print(f'Hit alert pass failed: {type(exc).__name__}', flush=True)
         remaining = end - clock()
