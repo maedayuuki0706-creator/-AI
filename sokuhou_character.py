@@ -88,10 +88,79 @@ def hype_lines(winner: str, payout: int, stream: str = "normal") -> tuple[str, s
     )
 
 
-def _decorate(message: str, winner: str, payout: int, stream: str) -> str:
+def _candidate_hit(hit_alerts_module, candidate: dict, stream: str) -> bool | None:
+    """Judge one already-published candidate against its official settled result."""
+    day = str(candidate.get("day") or "")
+    jcd = str(candidate.get("jcd") or "").zfill(2)
+    try:
+        rno = int(candidate.get("rno") or 0)
+    except (TypeError, ValueError):
+        return None
+    result = hit_alerts_module._load_official(day, jcd, rno)
+    if result is None:
+        return None
+    if stream == "normal":
+        picks = set(hit_alerts_module.report.disclosed_picks(candidate))
+    else:
+        picks = hit_alerts_module._opportunity_picks(candidate)
+    payouts = result.get("payouts") or {}
+    return any(str(combo) in picks for combo in payouts)
+
+
+def _current_streak(hit_alerts_module, row: dict, stream: str) -> int:
+    """Current same-venue/category streak across published predictions.
+
+    A miss resets the streak. Races with no prediction in that category do not
+    count as wins or losses, so delivery gaps never manufacture a false miss.
+    """
+    day = str(row.get("day") or "")
+    jcd = str(row.get("jcd") or "").zfill(2)
+    try:
+        current_rno = int(row.get("rno") or 0)
+    except (TypeError, ValueError):
+        return 1
+
+    candidates = []
+    if stream == "normal":
+        if hit_alerts_module.base.LOG_PATH.exists():
+            predictions = hit_alerts_module.report.read_jsonl(hit_alerts_module.base.LOG_PATH)
+            chosen, _ = hit_alerts_module.report.latest_predictions(predictions, day)
+            candidates = [
+                candidate for candidate in chosen.values()
+                if str(candidate.get("jcd") or "").zfill(2) == jcd
+                and int(candidate.get("rno") or 0) <= current_rno
+            ]
+    else:
+        candidates = [
+            candidate
+            for (candidate_stream, candidate_jcd, candidate_rno), candidate
+            in hit_alerts_module._latest_opportunities(day).items()
+            if candidate_stream == stream
+            and str(candidate_jcd).zfill(2) == jcd
+            and int(candidate_rno) <= current_rno
+        ]
+
+    candidates.sort(key=lambda candidate: int(candidate.get("rno") or 0))
+    streak = 0
+    for candidate in candidates:
+        hit = _candidate_hit(hit_alerts_module, candidate, stream)
+        if hit is True:
+            streak += 1
+        else:
+            # Pending/unknown is treated conservatively as a break so the
+            # displayed streak can never be overstated.
+            streak = 0
+    return max(1, streak)
+
+
+def _decorate(message: str, winner: str, payout: int, stream: str, streak: int = 1) -> str:
     opener, call, closer = hype_lines(winner, payout, stream)
-    # Keep the existing factual card intact between the two hype blocks.
-    return "\n".join((opener, call, "", message, "", closer))
+    streak_line = f"🔥🔥 **現在 {streak}連的中目ェェェ！！！**" if streak >= 2 else ""
+    parts = [opener, call]
+    if streak_line:
+        parts.append(streak_line)
+    parts.extend(("", message, "", closer))
+    return "\n".join(parts)
 
 
 def install(hit_alerts_module) -> None:
@@ -104,12 +173,14 @@ def install(hit_alerts_module) -> None:
 
     def message(row: dict, winner: str, payout: int, result: dict) -> str:
         base_message = original_message(row, winner, payout, result)
-        return _decorate(base_message, winner, payout, "normal")
+        streak = _current_streak(hit_alerts_module, row, "normal")
+        return _decorate(base_message, winner, payout, "normal", streak)
 
     def opportunity_message(row: dict, winner: str, payout: int) -> str:
         base_message = original_opportunity_message(row, winner, payout)
         stream = str(row.get("stream") or "longshot")
-        return _decorate(base_message, winner, payout, stream)
+        streak = _current_streak(hit_alerts_module, row, stream)
+        return _decorate(base_message, winner, payout, stream, streak)
 
     hit_alerts_module._message = message
     hit_alerts_module._opportunity_message = opportunity_message
