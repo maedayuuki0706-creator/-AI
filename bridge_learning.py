@@ -115,12 +115,20 @@ def _bridge_kind(
 def _reallocate(analysis: dict, picks: list[dict]) -> list[dict]:
     venue = str(analysis.get("venue") or "")
     enabled, metrics = _metrics_for(venue)
+    structure = dict(analysis.get("conviction_structure") or {})
+    protected_prefixes = {
+        prefix for prefix in (
+            structure.get("main_prefix"),
+            structure.get("reciprocal_prefix"),
+        ) if prefix
+    }
     meta = {
         **metrics,
         "enabled": enabled,
         "replacements": [],
         "point_count_before": len(picks),
         "point_count_after": len(picks),
+        "protected_prefixes": sorted(protected_prefixes),
     }
     analysis["bridge_learning"] = meta
 
@@ -209,9 +217,21 @@ def _reallocate(analysis: dict, picks: list[dict]) -> list[dict]:
         victim_index = replaceable.pop(0)
         victim = selected[victim_index]
         victim_probability = _prob(victim)
+        victim_parts = _parts(victim)
+        victim_prefix = (
+            f"{victim_parts[0]}-{victim_parts[1]}"
+            if victim_parts is not None else ""
+        )
 
-        # Do not trade a clearly stronger cover point for a weak hedge.
-        if victim_probability > 0 and probability < victim_probability * 0.55:
+        # Do not let learning delete the very ordered-pair tails the main card
+        # is deliberately extending. This prevents a "rescue" from erasing a
+        # valid hit such as the Tamagawa 5R postmortem case.
+        if victim_prefix in protected_prefixes:
+            continue
+
+        # Reallocation must now be close to probability-neutral; bridge value
+        # alone is not enough reason to throw away a materially stronger pick.
+        if victim_probability > 0 and probability < victim_probability * 0.95:
             continue
 
         old_combo = str(victim.get("combination") or "")
@@ -259,7 +279,7 @@ def install(app: Any) -> None:
         if meta:
             record = dict(record)
             record["bridge_learning"] = meta
-            record["bridge_learning_version"] = "bridge-cover-v2-venue-pattern"
+            record["bridge_learning_version"] = "bridge-cover-v3-protected-prefixes"
             policy = str(record.get("prediction_point_policy") or "")
             record["prediction_point_policy"] = (
                 policy + "+bridge_reallocation" if policy else "bridge_reallocation"
