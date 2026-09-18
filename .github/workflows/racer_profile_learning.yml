@@ -1,0 +1,61 @@
+name: Racer Profile Learning
+
+on:
+  schedule:
+    # 01:10 JST, after daily result settlement.
+    - cron: "10 16 * * *"
+  workflow_dispatch:
+    inputs:
+      day:
+        description: Race day in JST (YYYYMMDD)
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - "racer_profiles.py"
+      - "racer_profile_learning.py"
+      - "tests/test_racer_profiles.py"
+      - ".github/workflows/racer_profile_learning.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: racer-profile-learning
+  cancel-in-progress: false
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run profile unit tests
+        run: python -m unittest tests.test_racer_profiles -v
+      - name: Learn racer profiles
+        env:
+          INPUT_DAY: ${{ github.event_name == 'workflow_dispatch' && inputs.day || '' }}
+        run: |
+          if [ -n "$INPUT_DAY" ]; then
+            python racer_profile_learning.py --day "$INPUT_DAY"
+          else
+            python racer_profile_learning.py
+          fi
+      - name: Persist racer profiles
+        run: |
+          if [ -z "$(git status --porcelain data/racer_profiles.json)" ]; then
+            echo "No racer profile update"
+            exit 0
+          fi
+          git config user.name "boat-ai-learning-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/racer_profiles.json
+          git commit -m "Update racer profiles" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
