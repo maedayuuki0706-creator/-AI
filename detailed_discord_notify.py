@@ -58,7 +58,7 @@ def _target_point_count(analysis):
 
 
 def _conviction_heads(analysis):
-    """Pick one main winner axis and at most one genuine reversal candidate."""
+    """Choose 1-2 winner axes, with a rare three-head exception for true ties."""
     ranked = sorted(
         (analysis.get("heads") or {}).items(),
         key=lambda item: float(item[1] or 0.0),
@@ -74,11 +74,18 @@ def _conviction_heads(analysis):
     second = (str(ranked[1][0]), float(ranked[1][1] or 0.0))
     top = primary[1]
     second_value = second[1]
-    # Usually require the second head to be genuinely close. In Tamagawa G1
-    # we relax this slightly, but still never carry a third head just for cover.
     ratio = 0.68 if analysis.get("balanced_head_mode") else 0.72
     if top > 0 and (second_value >= top * ratio or (top - second_value) <= 0.065):
         out.append(second)
+
+    # Three heads are allowed only when the model itself cannot separate them.
+    # This is the "345-12=345" type of race: coherent mixed formation, not spray.
+    if len(out) >= 2 and len(ranked) >= 3 and top > 0:
+        third = (str(ranked[2][0]), float(ranked[2][1] or 0.0))
+        tight_ratio = 0.82 if analysis.get("balanced_head_mode") else 0.86
+        tight_gap = 0.050 if analysis.get("balanced_head_mode") else 0.040
+        if third[1] >= top * tight_ratio and (top - third[1]) <= tight_gap:
+            out.append(third)
     return out
 
 
@@ -105,6 +112,24 @@ def _best_prefix(rows, head):
     return max(masses, key=masses.get) if masses else None
 
 
+def _best_second_hubs(rows, allowed_heads, limit=2):
+    masses = {}
+    allowed = {str(head) for head in allowed_heads}
+    for row in rows:
+        parts = str(row.get("combination") or "").split("-")
+        if len(parts) != 3 or parts[0] not in allowed:
+            continue
+        second = parts[1]
+        masses[second] = masses.get(second, 0.0) + _row_probability(row)
+    return [
+        lane for lane, _ in sorted(
+            masses.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )[:limit]
+    ]
+
+
 def _append_unique(selected, seen, row):
     combo = str(row.get("combination") or "")
     if not combo or combo in seen:
@@ -115,11 +140,11 @@ def _append_unique(selected, seen, row):
 
 
 def _conviction_picks(analysis, target):
-    """Hit-rate-first card: 1-2 heads only, then extend the strongest tails.
+    """Hit-rate-first card: strong heads first, then extend their tails.
 
-    The goal is a card that says what it believes. Weak third/fourth head
-    singletons are removed before adding more third-place coverage behind the
-    strongest ordered pairs.
+    Default is one or two heads. A third head is permitted only in a true model
+    tie, and then the card is organized around two strong second-place hubs
+    rather than scattered singletons.
     """
     rows = list(analysis.get("trifecta") or [])
     if not rows:
@@ -132,38 +157,62 @@ def _conviction_picks(analysis, target):
     allowed_heads = [lane for lane, _ in heads]
     primary = allowed_heads[0]
     secondary = allowed_heads[1] if len(allowed_heads) > 1 else None
+    tertiary = allowed_heads[2] if len(allowed_heads) > 2 else None
+
+    # Keep 6-14 as the normal range. Only a genuine three-head tie may expand
+    # slightly, capped at 16, because otherwise the formation loses conviction.
+    if tertiary:
+        target = min(16, max(12, int(target) + 2))
 
     main_prefix = _best_prefix(rows, primary)
     reciprocal_prefix = f"{secondary}-{primary}" if secondary else None
+    second_hubs = _best_second_hubs(rows, allowed_heads, limit=2) if tertiary else []
 
     analysis["conviction_structure"] = {
         "primary_head": primary,
         "secondary_head": secondary,
+        "tertiary_head": tertiary,
         "main_prefix": main_prefix,
         "reciprocal_prefix": reciprocal_prefix,
+        "second_hubs": second_hubs,
         "max_heads": len(allowed_heads),
         "target_points": int(target),
-        "policy": "conviction-heads-v1",
+        "policy": "conviction-heads-v2-mixed-exception",
     }
 
     selected = []
     seen = set()
 
-    # Main line: make the first three tickets tell one clear story whenever
-    # possible (same 1st-2nd prefix, third place stretched by model rank).
-    if main_prefix:
-        main_rows = [row for row in rows if _prefix(row) == main_prefix]
-        for row in main_rows[:3]:
-            _append_unique(selected, seen, row)
+    if tertiary and second_hubs:
+        # Mixed race: seed one strong hub-based ticket per head, then keep the
+        # remaining budget inside the same head/hub structure.
+        for head in allowed_heads:
+            for row in rows:
+                parts = str(row.get("combination") or "").split("-")
+                if len(parts) == 3 and parts[0] == head and parts[1] in second_hubs:
+                    if _append_unique(selected, seen, row):
+                        break
+        for row in rows:
+            parts = str(row.get("combination") or "").split("-")
+            if len(parts) != 3:
+                continue
+            if parts[0] in allowed_heads and parts[1] in second_hubs:
+                _append_unique(selected, seen, row)
+                if len(selected) >= target:
+                    return selected[:target]
+    else:
+        # Normal race: first three tickets tell one clear ordered-pair story.
+        if main_prefix:
+            main_rows = [row for row in rows if _prefix(row) == main_prefix]
+            for row in main_rows[:3]:
+                _append_unique(selected, seen, row)
 
-    # If the main prefix has fewer than three usable rows, stay on the main head
-    # before considering the reversal head.
-    for row in rows:
-        if len(selected) >= min(3, target):
-            break
-        parts = str(row.get("combination") or "").split("-")
-        if len(parts) == 3 and parts[0] == primary:
-            _append_unique(selected, seen, row)
+        for row in rows:
+            if len(selected) >= min(3, target):
+                break
+            parts = str(row.get("combination") or "").split("-")
+            if len(parts) == 3 and parts[0] == primary:
+                _append_unique(selected, seen, row)
 
     # Tail extension gets priority over spraying extra winner candidates.
     priority_prefixes = []
@@ -192,7 +241,7 @@ def _conviction_picks(analysis, target):
             if len(selected) >= target:
                 return selected[:target]
 
-    # Fill the remaining budget only with the one or two declared heads.
+    # Fill the remaining budget only with the declared heads.
     for row in rows:
         parts = str(row.get("combination") or "").split("-")
         if len(parts) != 3 or parts[0] not in allowed_heads:
@@ -201,8 +250,8 @@ def _conviction_picks(analysis, target):
         if len(selected) >= target:
             return selected[:target]
 
-    # Defensive fallback; normally unreachable because one head has 20 trifecta
-    # combinations. Never add a third head unless data is incomplete.
+    # Defensive fallback; normally unreachable. Do not introduce a new head
+    # outside the declared conviction structure unless source data is incomplete.
     for row in rows:
         _append_unique(selected, seen, row)
         if len(selected) >= target:
@@ -229,9 +278,13 @@ def analysis_message_with_virtual(day, jcd, rno, deadline, phase, analysis, rows
     primary = structure.get("primary_head")
     secondary = structure.get("secondary_head")
     if primary:
-        axis_line = f"🎯 軸：**{primary}号艇**"
-        if secondary:
-            axis_line += f"　⚔️ 逆転候補：**{secondary}号艇**"
+        tertiary = structure.get("tertiary_head")
+        if tertiary:
+            axis_line = f"🎯 頭候補：**{primary}・{secondary}・{tertiary}号艇**　🌪️混戦"
+        else:
+            axis_line = f"🎯 軸：**{primary}号艇**"
+            if secondary:
+                axis_line += f"　⚔️ 逆転候補：**{secondary}号艇**"
         marker = "**3連単フォーメーション**"
         if marker in message:
             message = message.replace(marker, axis_line + "\n\n" + marker, 1)
@@ -376,7 +429,7 @@ def log_prediction_with_virtual(record):
         record["virtual_status"] = allocation.get("status")
         record["virtual_unit_yen"] = 100
         record["virtual_selection_rule"] = "latest_pre_deadline_per_race"
-        record["prediction_point_policy"] = "conviction_heads_1to2_tail_extension_v1"
+        record["prediction_point_policy"] = "conviction_heads_tail_extension_v2"
 
     _ORIGINAL_LOG_PREDICTION(record)
 
