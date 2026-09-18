@@ -46,12 +46,24 @@ def _metrics_for(venue: str | None) -> tuple[bool, dict]:
     if enabled and venue_samples >= MIN_VENUE_SAMPLES:
         enabled = venue_rate >= MIN_BRIDGE_MISS_RATE
 
+    same_three = float(venue_metrics.get("same_three_set_rate") or 0.0)
+    ordered_top2 = float(venue_metrics.get("ordered_top2_rate") or 0.0)
+    pattern = "neutral"
+    if venue_samples >= MIN_VENUE_SAMPLES:
+        if same_three >= ordered_top2 + 0.02:
+            pattern = "same_three_order"
+        elif ordered_top2 >= same_three + 0.08:
+            pattern = "ordered_top2_third"
+
     return enabled, {
         "learning_version": state.get("learning_version"),
         "samples": samples,
         "global_bridge_miss_rate": rate,
         "venue_samples": venue_samples,
         "venue_bridge_miss_rate": venue_rate if venue_samples else None,
+        "venue_same_three_set_rate": same_three if venue_samples else None,
+        "venue_ordered_top2_rate": ordered_top2 if venue_samples else None,
+        "venue_pattern": pattern,
     }
 
 
@@ -81,13 +93,20 @@ def _ev(row: dict) -> float | None:
         return None
 
 
-def _bridge_kind(candidate: tuple[int, int, int], base: tuple[int, int, int], allow_head_swap: bool) -> float:
+def _bridge_kind(
+    candidate: tuple[int, int, int],
+    base: tuple[int, int, int],
+    allow_head_swap: bool,
+    *,
+    order_bias: float = 0.0,
+    third_bias: float = 0.0,
+) -> float:
     if candidate[:2] == base[:2] and candidate[2] != base[2]:
-        return 3.0
+        return 3.0 + max(0.0, third_bias)
     if set(candidate) == set(base) and candidate != base:
-        return 2.6
+        return 2.6 + max(0.0, order_bias)
     if candidate[0] == base[0] and candidate[2] == base[2] and candidate[1] != base[1]:
-        return 2.2
+        return 2.2 + max(0.0, order_bias * 0.5)
     if allow_head_swap and candidate[1:] == base[1:] and candidate[0] != base[0]:
         return 1.8
     return 0.0
@@ -126,6 +145,22 @@ def _reallocate(analysis: dict, picks: list[dict]) -> list[dict]:
     )
     allow_head_swap = head_gap < 0.10
 
+    # Venue learning changes only the *priority* of bridge candidates. Core six,
+    # point count, probability floor and EV floor remain untouched.
+    pattern = str(metrics.get("venue_pattern") or "neutral")
+    same_three = float(metrics.get("venue_same_three_set_rate") or 0.0)
+    ordered_top2 = float(metrics.get("venue_ordered_top2_rate") or 0.0)
+    order_bias = 0.0
+    third_bias = 0.0
+    if int(metrics.get("venue_samples") or 0) >= MIN_VENUE_SAMPLES:
+        if pattern == "same_three_order":
+            order_bias = min(0.60, max(0.15, (same_three - ordered_top2) * 8.0))
+        elif pattern == "ordered_top2_third":
+            third_bias = min(0.60, max(0.15, (ordered_top2 - same_three) * 5.0))
+    meta["venue_pattern"] = pattern
+    meta["order_bias"] = round(order_bias, 3)
+    meta["third_bias"] = round(third_bias, 3)
+
     candidates = []
     for row in rows:
         combo = str(row.get("combination") or "")
@@ -135,7 +170,16 @@ def _reallocate(analysis: dict, picks: list[dict]) -> list[dict]:
         if parts is None or parts[0] not in allowed_heads:
             continue
 
-        kind = max((_bridge_kind(parts, base, allow_head_swap) for base in core), default=0.0)
+        kind = max((
+            _bridge_kind(
+                parts,
+                base,
+                allow_head_swap,
+                order_bias=order_bias,
+                third_bias=third_bias,
+            )
+            for base in core
+        ), default=0.0)
         if kind <= 0:
             continue
 
@@ -215,7 +259,7 @@ def install(app: Any) -> None:
         if meta:
             record = dict(record)
             record["bridge_learning"] = meta
-            record["bridge_learning_version"] = "bridge-cover-v1"
+            record["bridge_learning_version"] = "bridge-cover-v2-venue-pattern"
             policy = str(record.get("prediction_point_policy") or "")
             record["prediction_point_policy"] = (
                 policy + "+bridge_reallocation" if policy else "bridge_reallocation"
