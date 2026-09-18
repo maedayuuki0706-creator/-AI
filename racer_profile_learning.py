@@ -14,7 +14,7 @@ import racer_profiles
 
 JST = ZoneInfo("Asia/Tokyo")
 PROFILE_PATH = Path("data/racer_profiles.json")
-DEFAULT_BACKFILL_FLOOR = "20230101"
+DEFAULT_BACKFILL_FLOOR = "20200101"
 MAX_RECENT_RACE_KEYS = 50000
 FETCH_WORKERS = 8
 
