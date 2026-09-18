@@ -92,11 +92,16 @@ def _coherent_selection(candidates, kind, analysis=None):
 
     balanced = bool((analysis or {}).get("balanced_head_mode")) and kind == "mid"
     if balanced and len(ranked_heads) > 1:
-        # Tamagawa G1: keep prediction evidence first, but do not collapse the
-        # whole mid-odds card onto one winner in an elite, closely matched field.
-        chosen_heads = ranked_heads[:2]
-        if len(ranked_heads) >= 3 and head_strength[ranked_heads[2]] >= head_strength[ranked_heads[0]] * 0.45:
-            chosen_heads.append(ranked_heads[2])
+        # Hit-rate first. G1 is not enough by itself: only diversify when the
+        # model's supported head scenarios are genuinely close.
+        top_strength = head_strength[ranked_heads[0]]
+        second_strength = head_strength[ranked_heads[1]]
+        if top_strength > 0 and second_strength >= top_strength * 0.72:
+            chosen_heads = ranked_heads[:2]
+            if len(ranked_heads) >= 3 and head_strength[ranked_heads[2]] >= top_strength * 0.62:
+                chosen_heads.append(ranked_heads[2])
+        else:
+            balanced = False
 
     limit = 12 if kind == "mid" else 10
     if balanced:
