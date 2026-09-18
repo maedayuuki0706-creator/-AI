@@ -19,7 +19,7 @@ on:
       backfill_floor:
         description: Oldest historical day to retain (YYYYMMDD)
         required: false
-        default: "20230101"
+        default: "20200101"
         type: string
   push:
     branches: [main]
@@ -53,7 +53,7 @@ jobs:
         env:
           INPUT_DAY: ${{ github.event_name == 'workflow_dispatch' && inputs.day || '' }}
           INPUT_BACKFILL_DAYS: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill_days || '6' }}
-          INPUT_BACKFILL_FLOOR: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill_floor || '20230101' }}
+          INPUT_BACKFILL_FLOOR: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill_floor || '20200101' }}
         run: |
           RUN_DAY="$INPUT_DAY"
           if [ -z "$RUN_DAY" ]; then
