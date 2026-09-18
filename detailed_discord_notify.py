@@ -57,6 +57,64 @@ def _target_point_count(analysis):
     return max(6, min(14, target))
 
 
+def _balanced_tamagawa_g1_picks(analysis, target):
+    """For Tamagawa G1 only, avoid over-fixing one winner while keeping model rank meaningful."""
+    rows = list(analysis.get("trifecta") or [])
+    ranked_heads = sorted(
+        (analysis.get("heads") or {}).items(),
+        key=lambda item: float(item[1] or 0),
+        reverse=True,
+    )
+    if len(ranked_heads) < 2:
+        return rows[:target]
+
+    chosen = [str(ranked_heads[0][0]), str(ranked_heads[1][0])]
+    if len(ranked_heads) >= 3:
+        top = float(ranked_heads[0][1] or 0)
+        third = float(ranked_heads[2][1] or 0)
+        if third >= max(0.12, top * 0.45):
+            chosen.append(str(ranked_heads[2][0]))
+
+    buckets = {head: [] for head in chosen}
+    for row in rows:
+        combo = str(row.get("combination") or "")
+        head = combo.split("-")[0] if combo else ""
+        if head in buckets:
+            buckets[head].append(row)
+
+    selected = []
+    seen = set()
+    # Seed each supported head before filling by model rank. This keeps the G1
+    # card scenario-based rather than turning it into one rigid first-place axis.
+    seed_each = 2 if len(chosen) >= 3 and target >= 9 else 1
+    for head in chosen:
+        for row in buckets[head][:seed_each]:
+            combo = row.get("combination")
+            if combo and combo not in seen:
+                selected.append(row); seen.add(combo)
+
+    max_per_head = max(3, (target + 1) // 2)
+    counts = {head: sum(1 for row in selected if str(row.get("combination") or "").startswith(head + "-")) for head in chosen}
+    for row in rows:
+        combo = str(row.get("combination") or "")
+        if not combo or combo in seen:
+            continue
+        head = combo.split("-")[0]
+        if head not in counts or counts[head] >= max_per_head:
+            continue
+        selected.append(row); seen.add(combo); counts[head] += 1
+        if len(selected) >= target:
+            return selected
+
+    for row in rows:
+        combo = row.get("combination")
+        if combo and combo not in seen:
+            selected.append(row); seen.add(combo)
+            if len(selected) >= target:
+                break
+    return selected
+
+
 def displayed_picks_variable(analysis, required):
     """Keep the original six as the core and widen ties up to 14 points."""
     core = list(_ORIGINAL_DISPLAYED_PICKS(analysis, required))
@@ -64,6 +122,10 @@ def displayed_picks_variable(analysis, required):
         return core
 
     target = _target_point_count(analysis)
+    if analysis.get("balanced_head_mode"):
+        # Tamagawa G1 special case only. Other venues keep the existing logic.
+        # We widen winner scenarios only when the model still gives them support.
+        return _balanced_tamagawa_g1_picks(analysis, max(10, target))
     if target <= len(core):
         return core[:target]
 
