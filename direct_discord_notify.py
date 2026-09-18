@@ -26,6 +26,7 @@ from zoneinfo import ZoneInfo
 
 from prediction_engine import analyze_race
 from race_context import previous_form
+import racer_profiles
 from discord_formation import formation_summary, formation_lines
 from race_notices import withdrawal_lanes, notice_message, read_notices, record_notice
 
@@ -231,6 +232,9 @@ def analyze_official(day: str, jcd: str, rno: int) -> dict | None:
     form=previous_form(day,jcd,boats)
     for boat in boats:
         boat.update(preview['boats'].get(boat['lane'],{}))
+        # Persistent individual tendencies: actual-course history, course
+        # strength, venue exposure, ST and winning-method profile.
+        racer_profiles.apply_profile(boat, str(jcd).zfill(2))
         if boat['lane'] in form:
             boat['previous_day_score_delta']=form[boat['lane']]['score_delta']
     result=analyze_race({'race':{'venue':VENUES[jcd],'wind_speed':preview['wind_speed']},'boats':boats,'trifecta_odds':odds})
