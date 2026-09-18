@@ -2,13 +2,24 @@ name: Racer Profile Learning
 
 on:
   schedule:
-    # 01:10 JST, after daily result settlement.
-    - cron: "10 16 * * *"
+    # 01:10 / 10:10 / 16:10 / 22:10 JST.
+    # Each run learns the latest race day and advances a small historical batch.
+    - cron: "10 1,7,13,16 * * *"
   workflow_dispatch:
     inputs:
       day:
-        description: Race day in JST (YYYYMMDD)
+        description: Recent race day in JST (YYYYMMDD)
         required: false
+        type: string
+      backfill_days:
+        description: Historical calendar days to process this run
+        required: false
+        default: "6"
+        type: string
+      backfill_floor:
+        description: Oldest historical day to retain (YYYYMMDD)
+        required: false
+        default: "20230101"
         type: string
   push:
     branches: [main]
@@ -23,12 +34,12 @@ permissions:
 
 concurrency:
   group: racer-profile-learning
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   learn:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,15 +49,21 @@ jobs:
           python-version: "3.12"
       - name: Run profile unit tests
         run: python -m unittest tests.test_racer_profiles -v
-      - name: Learn racer profiles
+      - name: Learn current and historical racer profiles
         env:
           INPUT_DAY: ${{ github.event_name == 'workflow_dispatch' && inputs.day || '' }}
+          INPUT_BACKFILL_DAYS: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill_days || '6' }}
+          INPUT_BACKFILL_FLOOR: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill_floor || '20230101' }}
         run: |
-          if [ -n "$INPUT_DAY" ]; then
-            python racer_profile_learning.py --day "$INPUT_DAY"
-          else
-            python racer_profile_learning.py
+          RUN_DAY="$INPUT_DAY"
+          if [ -z "$RUN_DAY" ]; then
+            RUN_DAY="$(TZ=Asia/Tokyo date +%Y%m%d)"
+            HOUR="$(TZ=Asia/Tokyo date +%H)"
+            if [ "$HOUR" -lt 6 ]; then
+              RUN_DAY="$(TZ=Asia/Tokyo date -d yesterday +%Y%m%d)"
+            fi
           fi
+          python racer_profile_learning.py             --day "$RUN_DAY"             --backfill-days "$INPUT_BACKFILL_DAYS"             --backfill-floor "$INPUT_BACKFILL_FLOOR"
       - name: Persist racer profiles
         run: |
           if [ -z "$(git status --porcelain data/racer_profiles.json)" ]; then
@@ -57,5 +74,12 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add data/racer_profiles.json
           git commit -m "Update racer profiles" || exit 0
-          git pull --rebase origin main
-          git push origin HEAD:main
+          for attempt in 1 2 3 4; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep $((attempt * 2))
+          done
+          echo "Could not persist racer profiles after retries"
+          exit 1
