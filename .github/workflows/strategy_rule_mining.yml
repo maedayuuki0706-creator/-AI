@@ -1,0 +1,54 @@
+name: Strategy Rule Mining
+
+on:
+  schedule:
+    # 01:35 JST, after daily report/metrics.
+    - cron: "35 16 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "strategy_rule_miner.py"
+      - "tests/test_strategy_rule_miner.py"
+      - ".github/workflows/strategy_rule_mining.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: strategy-rule-mining
+  cancel-in-progress: false
+
+jobs:
+  mine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test rule miner
+        run: python -m unittest tests.test_strategy_rule_miner -v
+      - name: Mine validated rules
+        run: python strategy_rule_miner.py
+      - name: Persist rule report
+        run: |
+          if [ -z "$(git status --porcelain data/strategy_rules/)" ]; then
+            echo "No strategy rule update"
+            exit 0
+          fi
+          git config user.name "boat-ai-learning-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/strategy_rules/
+          git commit -m "Update strategy rule mining" || exit 0
+          for attempt in 1 2 3 4; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep $((attempt * 2))
+          done
+          exit 1
