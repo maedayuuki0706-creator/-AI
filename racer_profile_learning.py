@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
@@ -13,69 +14,154 @@ import racer_profiles
 
 JST = ZoneInfo("Asia/Tokyo")
 PROFILE_PATH = Path("data/racer_profiles.json")
+DEFAULT_BACKFILL_FLOOR = "20230101"
+MAX_RECENT_RACE_KEYS = 50000
+FETCH_WORKERS = 8
+
+
+def _parse_day(day: str) -> datetime:
+    return datetime.strptime(day, "%Y%m%d")
+
+
+def _day_before(day: str) -> str:
+    return (_parse_day(day) - timedelta(days=1)).strftime("%Y%m%d")
+
+
+def _observation_weight(day: str, anchor_day: str) -> float:
+    """Keep old history, but make recent behavior count more in live scoring."""
+    age = max(0, (_parse_day(anchor_day) - _parse_day(day)).days)
+    if age <= 180:
+        return 1.0
+    if age <= 365:
+        return 0.85
+    if age <= 730:
+        return 0.65
+    if age <= 1095:
+        return 0.48
+    return 0.35
 
 
 def _counter_bucket(mapping: dict, key: object) -> dict:
     key = str(key)
-    row = mapping.setdefault(key, {"starts": 0, "wins": 0, "top2": 0, "top3": 0})
-    return row
+    return mapping.setdefault(key, {
+        "starts": 0, "wins": 0, "top2": 0, "top3": 0,
+        "weighted_starts": 0.0, "weighted_wins": 0.0,
+        "weighted_top2": 0.0, "weighted_top3": 0.0,
+        "st_sum": 0.0, "st_samples": 0, "avg_st": None,
+        "win_methods": {},
+    })
 
 
-def _observe_bucket(row: dict, finish: int | None) -> None:
+def _observe_bucket(
+    row: dict,
+    finish: int | None,
+    *,
+    weight: float,
+    st: float | None = None,
+    method: str | None = None,
+) -> None:
     row["starts"] = int(row.get("starts") or 0) + 1
+    row["weighted_starts"] = round(float(row.get("weighted_starts") or 0.0) + weight, 6)
+
     if finish == 1:
         row["wins"] = int(row.get("wins") or 0) + 1
+        row["weighted_wins"] = round(float(row.get("weighted_wins") or 0.0) + weight, 6)
+        if method:
+            methods = row.setdefault("win_methods", {})
+            methods[method] = int(methods.get(method) or 0) + 1
+
     if isinstance(finish, int) and finish <= 2:
         row["top2"] = int(row.get("top2") or 0) + 1
+        row["weighted_top2"] = round(float(row.get("weighted_top2") or 0.0) + weight, 6)
     if isinstance(finish, int) and finish <= 3:
         row["top3"] = int(row.get("top3") or 0) + 1
+        row["weighted_top3"] = round(float(row.get("weighted_top3") or 0.0) + weight, 6)
+
+    if isinstance(st, (int, float)) and 0 <= float(st) <= 1:
+        row["st_sum"] = round(float(row.get("st_sum") or 0.0) + float(st), 6)
+        row["st_samples"] = int(row.get("st_samples") or 0) + 1
+        row["avg_st"] = round(row["st_sum"] / row["st_samples"], 4)
+
+
+def _new_racer(rid: str, name: str | None) -> dict:
+    return {
+        "racer_id": rid,
+        "name": name,
+        "starts": 0,
+        "wins": 0,
+        "top2": 0,
+        "top3": 0,
+        "weighted_starts": 0.0,
+        "weighted_wins": 0.0,
+        "weighted_top2": 0.0,
+        "weighted_top3": 0.0,
+        "st_sum": 0.0,
+        "st_samples": 0,
+        "avg_st": None,
+        "lanes": {},
+        "courses": {},
+        "venues": {},
+        "years": {},
+        "win_methods": {},
+        "course_win_methods": {},
+        "first_seen": None,
+        "last_seen": None,
+    }
 
 
 def update_from_result(state: dict, result: dict) -> None:
     racers = state.setdefault("racers", {})
     jcd = str(result.get("jcd") or "").zfill(2)
     method = result.get("method")
+    day = str(result.get("day") or "")
+    year = day[:4] if len(day) >= 4 else "unknown"
+    anchor_day = str(state.get("weight_anchor_day") or day or datetime.now(JST).strftime("%Y%m%d"))
+    weight = _observation_weight(day, anchor_day) if len(day) == 8 else 1.0
+
     for item in result.get("finish") or []:
         rid = str(item.get("racer_id") or "")
         if not rid:
             continue
         finish = item.get("finish") if item.get("status") == "finished" else None
-        racer = racers.setdefault(rid, {
-            "racer_id": rid,
-            "name": item.get("name"),
-            "starts": 0,
-            "wins": 0,
-            "top2": 0,
-            "top3": 0,
-            "st_sum": 0.0,
-            "st_samples": 0,
-            "avg_st": None,
-            "lanes": {},
-            "courses": {},
-            "venues": {},
-            "win_methods": {},
-            "last_seen": None,
-        })
+        racer = racers.setdefault(rid, _new_racer(rid, item.get("name")))
         if item.get("name"):
             racer["name"] = item["name"]
+
         racer["starts"] = int(racer.get("starts") or 0) + 1
+        racer["weighted_starts"] = round(float(racer.get("weighted_starts") or 0.0) + weight, 6)
         if finish == 1:
             racer["wins"] = int(racer.get("wins") or 0) + 1
+            racer["weighted_wins"] = round(float(racer.get("weighted_wins") or 0.0) + weight, 6)
         if isinstance(finish, int) and finish <= 2:
             racer["top2"] = int(racer.get("top2") or 0) + 1
+            racer["weighted_top2"] = round(float(racer.get("weighted_top2") or 0.0) + weight, 6)
         if isinstance(finish, int) and finish <= 3:
             racer["top3"] = int(racer.get("top3") or 0) + 1
+            racer["weighted_top3"] = round(float(racer.get("weighted_top3") or 0.0) + weight, 6)
 
         lane = int(item.get("lane") or 0)
         course = int(item.get("course") or lane or 0)
-        if 1 <= lane <= 6:
-            _observe_bucket(_counter_bucket(racer.setdefault("lanes", {}), lane), finish)
-        if 1 <= course <= 6:
-            _observe_bucket(_counter_bucket(racer.setdefault("courses", {}), course), finish)
-        if jcd and jcd != "00":
-            _observe_bucket(_counter_bucket(racer.setdefault("venues", {}), jcd), finish)
-
         st = item.get("st")
+        if 1 <= lane <= 6:
+            _observe_bucket(
+                _counter_bucket(racer.setdefault("lanes", {}), lane),
+                finish, weight=weight, st=st, method=method,
+            )
+        if 1 <= course <= 6:
+            _observe_bucket(
+                _counter_bucket(racer.setdefault("courses", {}), course),
+                finish, weight=weight, st=st, method=method,
+            )
+        if jcd and jcd != "00":
+            _observe_bucket(
+                _counter_bucket(racer.setdefault("venues", {}), jcd),
+                finish, weight=weight, st=st, method=method,
+            )
+        _observe_bucket(
+            _counter_bucket(racer.setdefault("years", {}), year),
+            finish, weight=1.0, st=st, method=method,
+        )
+
         if isinstance(st, (int, float)) and 0 <= float(st) <= 1:
             racer["st_sum"] = round(float(racer.get("st_sum") or 0.0) + float(st), 6)
             racer["st_samples"] = int(racer.get("st_samples") or 0) + 1
@@ -84,42 +170,162 @@ def update_from_result(state: dict, result: dict) -> None:
         if finish == 1 and method:
             methods = racer.setdefault("win_methods", {})
             methods[method] = int(methods.get(method) or 0) + 1
-        racer["last_seen"] = result.get("day")
+            if 1 <= course <= 6:
+                course_methods = racer.setdefault("course_win_methods", {}).setdefault(str(course), {})
+                course_methods[method] = int(course_methods.get(method) or 0) + 1
+
+        if day:
+            if not racer.get("first_seen") or day < racer["first_seen"]:
+                racer["first_seen"] = day
+            if not racer.get("last_seen") or day > racer["last_seen"]:
+                racer["last_seen"] = day
 
 
-def learn_day(day: str) -> dict:
+def _load_state(anchor_day: str) -> dict:
     if PROFILE_PATH.exists():
-        state = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        try:
+            state = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            state = {}
     else:
-        state = {"version": "racer-profile-v1", "racers": {}, "processed_races": []}
-    seen = set(state.get("processed_races") or [])
+        state = {}
+    state.setdefault("version", "racer-profile-v2-history")
+    state.setdefault("racers", {})
+    state.setdefault("processed_races", [])
+    state.setdefault("weight_anchor_day", anchor_day)
+    state.setdefault("backfill", {})
+    return state
 
-    venues = base.discover_venues(day)
-    added = 0
+
+def _save_state(state: dict, *, last_learning_day: str) -> None:
+    state["version"] = "racer-profile-v2-history"
+    state["updated_at"] = datetime.now(JST).isoformat()
+    state["last_learning_day"] = last_learning_day
+    # This recent-key guard is enough for overlapping current/retry runs; the
+    # monotonic historical cursor prevents old days from being processed twice.
+    state["processed_races"] = sorted(set(state.get("processed_races") or []))[-MAX_RECENT_RACE_KEYS:]
+    PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PROFILE_PATH.write_text(
+        json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    racer_profiles.clear_cache()
+
+
+def _fetch_one(day: str, jcd: str, rno: int) -> tuple[str, dict | None]:
+    key = f"{day}:{str(jcd).zfill(2)}:{rno}"
+    try:
+        raw = base.fetch(base.official_url("raceresult", day, jcd, rno))
+        result = parse_result(raw, day, str(jcd).zfill(2), rno)
+        return key, result
+    except Exception:
+        return key, None
+
+
+def learn_day_into_state(state: dict, day: str) -> dict:
+    seen = set(state.get("processed_races") or [])
+    try:
+        venues = base.discover_venues(day)
+    except Exception as exc:
+        print(f"racer profile discover failed: day={day} {type(exc).__name__}")
+        return {"day": day, "fatal": True, "added": 0, "skipped": 0, "failed": 0, "expected": 0}
+
+    jobs = []
     skipped = 0
     for jcd in venues:
         for rno in range(1, 13):
             key = f"{day}:{str(jcd).zfill(2)}:{rno}"
             if key in seen:
                 skipped += 1
-                continue
-            try:
-                raw = base.fetch(base.official_url("raceresult", day, jcd, rno))
-                result = parse_result(raw, day, str(jcd).zfill(2), rno)
-            except Exception:
-                continue
-            update_from_result(state, result)
-            seen.add(key)
-            added += 1
+            else:
+                jobs.append((str(jcd).zfill(2), rno))
 
-    state["processed_races"] = sorted(seen)[-20000:]
-    state["version"] = "racer-profile-v1"
-    state["updated_at"] = datetime.now(JST).isoformat()
-    state["last_learning_day"] = day
-    PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PROFILE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    racer_profiles.clear_cache()
-    print(f"racer profile learning: day={day} races_added={added} skipped={skipped} racers={len(state.get('racers') or {})}")
+    added = 0
+    failed = 0
+    if jobs:
+        with ThreadPoolExecutor(max_workers=FETCH_WORKERS) as pool:
+            futures = [pool.submit(_fetch_one, day, jcd, rno) for jcd, rno in jobs]
+            for future in as_completed(futures):
+                key, result = future.result()
+                if result is None:
+                    failed += 1
+                    continue
+                update_from_result(state, result)
+                seen.add(key)
+                added += 1
+
+    state["processed_races"] = sorted(seen)[-MAX_RECENT_RACE_KEYS:]
+    expected = len(venues) * 12
+    # Result pages for cancellations/abnormal races may not parse. Only hold
+    # the cursor when failures are widespread enough to look like a fetch issue.
+    incomplete = bool(jobs) and failed > max(8, int(len(jobs) * 0.30))
+    print(
+        f"racer profile day={day} venues={len(venues)} added={added} "
+        f"skipped={skipped} failed={failed} racers={len(state.get('racers') or {})}"
+    )
+    return {
+        "day": day,
+        "fatal": False,
+        "incomplete": incomplete,
+        "added": added,
+        "skipped": skipped,
+        "failed": failed,
+        "expected": expected,
+    }
+
+
+def run_backfill(state: dict, *, recent_day: str, days: int, floor_day: str) -> dict:
+    backfill = state.setdefault("backfill", {})
+    backfill["floor_day"] = floor_day
+    next_day = str(backfill.get("next_day") or _day_before(recent_day))
+    processed_days = 0
+    added_races = 0
+
+    for _ in range(max(0, int(days))):
+        if next_day < floor_day:
+            backfill["completed"] = True
+            break
+        summary = learn_day_into_state(state, next_day)
+        if summary.get("fatal") or summary.get("incomplete"):
+            # Retry the same historical day next run; successful race keys from
+            # this partial pass are retained so they are not double-counted.
+            break
+        processed_days += 1
+        added_races += int(summary.get("added") or 0)
+        backfill["last_completed_day"] = next_day
+        next_day = _day_before(next_day)
+        backfill["next_day"] = next_day
+        backfill["completed"] = next_day < floor_day
+
+    backfill["days_processed"] = int(backfill.get("days_processed") or 0) + processed_days
+    backfill["races_added"] = int(backfill.get("races_added") or 0) + added_races
+    backfill["next_day"] = next_day
+    return {
+        "processed_days": processed_days,
+        "added_races": added_races,
+        "next_day": next_day,
+        "completed": bool(backfill.get("completed")),
+        "floor_day": floor_day,
+    }
+
+
+def learn(day: str, *, backfill_days: int = 0, backfill_floor: str = DEFAULT_BACKFILL_FLOOR) -> dict:
+    state = _load_state(day)
+    current = learn_day_into_state(state, day)
+    backfill = run_backfill(
+        state,
+        recent_day=day,
+        days=backfill_days,
+        floor_day=backfill_floor,
+    )
+    _save_state(state, last_learning_day=day)
+    print(
+        "racer profile learning complete: "
+        f"day={day} current_added={current.get('added', 0)} "
+        f"backfill_days={backfill['processed_days']} "
+        f"backfill_races={backfill['added_races']} "
+        f"next={backfill['next_day']} racers={len(state.get('racers') or {})}"
+    )
     return state
 
 
@@ -133,5 +339,7 @@ def default_day() -> str:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--day", default=default_day())
+    parser.add_argument("--backfill-days", type=int, default=0)
+    parser.add_argument("--backfill-floor", default=DEFAULT_BACKFILL_FLOOR)
     args = parser.parse_args()
-    learn_day(args.day)
+    learn(args.day, backfill_days=args.backfill_days, backfill_floor=args.backfill_floor)
