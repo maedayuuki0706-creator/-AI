@@ -61,6 +61,18 @@ def textify(raw: str) -> str:
     return "\n".join(line.strip() for line in raw.splitlines() if line.strip())
 
 
+def detect_event_grade(raw: str) -> str | None:
+    """Detect the meeting grade from the official race page without using racer class labels."""
+    upper = unicodedata.normalize("NFKC", raw).upper()
+    if re.search(r'(?:IS-|GRADE[-_ ]?)G1\\b|G[Ⅰ１1]', upper):
+        return "G1"
+    if re.search(r'(?:IS-|GRADE[-_ ]?)G2\\b|G[Ⅱ２2]', upper):
+        return "G2"
+    if re.search(r'(?:IS-|GRADE[-_ ]?)G3\\b|G[Ⅲ３3]', upper):
+        return "G3"
+    return None
+
+
 def official_url(kind: str, day: str, jcd: str | None = None, rno: int | None = None) -> str:
     q = {"hd": day}
     if jcd is not None:
@@ -201,8 +213,10 @@ def parse_odds(raw: str) -> dict:
 
 
 def analyze_official(day: str, jcd: str, rno: int) -> dict | None:
-    if withdrawal_lanes(fetch(official_url('racelist',day,jcd,rno))):
+    racelist_raw = fetch(official_url('racelist',day,jcd,rno))
+    if withdrawal_lanes(racelist_raw):
         return None
+    event_grade = detect_event_grade(racelist_raw)
     boats=parse_racelist_boats(day,jcd,rno)
     if len(boats)!=6:
         return None
@@ -224,7 +238,9 @@ def analyze_official(day: str, jcd: str, rno: int) -> dict | None:
     ranking=sorted(heads,key=heads.get,reverse=True)
     top,gap=heads[ranking[0]],heads[ranking[0]]-heads[ranking[1]]
     grade=None if preview['exhibition_count']<6 else 'A' if top>=.45 and gap>=.20 else 'B' if top>=.30 and gap>=.08 else 'C'
-    result.update(inputs=boats,preview=preview,heads=heads,grade=grade,previous_form=form)
+    result.update(inputs=boats,preview=preview,heads=heads,grade=grade,previous_form=form,
+                  jcd=str(jcd).zfill(2),event_grade=event_grade,
+                  balanced_head_mode=(str(jcd).zfill(2) == "05" and event_grade == "G1"))
     return result
 
 
