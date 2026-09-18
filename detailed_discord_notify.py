@@ -57,119 +57,186 @@ def _target_point_count(analysis):
     return max(6, min(14, target))
 
 
-def _balanced_tamagawa_g1_picks(analysis, target):
-    """For Tamagawa G1, diversify heads only when the model says the race is genuinely close."""
-    rows = list(analysis.get("trifecta") or [])
-    ranked_heads = sorted(
+def _conviction_heads(analysis):
+    """Pick one main winner axis and at most one genuine reversal candidate."""
+    ranked = sorted(
         (analysis.get("heads") or {}).items(),
-        key=lambda item: float(item[1] or 0),
+        key=lambda item: float(item[1] or 0.0),
         reverse=True,
     )
-    if len(ranked_heads) < 2:
-        return rows[:target]
+    if not ranked:
+        return []
+    primary = (str(ranked[0][0]), float(ranked[0][1] or 0.0))
+    out = [primary]
+    if len(ranked) < 2:
+        return out
 
-    top = float(ranked_heads[0][1] or 0)
-    second = float(ranked_heads[1][1] or 0)
-    # Hit-rate first: if one winner is still clearly stronger, keep the normal
-    # single-head leaning rather than widening just because the meeting is G1.
-    if top <= 0 or second < max(0.14, top * 0.72):
-        return rows[:target]
+    second = (str(ranked[1][0]), float(ranked[1][1] or 0.0))
+    top = primary[1]
+    second_value = second[1]
+    # Usually require the second head to be genuinely close. In Tamagawa G1
+    # we relax this slightly, but still never carry a third head just for cover.
+    ratio = 0.68 if analysis.get("balanced_head_mode") else 0.72
+    if top > 0 and (second_value >= top * ratio or (top - second_value) <= 0.065):
+        out.append(second)
+    return out
 
-    chosen = [str(ranked_heads[0][0]), str(ranked_heads[1][0])]
-    if len(ranked_heads) >= 3:
-        third = float(ranked_heads[2][1] or 0)
-        if third >= max(0.13, top * 0.62):
-            chosen.append(str(ranked_heads[2][0]))
 
-    buckets = {head: [] for head in chosen}
+def _row_probability(row):
+    try:
+        return float(row.get("probability") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _prefix(row):
+    parts = str(row.get("combination") or "").split("-")
+    return "-".join(parts[:2]) if len(parts) == 3 else ""
+
+
+def _best_prefix(rows, head):
+    masses = {}
     for row in rows:
-        combo = str(row.get("combination") or "")
-        head = combo.split("-")[0] if combo else ""
-        if head in buckets:
-            buckets[head].append(row)
+        parts = str(row.get("combination") or "").split("-")
+        if len(parts) != 3 or parts[0] != str(head):
+            continue
+        key = f"{parts[0]}-{parts[1]}"
+        masses[key] = masses.get(key, 0.0) + _row_probability(row)
+    return max(masses, key=masses.get) if masses else None
+
+
+def _append_unique(selected, seen, row):
+    combo = str(row.get("combination") or "")
+    if not combo or combo in seen:
+        return False
+    selected.append(row)
+    seen.add(combo)
+    return True
+
+
+def _conviction_picks(analysis, target):
+    """Hit-rate-first card: 1-2 heads only, then extend the strongest tails.
+
+    The goal is a card that says what it believes. Weak third/fourth head
+    singletons are removed before adding more third-place coverage behind the
+    strongest ordered pairs.
+    """
+    rows = list(analysis.get("trifecta") or [])
+    if not rows:
+        return []
+
+    heads = _conviction_heads(analysis)
+    if not heads:
+        return rows[:target]
+
+    allowed_heads = [lane for lane, _ in heads]
+    primary = allowed_heads[0]
+    secondary = allowed_heads[1] if len(allowed_heads) > 1 else None
+
+    main_prefix = _best_prefix(rows, primary)
+    reciprocal_prefix = f"{secondary}-{primary}" if secondary else None
+
+    analysis["conviction_structure"] = {
+        "primary_head": primary,
+        "secondary_head": secondary,
+        "main_prefix": main_prefix,
+        "reciprocal_prefix": reciprocal_prefix,
+        "max_heads": len(allowed_heads),
+        "target_points": int(target),
+        "policy": "conviction-heads-v1",
+    }
 
     selected = []
     seen = set()
-    # Seed each supported head before filling by model rank. This keeps the G1
-    # card scenario-based rather than turning it into one rigid first-place axis.
-    seed_each = 2 if len(chosen) >= 3 and target >= 9 else 1
-    for head in chosen:
-        for row in buckets[head][:seed_each]:
-            combo = row.get("combination")
-            if combo and combo not in seen:
-                selected.append(row); seen.add(combo)
 
-    max_per_head = max(3, (target + 1) // 2)
-    counts = {head: sum(1 for row in selected if str(row.get("combination") or "").startswith(head + "-")) for head in chosen}
-    for row in rows:
-        combo = str(row.get("combination") or "")
-        if not combo or combo in seen:
-            continue
-        head = combo.split("-")[0]
-        if head not in counts or counts[head] >= max_per_head:
-            continue
-        selected.append(row); seen.add(combo); counts[head] += 1
-        if len(selected) >= target:
-            return selected
+    # Main line: make the first three tickets tell one clear story whenever
+    # possible (same 1st-2nd prefix, third place stretched by model rank).
+    if main_prefix:
+        main_rows = [row for row in rows if _prefix(row) == main_prefix]
+        for row in main_rows[:3]:
+            _append_unique(selected, seen, row)
 
+    # If the main prefix has fewer than three usable rows, stay on the main head
+    # before considering the reversal head.
     for row in rows:
-        combo = row.get("combination")
-        if combo and combo not in seen:
-            selected.append(row); seen.add(combo)
+        if len(selected) >= min(3, target):
+            break
+        parts = str(row.get("combination") or "").split("-")
+        if len(parts) == 3 and parts[0] == primary:
+            _append_unique(selected, seen, row)
+
+    # Tail extension gets priority over spraying extra winner candidates.
+    priority_prefixes = []
+    if main_prefix:
+        priority_prefixes.append(main_prefix)
+    if secondary:
+        direct = f"{primary}-{secondary}"
+        reverse = f"{secondary}-{primary}"
+        for pref in (direct, reverse):
+            if pref not in priority_prefixes:
+                priority_prefixes.append(pref)
+        second_best = _best_prefix(rows, secondary)
+        if second_best and second_best not in priority_prefixes:
+            priority_prefixes.append(second_best)
+
+    for pref in priority_prefixes:
+        pref_rows = [row for row in rows if _prefix(row) == pref]
+        if not pref_rows:
+            continue
+        best = max((_row_probability(row) for row in pref_rows), default=0.0)
+        floor = max(0.004, best * 0.50)
+        for row in pref_rows:
+            if _row_probability(row) < floor:
+                continue
+            _append_unique(selected, seen, row)
             if len(selected) >= target:
-                break
-    return selected
+                return selected[:target]
+
+    # Fill the remaining budget only with the one or two declared heads.
+    for row in rows:
+        parts = str(row.get("combination") or "").split("-")
+        if len(parts) != 3 or parts[0] not in allowed_heads:
+            continue
+        _append_unique(selected, seen, row)
+        if len(selected) >= target:
+            return selected[:target]
+
+    # Defensive fallback; normally unreachable because one head has 20 trifecta
+    # combinations. Never add a third head unless data is incomplete.
+    for row in rows:
+        _append_unique(selected, seen, row)
+        if len(selected) >= target:
+            break
+    return selected[:target]
 
 
 def displayed_picks_variable(analysis, required):
-    """Keep the original six as the core and widen ties up to 14 points."""
+    """Build a clear 1-2 head card, then spend extra points on tail coverage."""
     core = list(_ORIGINAL_DISPLAYED_PICKS(analysis, required))
     if not required or len(core) < 6:
         return core
 
     target = _target_point_count(analysis)
     if analysis.get("balanced_head_mode"):
-        # Tamagawa G1 special case only. Other venues keep the existing logic.
-        # We widen winner scenarios only when the model still gives them support.
-        return _balanced_tamagawa_g1_picks(analysis, max(10, target))
-    if target <= len(core):
-        return core[:target]
-
-    selected = list(core)
-    seen = {row.get("combination") for row in selected}
-    rows = analysis.get("trifecta", [])
-
-    ranked_heads = sorted(
-        (analysis.get("heads") or {}).items(),
-        key=lambda item: item[1],
-        reverse=True,
-    )
-    core_heads = {str(item[0]) for item in ranked_heads[:2]}
-
-    for row in rows:
-        combo = row.get("combination")
-        if not combo or combo in seen:
-            continue
-        if combo.split("-")[0] not in core_heads:
-            continue
-        selected.append(row)
-        seen.add(combo)
-        if len(selected) >= target:
-            return selected
-
-    for row in rows:
-        combo = row.get("combination")
-        if not combo or combo in seen:
-            continue
-        selected.append(row)
-        seen.add(combo)
-        if len(selected) >= target:
-            break
-    return selected
+        target = max(10, target)
+    return _conviction_picks(analysis, target)
 
 
 def analysis_message_with_virtual(day, jcd, rno, deadline, phase, analysis, rows, required):
     message = _ORIGINAL_ANALYSIS_MESSAGE(day, jcd, rno, deadline, phase, analysis, rows, required)
+
+    structure = analysis.get("conviction_structure") or {}
+    primary = structure.get("primary_head")
+    secondary = structure.get("secondary_head")
+    if primary:
+        axis_line = f"🎯 軸：**{primary}号艇**"
+        if secondary:
+            axis_line += f"　⚔️ 逆転候補：**{secondary}号艇**"
+        marker = "**3連単フォーメーション**"
+        if marker in message:
+            message = message.replace(marker, axis_line + "\n\n" + marker, 1)
+        elif axis_line not in message:
+            message = axis_line + "\n" + message
 
     allocation = allocate_virtual_bets(rows[:6])
     _VIRTUAL[(day, jcd, int(rno), phase)] = allocation
@@ -309,7 +376,7 @@ def log_prediction_with_virtual(record):
         record["virtual_status"] = allocation.get("status")
         record["virtual_unit_yen"] = 100
         record["virtual_selection_rule"] = "latest_pre_deadline_per_race"
-        record["prediction_point_policy"] = "variable_6_to_14_tie_expansion"
+        record["prediction_point_policy"] = "conviction_heads_1to2_tail_extension_v1"
 
     _ORIGINAL_LOG_PREDICTION(record)
 
