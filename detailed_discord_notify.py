@@ -58,7 +58,7 @@ def _target_point_count(analysis):
 
 
 def _balanced_tamagawa_g1_picks(analysis, target):
-    """For Tamagawa G1 only, avoid over-fixing one winner while keeping model rank meaningful."""
+    """For Tamagawa G1, diversify heads only when the model says the race is genuinely close."""
     rows = list(analysis.get("trifecta") or [])
     ranked_heads = sorted(
         (analysis.get("heads") or {}).items(),
@@ -68,11 +68,17 @@ def _balanced_tamagawa_g1_picks(analysis, target):
     if len(ranked_heads) < 2:
         return rows[:target]
 
+    top = float(ranked_heads[0][1] or 0)
+    second = float(ranked_heads[1][1] or 0)
+    # Hit-rate first: if one winner is still clearly stronger, keep the normal
+    # single-head leaning rather than widening just because the meeting is G1.
+    if top <= 0 or second < max(0.14, top * 0.72):
+        return rows[:target]
+
     chosen = [str(ranked_heads[0][0]), str(ranked_heads[1][0])]
     if len(ranked_heads) >= 3:
-        top = float(ranked_heads[0][1] or 0)
         third = float(ranked_heads[2][1] or 0)
-        if third >= max(0.12, top * 0.45):
+        if third >= max(0.13, top * 0.62):
             chosen.append(str(ranked_heads[2][0]))
 
     buckets = {head: [] for head in chosen}
