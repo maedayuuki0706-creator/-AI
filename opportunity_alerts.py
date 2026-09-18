@@ -76,7 +76,7 @@ def _candidate_rows(analysis, kind):
     return rows
 
 
-def _coherent_selection(candidates, kind):
+def _coherent_selection(candidates, kind, analysis=None):
     if not candidates:
         return []
 
@@ -90,8 +90,42 @@ def _coherent_selection(candidates, kind):
     if len(ranked_heads) > 1 and head_strength[ranked_heads[1]] >= head_strength[ranked_heads[0]] * (0.72 if kind == "mid" else 0.78):
         chosen_heads.append(ranked_heads[1])
 
+    balanced = bool((analysis or {}).get("balanced_head_mode")) and kind == "mid"
+    if balanced and len(ranked_heads) > 1:
+        # Tamagawa G1: keep prediction evidence first, but do not collapse the
+        # whole mid-odds card onto one winner in an elite, closely matched field.
+        chosen_heads = ranked_heads[:2]
+        if len(ranked_heads) >= 3 and head_strength[ranked_heads[2]] >= head_strength[ranked_heads[0]] * 0.45:
+            chosen_heads.append(ranked_heads[2])
+
     limit = 12 if kind == "mid" else 10
-    selected = [row for row in candidates if str(row.get("combination", "")).split("-")[0] in chosen_heads][:limit]
+    if balanced:
+        buckets = {head: [] for head in chosen_heads}
+        for row in candidates:
+            head = str(row.get("combination", "")).split("-")[0]
+            if head in buckets:
+                buckets[head].append(row)
+        selected = []
+        seen_balanced = set()
+        # Seed two tickets per supported head, then fill by quality with a cap.
+        for head in chosen_heads:
+            for row in buckets[head][:2]:
+                combo = row.get("combination")
+                if combo and combo not in seen_balanced:
+                    selected.append(row); seen_balanced.add(combo)
+        cap = max(4, (limit + 1) // 2)
+        counts = {head: sum(1 for row in selected if str(row.get("combination", "")).startswith(head + "-")) for head in chosen_heads}
+        for row in candidates:
+            combo = row.get("combination")
+            head = str(combo or "").split("-")[0]
+            if not combo or combo in seen_balanced or head not in counts or counts[head] >= cap:
+                continue
+            selected.append(row); seen_balanced.add(combo); counts[head] += 1
+            if len(selected) >= limit:
+                break
+        selected = selected[:limit]
+    else:
+        selected = [row for row in candidates if str(row.get("combination", "")).split("-")[0] in chosen_heads][:limit]
 
     # Keep a strong 1-escape longshot scenario alive even when another head
     # narrowly wins the aggregate longshot score.
@@ -247,6 +281,8 @@ def _formation_lines(picks):
 def _strategy_text(analysis, picks, kind):
     if not picks:
         return "該当する配当帯に有力候補なし。検証用に見送り判定を記録。"
+    if kind == "mid" and analysis.get("balanced_head_mode"):
+        return "多摩川G1の実力伯仲を考慮。1着軸を決め打ちせず、根拠の強い複数シナリオを組み合わせる。"
 
     first = str(picks[0].get("combination") or "")
     parts = first.split("-")
@@ -339,7 +375,7 @@ def _message(venue, rno, deadline, analysis, picks, kind, score, breakdown):
 
 def _build_payload(venue, rno, deadline, analysis, kind):
     candidates = _candidate_rows(analysis, kind)
-    picks = _coherent_selection(candidates, kind)
+    picks = _coherent_selection(candidates, kind, analysis)
     score, breakdown = _score(analysis, picks, kind)
     return {
         "kind": kind,
