@@ -104,7 +104,9 @@ def _bridge_kind(
     if candidate[:2] == base[:2] and candidate[2] != base[2]:
         return 3.0 + max(0.0, third_bias)
     if set(candidate) == set(base) and candidate != base:
-        return 2.6 + max(0.0, order_bias)
+        # A learned order-miss pattern should be able to outrank a plain
+        # third-place bridge when the venue evidence is strong enough.
+        return 2.6 + max(0.0, order_bias) * 1.25
     if candidate[0] == base[0] and candidate[2] == base[2] and candidate[1] != base[1]:
         return 2.2 + max(0.0, order_bias * 0.5)
     if allow_head_swap and candidate[1:] == base[1:] and candidate[0] != base[0]:
