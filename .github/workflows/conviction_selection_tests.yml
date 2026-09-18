@@ -1,0 +1,27 @@
+name: Conviction Selection Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "detailed_discord_notify.py"
+      - "bridge_learning.py"
+      - "tests/test_conviction_selection.py"
+      - "tests/test_bridge_learning.py"
+      - ".github/workflows/conviction_selection_tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run focused main-selection tests
+        run: python3 -m unittest tests.test_conviction_selection tests.test_bridge_learning -v
