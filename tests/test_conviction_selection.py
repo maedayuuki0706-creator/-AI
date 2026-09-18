@@ -45,7 +45,7 @@ class ConvictionSelectionTests(unittest.TestCase):
             {"1"},
         )
 
-    def test_tamagawa_g1_still_never_adds_third_head(self):
+    def test_tamagawa_g1_allows_third_head_only_when_truly_tight(self):
         rows = []
         for head, base in (("1", .035), ("2", .033), ("3", .031)):
             for second in ("1", "2", "3", "4", "5", "6"):
@@ -62,8 +62,20 @@ class ConvictionSelectionTests(unittest.TestCase):
         }
         picks = d._conviction_picks(analysis, 14)
         heads = {x["combination"].split("-")[0] for x in picks}
-        self.assertLessEqual(len(heads), 2)
-        self.assertEqual(heads, {"1", "2"})
+        self.assertEqual(heads, {"1", "2", "3"})
+        self.assertLessEqual(len(picks), 16)
+
+
+    def test_third_head_is_not_added_when_gap_is_not_tight(self):
+        analysis = {
+            "trifecta": [
+                row("1-4-2", .04), row("1-4-3", .035), row("2-4-1", .03),
+                row("2-4-3", .028), row("3-4-1", .026), row("3-4-2", .024),
+            ],
+            "heads": {"1": .30, "2": .24, "3": .21, "4": .10, "5": .08, "6": .07},
+        }
+        heads = d._conviction_heads(analysis)
+        self.assertEqual([x[0] for x in heads], ["1", "2"])
 
 
 if __name__ == "__main__":
