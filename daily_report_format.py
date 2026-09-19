@@ -147,6 +147,27 @@ def report_payloads(report):
         {'name': '記録された評価別', 'value': '\n'.join(grade_lines) or '対象なし', 'inline': False},
         {'name': '改善に向けた確認事項', 'value': issue, 'inline': False},
         {'name': '予想配信記録なし（集計外）', 'value': missing_text, 'inline': False}]
+    main_stats = sections.get('main') or {}
+    cover_stats = sections.get('cover') or {}
+    diag = report.get('main_diagnostics') or {}
+    rolling = report.get('main_rolling') or {}
+
+    def rolling_line(window):
+        stats = rolling.get(str(window)) or {}
+        if not stats.get('day_count'):
+            return f'{window}日：データ不足'
+        return (f"{window}日：{stats.get('hits', 0)}/{stats.get('samples', 0)}R＝{percent(stats.get('hit_rate'))}"
+                f"／回収率 {percent(stats.get('roi'))}／収支 {int(stats.get('profit_yen') or 0):+,}円")
+
+    main_health = (
+        f"本線3点：{hit_text(main_stats) if main_stats else '対象なし'}／回収率 {percent(main_stats.get('roi')) if main_stats else '—'}\n"
+        f"頭候補一致：{diag.get('head_hits', 0)}/{diag.get('samples', 0)}R＝{percent(diag.get('head_rate'))}\n"
+        f"1→2着まで一致：{diag.get('ordered12_hits', 0)}/{diag.get('samples', 0)}R＝{percent(diag.get('ordered12_rate'))}\n"
+        f"3着だけ抜け：{diag.get('third_only_misses', 0)}R\n"
+        f"{rolling_line(3)}\n{rolling_line(5)}\n"
+        f"抑え回収率：{percent(cover_stats.get('roi')) if cover_stats else '—'}"
+    )
+    fields.insert(3, {'name': '🛡️ 本線保護モニター', 'value': main_health, 'inline': False})
     simulation = stake_simulation_field(day)
     if simulation:
         fields.append(simulation)
