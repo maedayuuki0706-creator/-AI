@@ -1,0 +1,139 @@
+{
+  "day": "20260919",
+  "created_at_jst": "2026-09-19T12:08:00+09:00",
+  "purpose": "hot-postmortem of main-stream high-payout hits; preserve pre-close structure without promoting a rule from a tiny sample",
+  "confirmed_hits": [
+    {
+      "venue": "鳴門",
+      "jcd": "14",
+      "rno": 5,
+      "result": "5-1-2",
+      "payout_per_100": 12590,
+      "main": [
+        "5-2-3",
+        "5-2-6",
+        "5-2-1"
+      ],
+      "winning_ticket_location": "cover",
+      "winning_ticket": "5-1-2",
+      "heads": {
+        "1": 0.15322894256801933,
+        "2": 0.1930131187938801,
+        "3": 0.18592775041458492,
+        "4": 0.08665486496724532,
+        "5": 0.22735018476342425,
+        "6": 0.15382513849284607
+      },
+      "point_count": 14,
+      "bridge_applied": false,
+      "send_odds": 95.9,
+      "diagnosis": [
+        "primary head 5 was correctly ranked first",
+        "race was head-uncertain behind 5; keeping the primary head while extending second/third tails captured 5-1-2",
+        "this was not created by bridge replacement"
+      ]
+    },
+    {
+      "venue": "平和島",
+      "jcd": "04",
+      "rno": 1,
+      "result": "6-1-4",
+      "payout_per_100": 11300,
+      "main": [
+        "6-1-3",
+        "6-1-4",
+        "6-1-2"
+      ],
+      "winning_ticket_location": "main",
+      "winning_ticket": "6-1-4",
+      "heads": {
+        "1": 0.18474784423219512,
+        "2": 0.14068174682322176,
+        "3": 0.17142860648094793,
+        "4": 0.14432247773762114,
+        "5": 0.13507770757797732,
+        "6": 0.22374161714803692
+      },
+      "point_count": 14,
+      "bridge_applied": true,
+      "protected_prefixes": [
+        "1-6",
+        "6-1"
+      ],
+      "send_odds": 69.2,
+      "diagnosis": [
+        "primary head 6 and ordered pair 6-1 were correct",
+        "new tail-extension logic put three third-place candidates behind the same 6-1 prefix",
+        "bridge protection preserved the 6-1 core line"
+      ]
+    },
+    {
+      "venue": "江戸川",
+      "jcd": "03",
+      "rno": 2,
+      "result": "6-3-5",
+      "payout_per_100": 10740,
+      "main": [
+        "6-3-2",
+        "6-3-1",
+        "6-3-5"
+      ],
+      "winning_ticket_location": "main",
+      "winning_ticket": "6-3-5",
+      "heads": {
+        "1": 0.14799286550357874,
+        "2": 0.18500152467766665,
+        "3": 0.209950628328466,
+        "4": 0.06960576538343782,
+        "5": 0.14018748891558572,
+        "6": 0.2472617271912653
+      },
+      "point_count": 14,
+      "bridge_applied": false,
+      "protected_prefixes": [
+        "3-6",
+        "6-3"
+      ],
+      "send_odds": 59.4,
+      "diagnosis": [
+        "primary head 6 and ordered pair 6-3 were correct",
+        "third-place extension 2/1/5 converted the read into an exact trifecta",
+        "main stream caught a combination the longshot stream did not include"
+      ]
+    }
+  ],
+  "pending_confirmation": [
+    {
+      "venue": "唐津",
+      "jcd": "23",
+      "rno": 8,
+      "user_reported_hit": true,
+      "system_hit_alert_status": "pending at snapshot",
+      "main": [
+        "3-4-1",
+        "1-4-3",
+        "6-4-3"
+      ],
+      "heads": {
+        "1": 0.1852660786032856,
+        "2": 0.15267345932064655,
+        "3": 0.18622576372778668,
+        "4": 0.16301241895671506,
+        "5": 0.14929283625191564,
+        "6": 0.16352944313965073
+      },
+      "point_count": 16,
+      "send_odds_for_6_4_3": 152.1,
+      "diagnosis": [
+        "top heads were extremely compressed: 3 and 1 nearly tied, with 6 close enough to trigger the rare three-head exception",
+        "card stayed coherent by sharing 4 as the second-place hub across 3-4-1 / 1-4-3 / 6-4-3",
+        "this is the live example of the user-requested mixed formation concept, compressed to 16 points instead of spraying all combinations"
+      ]
+    }
+  ],
+  "candidate_learnings": [
+    "When the primary head is credible but the race is not head-dominant, spend extra budget on tails behind a strong ordered pair before adding weak heads.",
+    "For true three-head ties, a shared second-place hub can preserve clarity while allowing a third head.",
+    "Do not promote these as production winning rules until out-of-time sample validation confirms hit-rate and ROI."
+  ]
+}
