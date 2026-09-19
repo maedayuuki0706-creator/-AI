@@ -197,6 +197,76 @@ def totals(rows):
             'pass_races': sum(r['plan_recorded'] and not r['stake_yen'] for r in rows)}
 
 
+
+def main_diagnostics(rows):
+    """Observe main-line quality without changing prediction generation."""
+    samples = exact = head = ordered12 = third_only_miss = 0
+    for row in rows:
+        if row.get('status') != 'settled':
+            continue
+        winners = list((row.get('official') or {}).get('payouts') or {})
+        if not winners:
+            continue
+        samples += 1
+        main = unique_picks(row.get('main') or [])
+        main_set = set(main)
+        heads = {pick.split('-')[0] for pick in main}
+        pairs = {'-'.join(pick.split('-')[:2]) for pick in main}
+        race_exact = any(winner in main_set for winner in winners)
+        race_head = any(winner.split('-')[0] in heads for winner in winners)
+        race_pair = any('-'.join(winner.split('-')[:2]) in pairs for winner in winners)
+        exact += int(race_exact)
+        head += int(race_head)
+        ordered12 += int(race_pair)
+        third_only_miss += int(race_pair and not race_exact)
+    return {
+        'samples': samples,
+        'exact_hits': exact,
+        'exact_rate': exact / samples * 100 if samples else None,
+        'head_hits': head,
+        'head_rate': head / samples * 100 if samples else None,
+        'ordered12_hits': ordered12,
+        'ordered12_rate': ordered12 / samples * 100 if samples else None,
+        'third_only_misses': third_only_miss,
+    }
+
+
+def rolling_main_performance(day, current_main):
+    """Aggregate recent saved daily main-line stats; current day always uses the freshly built stats."""
+    history = [(day, current_main)]
+    for path in REPORT_DIR.glob('20*.json'):
+        past_day = path.stem
+        if past_day >= day or not re.fullmatch(r'20\d{6}', past_day):
+            continue
+        try:
+            saved = json.loads(path.read_text(encoding='utf-8'))
+            stats = (saved.get('section_totals') or {}).get('main')
+        except (OSError, ValueError):
+            stats = None
+        if isinstance(stats, dict):
+            history.append((past_day, stats))
+    history.sort(key=lambda item: item[0], reverse=True)
+
+    out = {}
+    for window in (3, 5):
+        selected = history[:window]
+        stake = sum(int(stats.get('settled_stake_yen') or 0) for _, stats in selected)
+        returned = sum(int(stats.get('return_yen') or 0) for _, stats in selected)
+        hits = sum(int(stats.get('virtual_hits') or 0) for _, stats in selected)
+        samples = sum(int(stats.get('virtual_hit_samples') or 0) for _, stats in selected)
+        out[str(window)] = {
+            'days': [d for d, _ in selected],
+            'day_count': len(selected),
+            'stake_yen': stake,
+            'return_yen': returned,
+            'profit_yen': returned - stake,
+            'roi': returned / stake * 100 if stake else None,
+            'hits': hits,
+            'samples': samples,
+            'hit_rate': hits / samples * 100 if samples else None,
+        }
+    return out
+
 def build_report(day, predictions, results, card):
     chosen, excluded = latest_predictions(predictions, day)
     rows, uniform_rows = [], []
@@ -236,12 +306,16 @@ def build_report(day, predictions, results, card):
             value = str(len(actual['picks'])) if dimension == 'points' else str(actual.get(dimension) or '未記録')
             segments[value].append(uniform)
         comparisons[dimension] = {key: totals(value) for key, value in segments.items()}
+    section_totals = {key: totals(value) for key, value in section_rows.items()}
+    main_stats = section_totals.get('main') or totals([])
     return {'day': day, 'unit_yen': UNIT_YEN, 'selection_rule': 'latest_pre_deadline_per_race',
             'coverage_verified': card.get('complete', False), 'expected_races': len(expected),
             'missing_predictions': missing, 'excluded_deliveries': len(excluded),
             'excluded_races': sorted({race_key(r) for r in excluded if 'jcd' in r and 'rno' in r}),
             'totals': totals(rows), 'uniform_totals': totals(uniform_rows), 'venues': venue_stats,
-            'section_totals': {key: totals(value) for key, value in section_rows.items()}, 'comparisons': comparisons,
+            'section_totals': section_totals, 'comparisons': comparisons,
+            'main_diagnostics': main_diagnostics(rows),
+            'main_rolling': rolling_main_performance(day, main_stats),
             'races': rows}
 
 
