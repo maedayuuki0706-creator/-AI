@@ -1,6 +1,8 @@
 name: Boat AI Daily Report Review
 
 on:
+  schedule:
+    - cron: "50 14 * * *" # 23:50 JST
   workflow_dispatch:
     inputs:
       day:
@@ -24,7 +26,7 @@ concurrency:
 
 jobs:
   report:
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'Send daily review ') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || startsWith(github.event.head_commit.message, 'Send daily review ') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -34,6 +36,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Resolve report day
+        env:
+          INPUT_DAY: ${{ github.event_name == 'workflow_dispatch' && inputs.day || '' }}
+        run: |
+          if [ -n "$INPUT_DAY" ]; then
+            echo "REPORT_DAY=$INPUT_DAY" >> "$GITHUB_ENV"
+          else
+            echo "REPORT_DAY=$(TZ=Asia/Tokyo date +%Y%m%d)" >> "$GITHUB_ENV"
+          fi
       - name: Verify separate report channel
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -55,7 +66,7 @@ jobs:
               parsed = urllib.parse.urlsplit(url)
               if (parsed.scheme != 'https'
                       or parsed.netloc not in {'discord.com', 'discordapp.com', 'ptb.discord.com', 'canary.discord.com'}
-                      or not re.fullmatch(r'/api(?:/v\d+)?/webhooks/\d+/[^/]+/?', parsed.path)):
+                      or not re.fullmatch(r'/api(?:/v\\d+)?/webhooks/\\d+/[^/]+/?', parsed.path)):
                   raise SystemExit(f'{name} is not a Discord webhook URL')
               request = urllib.request.Request(url, headers={'User-Agent': UA})
               try:
@@ -75,15 +86,14 @@ jobs:
               raise SystemExit('Report and prediction webhooks point to the same channel')
           print('Report channel verified: distinct from predictions')
           PY
+      - name: Collect final official results
+        run: python daily_report.py --day "$REPORT_DAY"
       - name: Build 3000 yen stake simulation
-        env:
-          REPORT_DAY: ${{ github.event_name == 'workflow_dispatch' && inputs.day || '20260913' }}
         run: python stake_simulation_3000.py --day "$REPORT_DAY"
       - name: Send reviewed daily report
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
-          REPORT_DAY: ${{ github.event_name == 'workflow_dispatch' && inputs.day || '20260913' }}
         run: python daily_report.py --day "$REPORT_DAY" --saved-results --send
       - name: Persist acknowledged reports
         if: always()
