@@ -16,6 +16,8 @@ import random
 from pathlib import Path
 import urllib.request
 
+from discord_notification_policy import message_payload
+
 LOG_PATH = Path("data/opportunity_alert_deliveries.jsonl")
 _CACHE: dict[tuple, dict] = {}
 
@@ -453,7 +455,7 @@ def _send(env_name, content):
     if not url:
         raise RuntimeError(f"{env_name} is missing")
     payload = json.dumps(
-        {"content": content, "allowed_mentions": {"parse": []}},
+        message_payload(content, notify_everyone=env_name == "DISCORD_WEBHOOK_MID_ODDS_SELECTED"),
         ensure_ascii=False,
     ).encode("utf-8")
     request = urllib.request.Request(

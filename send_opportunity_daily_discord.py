@@ -8,6 +8,8 @@ import time
 import urllib.error
 import urllib.request
 
+from discord_notification_policy import message_payload
+
 DAY = os.getenv("REPORT_DAY", "20260916")
 REPORT_PATH = Path(f"data/opportunity_report_{DAY}.json")
 RESULT_PATH = Path(f"data/official_results/{DAY}.json")
@@ -45,7 +47,7 @@ def post_discord(message: str):
     url = os.getenv(WEBHOOK_ENV, "").strip()
     if not url:
         raise RuntimeError(f"{WEBHOOK_ENV} is not set")
-    payload = json.dumps({"content": message, "allowed_mentions": {"parse": []}}, ensure_ascii=False).encode("utf-8")
+    payload = json.dumps(message_payload(message), ensure_ascii=False).encode("utf-8")
     for attempt in range(4):
         req = urllib.request.Request(
             url,

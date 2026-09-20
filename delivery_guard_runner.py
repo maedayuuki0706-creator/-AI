@@ -31,6 +31,7 @@ def run_continuous(total_seconds: int) -> int:
 
 
 def main() -> int:
+    print("Discord notification policy: main/mid_odds/longshot=silent; selected/mid_odds_selected/hit=@everyone", flush=True)
     runner.run_channel_smoke_test_once()
     runner.run_opportunity_smoke_test_once()
     if os.getenv("SUMMARY_ONLY") == "1":

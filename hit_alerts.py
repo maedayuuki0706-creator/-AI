@@ -98,7 +98,7 @@ def _send_hit_channel(content: str) -> None:
     original = os.environ.get("DISCORD_WEBHOOK_URL")
     os.environ["DISCORD_WEBHOOK_URL"] = hit_url
     try:
-        base.send_discord(content)
+        base.send_discord(content, notify_everyone=True)
     finally:
         if original is None:
             os.environ.pop("DISCORD_WEBHOOK_URL", None)

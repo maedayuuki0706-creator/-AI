@@ -28,6 +28,7 @@ from prediction_engine import analyze_race
 from race_context import previous_form
 import racer_profiles
 from discord_formation import formation_summary, formation_lines
+from discord_notification_policy import message_payload
 from race_notices import withdrawal_lanes, notice_message, read_notices, record_notice
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -280,11 +281,11 @@ def beforeinfo_available(day: str, jcd: str, rno: int) -> bool:
         return False
 
 
-def send_discord(content: str) -> None:
+def send_discord(content: str, *, notify_everyone: bool = False) -> None:
     url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
     if not url:
         raise RuntimeError("DISCORD_WEBHOOK_URL is missing")
-    payload = json.dumps({"content": content, "allowed_mentions": {"parse": []}}, ensure_ascii=False).encode("utf-8")
+    payload = json.dumps(message_payload(content, notify_everyone=notify_everyone), ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(url, data=payload, headers={"Content-Type":"application/json","User-Agent":UA}, method="POST")
     with urllib.request.urlopen(req, timeout=20) as r:
         if r.status not in (200, 204):
