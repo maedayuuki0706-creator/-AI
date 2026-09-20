@@ -1,198 +1,233 @@
+"""Post cutoff-based venue tallies from the same settled journal as Sokuhou-kun."""
+from __future__ import annotations
+
+import argparse
 from collections import defaultdict
 from datetime import datetime
-from pathlib import Path
 import json
+import os
+from pathlib import Path
+import re
+import urllib.parse
+import urllib.request
 
-import daily_report as dr
 import direct_discord_notify as base
+from discord_notification_policy import SUPPRESS_NOTIFICATIONS
 from prediction_recap import post_confirmed, report_destination_key
 
-# This file is intentionally safe to re-run.  Each run refreshes only races whose
-# deadlines have passed and reports settled 3連単 results available at that moment.
-REQUEST_ID = "20260914-final"
+SCHEDULE = Path('interim_report_schedule.json')
+JOURNAL = Path('data/hit_alert_deliveries.jsonl')
+PREDICTIONS = Path('data/prediction_log.jsonl')
+OPPORTUNITIES = Path('data/opportunity_alert_deliveries.jsonl')
+DELIVERIES = Path('data/interim_report_deliveries.jsonl')
+SNAPSHOTS = Path('data/interim_reports')
+STREAMS = {'normal': '🔵 メイン', 'mid_odds': '🟡 中穴', 'longshot': '🔴 穴'}
 
 
-def _winning_combos(result):
-    return set((result or {}).get("payouts") or {})
-
-
-def _hit_bucket(row, result):
-    winners = _winning_combos(result)
-    if not winners:
-        return None
-    disclosed = set(dr.disclosed_picks(row))
-    hit_winners = disclosed & winners
-    if not hit_winners:
-        return None
-    # A hit paying 10,000 yen or more is surfaced as a true 万舟 hit first.
-    if any((result["payouts"].get(combo) or 0) >= 10000 for combo in hit_winners):
-        return "man"
-    if set(row.get("main") or []) & winners:
-        return "main"
-    return "mid"
-
-
-def _uniform_settle(row, result):
-    picks = dr.disclosed_picks(row)
-    return dr.settle(
-        {
-            **row,
-            "main": picks,
-            "cover": [],
-            "outsiders": [],
-            "virtual_bets": [{"combination": pick, "units": 1} for pick in picks],
-            "virtual_total_units": len(picks),
-            "virtual_unit_yen": 100,
-        },
-        result,
-    )
-
-
-def _pct(n, d):
-    return "—" if not d else f"{n / d * 100:.1f}%"
-
-
-def _yen(value):
-    return f"¥{int(value):,}"
-
-
-def build_payload():
-    now = datetime.now(base.JST)
-    day = now.strftime("%Y%m%d")
-    predictions = dr.read_jsonl(base.LOG_PATH)
-    chosen, _ = dr.latest_predictions(predictions, day)
-    results = dr.collect_results(day, chosen)
-
-    settled = []
-    venue_rows = defaultdict(list)
-    for key, row in sorted(chosen.items()):
-        result = results.get(key) or {"status": "pending", "payouts": {}, "refund_lanes": []}
-        if result.get("status") != "settled":
+def read_rows(path):
+    if not path.exists():
+        return []
+    rows = []
+    for line in path.read_text(encoding='utf-8').splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
             continue
-        actual = dr.settle(row, result)
-        uniform = _uniform_settle(row, result)
-        bucket = _hit_bucket(row, result)
-        payouts = list((result.get("payouts") or {}).values())
-        max_payout = max(payouts) if payouts else 0
-        item = {
-            "row": row,
-            "result": result,
-            "actual": actual,
-            "uniform": uniform,
-            "bucket": bucket,
-            "hit": bool(actual["prediction_hit"]),
-            "payout": max_payout,
-        }
-        settled.append(item)
-        venue_rows[row.get("venue") or str(row.get("jcd"))].append(item)
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
 
-    hits = sum(x["hit"] for x in settled)
-    main_hits = sum(x["bucket"] == "main" for x in settled)
-    mid_hits = sum(x["bucket"] == "mid" for x in settled)
-    man_hits = sum(x["bucket"] == "man" for x in settled)
 
-    final_rows = [x for x in settled if x["row"].get("phase") == "final"]
-    prelim_rows = [x for x in settled if x["row"].get("phase") != "final"]
-    final_hits = sum(x["hit"] for x in final_rows)
-    prelim_hits = sum(x["hit"] for x in prelim_rows)
+def timestamp(value):
+    try:
+        value = datetime.fromisoformat(value)
+        return value.astimezone(base.JST) if value.tzinfo is not None else None
+    except (TypeError, ValueError):
+        return None
 
-    uniform_stake = sum(x["uniform"]["stake_yen"] for x in settled)
-    uniform_return = sum(x["uniform"]["return_yen"] for x in settled)
-    uniform_roi = uniform_return / uniform_stake * 100 if uniform_stake else None
 
-    virtual_rows = [x for x in settled if x["actual"]["stake_yen"] > 0]
-    virtual_stake = sum(x["actual"]["stake_yen"] for x in virtual_rows)
-    virtual_return = sum(x["actual"]["return_yen"] for x in virtual_rows)
-    virtual_roi = virtual_return / virtual_stake * 100 if virtual_stake else None
+def identity(row, stream):
+    try:
+        jcd, rno = str(row['jcd']).zfill(2), int(row['rno'])
+        if jcd in base.VENUES and 1 <= rno <= 12 and stream in STREAMS:
+            return stream, jcd, rno
+    except (KeyError, TypeError, ValueError):
+        pass
+    return None
 
-    missed_man = [x for x in settled if x["payout"] >= 10000 and not x["hit"]]
-    missed_man.sort(key=lambda x: x["payout"], reverse=True)
 
-    lines = [
-        f"📊 **9/14 {now.strftime('%H:%M')} JST 中間報告**",
-        f"結果確定 **{len(settled)}R**｜的中 **{hits}/{len(settled)}R（{_pct(hits, len(settled))}）**",
-        f"本線 **{main_hits}R**｜中穴 **{mid_hits}R**｜万舟 **{man_hits}R**",
-        f"直前更新 **{final_hits}/{len(final_rows)}R（{_pct(final_hits, len(final_rows))}）**｜暫定のまま **{prelim_hits}/{len(prelim_rows)}R（{_pct(prelim_hits, len(prelim_rows))}）**",
-        f"全買い均等100円：投資 **{_yen(uniform_stake)}** → 回収 **{_yen(uniform_return)}**｜回収率 **{uniform_roi:.1f}%**" if uniform_roi is not None else "全買い均等100円：集計待ち",
-        f"EV仮想投票：投資 **{_yen(virtual_stake)}** → 回収 **{_yen(virtual_return)}**｜回収率 **{virtual_roi:.1f}%**" if virtual_roi is not None else "EV仮想投票：集計待ち",
-        "━━━━━━━━━━━━━━━━━━",
-    ]
-
-    preferred_order = ["戸田", "平和島", "浜名湖", "蒲郡", "常滑", "津", "三国", "びわこ", "住之江", "徳山", "下関", "若松", "芦屋", "福岡"]
-    for venue in preferred_order:
-        rows = venue_rows.get(venue, [])
-        if not rows:
-            sent = sum(1 for r in chosen.values() if r.get("venue") == venue)
-            if sent:
-                lines.append(f"**{venue}**　配信 {sent}R｜結果待ち")
+def tally(as_of, journal, predictions=(), opportunities=()):
+    """Never count a later result, an unsent forecast, or a duplicate race twice."""
+    if as_of.tzinfo is None:
+        raise ValueError('A timezone-aware cutoff is required')
+    as_of = as_of.astimezone(base.JST)
+    day = as_of.strftime('%Y%m%d')
+    settled, eligible, venues = {}, set(), set()
+    for row in journal:
+        seen_at = timestamp(row.get('sent_at'))
+        key = identity(row, row.get('stream') or 'normal')
+        if (row.get('day') != day or key is None or seen_at is None
+                or seen_at.strftime('%Y%m%d') != day or seen_at > as_of
+                or row.get('status') not in {'sent', 'miss'}):
             continue
-        sent = sum(1 for r in chosen.values() if r.get("venue") == venue)
-        vhits = sum(x["hit"] for x in rows)
-        vm = sum(x["bucket"] == "main" for x in rows)
-        vi = sum(x["bucket"] == "mid" for x in rows)
-        vv = sum(x["bucket"] == "man" for x in rows)
-        lines.append(f"**{venue}**　配信 {sent}R｜結果 {len(rows)}R｜的中 **{vhits}/{len(rows)}**｜本 {vm}・中 {vi}・万 {vv}")
+        previous = settled.get(key)
+        if previous is None or seen_at < timestamp(previous['sent_at']):
+            settled[key] = row
+        venues.add(key[1])
 
-    if missed_man:
-        lines += ["━━━━━━━━━━━━━━━━━━", f"🎯 **万舟取り逃し {len(missed_man)}R**"]
-        for x in missed_man[:5]:
-            row = x["row"]
-            result = x["result"]
-            combo = max(result["payouts"], key=result["payouts"].get)
-            lines.append(f"{row.get('venue')} {row.get('rno')}R｜{combo} **{_yen(result['payouts'][combo])}**")
+    for rows, default_stream in ((predictions, 'normal'), (opportunities, None)):
+        for row in rows:
+            key = identity(row, default_stream or row.get('stream'))
+            sent_at = timestamp(row.get('sent_at'))
+            try:
+                close = datetime.strptime(day + ' ' + row['deadline'], '%Y%m%d %H:%M').replace(tzinfo=base.JST)
+            except (KeyError, ValueError, TypeError):
+                continue
+            if (row.get('day') != day or key is None or sent_at is None
+                    or sent_at.strftime('%Y%m%d') != day or sent_at > as_of or sent_at >= close):
+                continue
+            picks = (row.get('main') or row.get('cover') or row.get('outsiders') or row.get('all_picks')) if default_stream else row.get('picks')
+            if not picks:
+                continue
+            venues.add(key[1])
+            if close <= as_of:
+                eligible.add(key)
+
+    counts = {jcd: {stream: {'hits': 0, 'judged': 0, 'pending': 0, 'man': 0} for stream in STREAMS} for jcd in sorted(venues)}
+    for (stream, jcd, _), row in settled.items():
+        count = counts[jcd][stream]
+        count['judged'] += 1
+        if row['status'] == 'sent':
+            count['hits'] += 1
+            if int(row.get('payout_per_100') or 0) >= 10000:
+                count['man'] += 1
+    for stream, jcd, rno in eligible - set(settled):
+        counts[jcd][stream]['pending'] += 1
+    return counts
+
+
+def result_text(count):
+    if count['judged']:
+        text = f"{count['hits']}/{count['judged']}R（{count['hits'] / count['judged'] * 100:.1f}%）"
     else:
-        lines += ["━━━━━━━━━━━━━━━━━━", "🎯 **万舟取り逃し 0R**"]
+        text = '—（判定済み0R）'
+    if count['pending']:
+        text += f"｜未集計{count['pending']}R"
+    return text
 
-    lines += [
-        "",
-        "※結果確定分のみ。未確定は分母外。",
-        "※万舟＝3連単払戻1万円以上。本線/中穴は万舟を除いた的中を予想セクションで分類。",
-    ]
 
-    payload = {
-        "embeds": [{
-            "title": f"9/14 {now.strftime('%H:%M')}時点｜全場中間報告",
-            "description": "\n".join(lines),
-            "color": 0x176B87,
-            "footer": {"text": "確定結果だけを自動集計。暫定予想と展示後の直前更新を分離集計。"},
-        }],
-        "allowed_mentions": {"parse": []},
+def build_snapshot(as_of, journal=None, predictions=None, opportunities=None):
+    as_of = as_of.astimezone(base.JST)
+    counts = tally(as_of, read_rows(JOURNAL) if journal is None else journal,
+                   read_rows(PREDICTIONS) if predictions is None else predictions,
+                   read_rows(OPPORTUNITIES) if opportunities is None else opportunities)
+    totals = {stream: {key: sum(v[stream][key] for v in counts.values()) for key in ('hits', 'judged', 'pending', 'man')} for stream in STREAMS}
+    description = ['**速報くん、ここまでの成績を持ってきたぞー！📣**', '', '**全場合計**']
+    description += [f'{label}：{result_text(totals[stream])}' for stream, label in STREAMS.items()]
+    if not counts:
+        description.append('\nこの時刻までの配信・判定記録はまだありません。')
+    embed = {
+        'title': f'📊 速報くん途中成績｜{as_of:%m/%d %H:%M}時点',
+        'description': '\n'.join(description),
+        'color': 0xFFB000,
+        'fields': [{'name': base.VENUES[jcd], 'value': '\n'.join(f'{label}：{result_text(v[stream])}' for stream, label in STREAMS.items()), 'inline': False} for jcd, v in counts.items()],
+        'footer': {'text': 'JST｜速報くんの時刻内の的中・不的中記録を集計。的中数/判定済み数。未配信・結果待ち・未集計は分母外。0件は0%にしません。'},
     }
-    meta = {
-        "day": day,
-        "as_of": now.strftime("%H:%M JST"),
-        "confirmed_races": len(settled),
-        "hits": hits,
-        "hit_rate": (hits / len(settled) * 100) if settled else None,
-        "main_hits": main_hits,
-        "mid_hits": mid_hits,
-        "man_hits": man_hits,
-        "uniform_stake_yen": uniform_stake,
-        "uniform_return_yen": uniform_return,
-        "uniform_roi": uniform_roi,
-        "virtual_stake_yen": virtual_stake,
-        "virtual_return_yen": virtual_return,
-        "virtual_roi": virtual_roi,
-        "missed_man": len(missed_man),
-    }
-    return payload, meta
+    return {'day': as_of.strftime('%Y%m%d'), 'hour': as_of.hour, 'as_of': as_of.isoformat(),
+            'venues': counts, 'totals': totals,
+            'payload': {'embeds': [embed], 'allowed_mentions': {'parse': []}, 'flags': SUPPRESS_NOTIFICATIONS}}
+
+
+def require_report_channel():
+    url = os.getenv('DISCORD_REPORT_WEBHOOK_URL', '').strip()
+    if not url:
+        raise RuntimeError('Dedicated report channel is not configured')
+    if url == os.getenv('DISCORD_WEBHOOK_URL', '').strip():
+        raise RuntimeError('Report channel must differ from predictions')
+    return url
+
+
+def verify_channel():
+    url = require_report_channel()
+    parsed = urllib.parse.urlsplit(url)
+    if (parsed.scheme != 'https' or parsed.netloc not in {'discord.com', 'discordapp.com', 'ptb.discord.com', 'canary.discord.com'}
+            or not re.fullmatch(r'/api(?:/v\d+)?/webhooks/\d+/[^/]+/?', parsed.path)):
+        raise RuntimeError('Report webhook URL is invalid')
+    with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': base.UA}), timeout=20) as response:
+        channel = str(json.load(response).get('channel_id', ''))
+    if not channel.isdigit():
+        raise RuntimeError('Report webhook returned no channel')
+    print('Dedicated report webhook verified (read-only)', flush=True)
+
+
+def send_slot(as_of, *, sender=None):
+    require_report_channel()
+    destination = report_destination_key()
+    key = f"sokuhou:{as_of:%Y%m%d}:{as_of.hour:02d}"
+    if any(row.get('request_id') == key and row.get('destination') == destination for row in read_rows(DELIVERIES)):
+        return 0
+    SNAPSHOTS.mkdir(parents=True, exist_ok=True)
+    path = SNAPSHOTS / f'{as_of:%Y%m%d}_{as_of.hour:02d}.json'
+    if path.exists():
+        snapshot = json.loads(path.read_text(encoding='utf-8'))
+    else:
+        snapshot = build_snapshot(as_of)
+        path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    message = (sender or post_confirmed)(snapshot['payload'])
+    if not str(message.get('id', '')).isdigit():
+        raise RuntimeError('Discord acknowledgement has no message ID')
+    DELIVERIES.parent.mkdir(parents=True, exist_ok=True)
+    with DELIVERIES.open('a', encoding='utf-8') as handle:
+        handle.write(json.dumps({'day': snapshot['day'], 'as_of': snapshot['as_of'], 'hour': as_of.hour,
+                                 'request_id': key, 'destination': destination, 'message_id': message['id'],
+                                 'sent_at': datetime.now(base.JST).isoformat()}, ensure_ascii=False) + '\n')
+        handle.flush()
+        os.fsync(handle.fileno())
+    print(f'Interim report acknowledged: {key}', flush=True)
+    return 1
+
+
+def send_due(now=None, *, sender=None):
+    now = (now or datetime.now(base.JST)).astimezone(base.JST)
+    schedule = json.loads(SCHEDULE.read_text(encoding='utf-8'))
+    if not schedule['enabled'] or now.strftime('%Y%m%d') < schedule['start_day']:
+        return 0
+    sent = 0
+    for hour in schedule['hours']:
+        cutoff = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+        if cutoff <= now:
+            sent += send_slot(cutoff, sender=sender)
+    return sent
 
 
 def main():
-    payload, meta = build_payload()
-    msg = post_confirmed(payload)
-    Path("data").mkdir(exist_ok=True)
-    with Path("data/interim_report_deliveries.jsonl").open("a", encoding="utf-8") as f:
-        f.write(json.dumps({
-            **meta,
-            "request_id": REQUEST_ID,
-            "destination": report_destination_key(),
-            "message_id": msg["id"],
-            "sent_at": datetime.now(base.JST).isoformat(),
-        }, ensure_ascii=False) + "\n")
-    print(json.dumps(meta, ensure_ascii=False, sort_keys=True))
-    print("Interim report acknowledged")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--verify-channel', action='store_true')
+    parser.add_argument('--request', type=Path)
+    args = parser.parse_args()
+    if args.verify_channel:
+        verify_channel()
+        return
+    if args.request:
+        request = json.loads(args.request.read_text(encoding='utf-8'))
+        now = datetime.now(base.JST)
+        schedule = json.loads(SCHEDULE.read_text(encoding='utf-8'))
+        if request.get('day') != now.strftime('%Y%m%d'):
+            print('Skip stale interim report request')
+            return
+        hour = request.get('hour')
+        if not schedule['enabled'] or request['day'] < schedule['start_day'] or hour not in schedule['hours']:
+            raise ValueError('Report slot is not enabled')
+        cutoff = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+        if cutoff > now:
+            raise ValueError('Report cutoff has not been reached')
+        send_slot(cutoff)
+    else:
+        send_due()
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as exc:
+        raise SystemExit(f'Interim report failed: {type(exc).__name__}') from None

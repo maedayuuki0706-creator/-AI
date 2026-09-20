@@ -2,30 +2,59 @@ name: Boat AI Interim Report
 on:
   push:
     branches: [main]
-    paths: [interim_report.py, .github/workflows/interim_report.yml]
+    paths:
+      - interim_report.py
+      - interim_report_schedule.json
+      - interim_report_request.json
+      - tests/test_interim_report.py
+      - .github/workflows/interim_report.yml
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
-  send:
-    if: ${{ startsWith(github.event.head_commit.message, 'Send interim report') }}
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Send one combined interim report
+      - name: Check cutoff, denominator and duplicate protection
+        run: python -m unittest discover -s tests -p 'test_interim_report.py' -v
+      - name: Verify report destination without posting
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
-        run: python interim_report.py
-      - name: Persist report acknowledgement and refreshed results
+        run: python interim_report.py --verify-channel
+  send:
+    needs: verify
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'Request scheduled interim report ') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Wait for the active watcher to persist its receipts before fallback sends.
+    concurrency:
+      group: boat-ai-discord-notify-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Send only an unacknowledged requested report
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
+        run: python interim_report.py --request interim_report_request.json
+      - name: Persist snapshots and report acknowledgements
         if: always()
         run: |
-          if [ -z "$(git status --porcelain data/interim_report_deliveries.jsonl data/official_results)" ]; then exit 0; fi
+          if [ -z "$(git status --porcelain data/)" ]; then exit 0; fi
           git config user.name boat-ai-learning-bot
           git config user.email actions@users.noreply.github.com
-          git add data/interim_report_deliveries.jsonl data/official_results
-          git commit -m 'Record interim report acknowledgement'
+          git add data/
+          git commit -m 'Record scheduled interim report acknowledgement'
           git pull --rebase origin main
           git push origin HEAD:main

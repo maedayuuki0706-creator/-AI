@@ -15,6 +15,7 @@ import detailed_discord_notify as app
 import bridge_learning
 import hit_alerts
 import hit_alerts_fast
+import interim_report
 import mid_value_selection
 import opportunity_alerts
 import opportunity_character
@@ -179,6 +180,10 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
             hit_alerts_fast.check_and_send()
         except Exception as exc:
             print(f'Hit alert pass failed: {type(exc).__name__}', flush=True)
+        try:
+            interim_report.send_due()
+        except Exception as exc:
+            print(f'Interim report pass failed: {type(exc).__name__}', flush=True)
         remaining = end - clock()
         if duration == 0 or remaining <= 0:
             break
