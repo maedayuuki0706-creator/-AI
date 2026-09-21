@@ -1,0 +1,47 @@
+name: Hiyori Discord Smoke Test
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - hiyori_smoke_test.py
+      - tests/test_hiyori_smoke_test.py
+      - .github/workflows/hiyori_smoke_test.yml
+permissions:
+  contents: write
+concurrency:
+  group: boat-ai-hiyori-smoke-test
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify destination isolation and real acknowledgement
+        run: python -m unittest discover -s tests -p 'test_hiyori_smoke_test.py' -v
+      - name: Post one test to the dedicated Hiyori channel
+        if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'Send Hiyori connection test ') }}
+        env:
+          HIYORI_DISCORD_WEBHOOK_URL: ${{ secrets.HIYORI_DISCORD_WEBHOOK_URL }}
+        run: python hiyori_smoke_test.py --request-id "$GITHUB_RUN_ID"
+      - name: Persist the confirmed Hiyori message ID
+        if: always()
+        run: |
+          receipt="data/hiyori_smoke_tests/${GITHUB_RUN_ID}.json"
+          if [ ! -f "$receipt" ]; then exit 0; fi
+          git config user.name boat-ai-learning-bot
+          git config user.email actions@users.noreply.github.com
+          git add "$receipt"
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Record confirmed Hiyori connection test'
+          for attempt in 1 2 3; do
+            git pull --rebase origin main
+            if git push origin HEAD:main; then exit 0; fi
+          done
+          exit 1
