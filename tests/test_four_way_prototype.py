@@ -197,6 +197,20 @@ class StorageAndSettlementTests(unittest.TestCase):
                                  '2026-09-21T10:10:00+09:00')
         self.assertEqual(report['counts'], {'closed_before_trial_start': 1, 'missed_deadline': 1, 'scheduled': 1})
 
+    def test_first_pass_fetches_schedule_even_on_a_fresh_runner(self):
+        now = datetime.fromisoformat('2026-09-21T10:00:00+09:00')
+        with patch.object(runner.time, 'monotonic', return_value=0), \
+             patch.object(runner, 'now_jst', return_value=now), \
+             patch.object(runner.base, 'discover_venues', return_value=['05']) as discover, \
+             patch.object(runner, 'get_schedule', return_value=('05', ['11:00'], None)), \
+             patch.object(runner, 'settle_available') as settle:
+            self.assertEqual(runner.run(0), 0)
+        discover.assert_called_once_with('20260921')
+        settle.assert_called_once()
+        report = trial.read(trial.ROOT/'20260921/coverage.json')
+        self.assertEqual(report['expected'], 1)
+        self.assertEqual(report['counts'], {'scheduled': 1})
+
 
 if __name__ == '__main__':
     unittest.main()

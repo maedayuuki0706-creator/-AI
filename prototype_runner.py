@@ -145,13 +145,15 @@ def coverage(day, schedules, errors, now, started_at):
 
 def run(watch_seconds=0):
     end = time.monotonic() + max(0, watch_seconds)
-    schedules, errors, schedule_at, result_at, active_day = {}, {}, 0.0, 0.0, None
+    # The monotonic clock may start close to zero on a fresh Actions runner.
+    # The first pass must still fetch schedules and settle pending results.
+    schedules, errors, schedule_at, result_at, active_day = {}, {}, float('-inf'), float('-inf'), None
     touched = set()
     while True:
         now = now_jst()
         day = now.strftime('%Y%m%d')
         if day != active_day:
-            schedules, errors, schedule_at = {}, {}, 0.0
+            schedules, errors, schedule_at = {}, {}, float('-inf')
             active_day = day
         start_path = trial.ROOT/day/'start.json'
         import json
