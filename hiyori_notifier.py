@@ -9,6 +9,7 @@ import json, os, urllib.request
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import direct_discord_notify as base
+import kyoteibiyori_adapter as hiyori
 from ticket_compression import compression_snapshot, format_support_note
 
 JST=ZoneInfo("Asia/Tokyo")
@@ -41,6 +42,7 @@ def run_once(now=None):
             key=(day,str(jcd),rno)
             try:
                 a=base.analyze_official(day,jcd,rno)
+                hs=hiyori.public_signals()
                 if not a or not base.valid_six_boats(a,base.load_policy()):continue
                 snap=compression_snapshot(a)
                 rows=(a.get("trifecta") or [])[:10]
@@ -50,10 +52,10 @@ def run_once(now=None):
                      f"🎯 軸候補：**{leader}号艇**\n"
                      f"買い目候補：{' / '.join(picks)}\n"
                      f"{format_support_note(a)}\n\n"
-                     "※現在は日和データ接続検証中。既存AIとは別ログで比較保存。")
+                     "日和公開データ接続：OK｜既存AIとは別ログで比較保存。")
                 send(msg)
                 log({"day":day,"jcd":str(jcd),"venue":base.VENUES[jcd],"rno":rno,"deadline":deadline,
-                     "sent_at":now.isoformat(),"stream":"hiyori-ab","hiyori_data_status":"adapter-pending",
+                     "sent_at":now.isoformat(),"stream":"hiyori-ab","hiyori_data_status":"public-connected","hiyori_signals":hs,
                      "picks":picks,"compression":snap})
                 sent+=1
             except Exception as e: print("hiyori failed",key,type(e).__name__)
