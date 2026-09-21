@@ -22,7 +22,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,10 +31,22 @@ jobs:
         with:
           python-version: '3.12'
       - name: Verify four-way comparison invariants
-        run: python -m unittest discover -s tests -p 'test_four_way_prototype.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_four_way_prototype.py' -v
+          python -m py_compile prototype_runner.py four_way_prototype.py
+      - name: Verify prototype Discord secrets
+        env:
+          PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
+          PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
+        run: |
+          test -n "$PROTO1_DISCORD_WEBHOOK_URL"
+          test -n "$PROTO2_DISCORD_WEBHOOK_URL"
       - name: Capture first four-way checkpoint
         env:
           TZ: Asia/Tokyo
+          PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
+          PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
+          PROTOTYPE_DELIVERY_START_DAY: '20260922'
         run: PROTOTYPE_CODE_SHA="$(git rev-parse HEAD)" python -u prototype_runner.py --watch-seconds 0
       - name: Persist first checkpoint
         if: success()
@@ -51,7 +63,10 @@ jobs:
       - name: Watch near-deadline races and settle all four methods
         env:
           TZ: Asia/Tokyo
-        run: PROTOTYPE_CODE_SHA="$(git rev-parse HEAD)" python -u prototype_runner.py --watch-seconds 720
+          PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
+          PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
+          PROTOTYPE_DELIVERY_START_DAY: '20260922'
+        run: PROTOTYPE_CODE_SHA="$(git rev-parse HEAD)" python -u prototype_runner.py --watch-seconds 240
       - name: Preserve four-way records as execution artifact
         if: always()
         uses: actions/upload-artifact@v4
