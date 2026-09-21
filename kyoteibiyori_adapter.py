@@ -32,3 +32,47 @@ def health():
 
 if __name__=="__main__":
     print(public_signals())
+
+
+def race_url(day, jcd, rno):
+    return (f"{BASE}race_shusso.php?hiduke={day}&place_no={int(jcd)}&race_no={int(rno)}")
+
+def race_signals(day, jcd, rno, html=None):
+    """Race-scoped public-page metadata. Never fabricates missing dynamic fields."""
+    url=race_url(day,jcd,rno)
+    html=html or fetch(url)
+    text=re.sub(r"<[^>]+>"," ",html)
+    text=re.sub(r"\\s+"," ",text)
+    deadline=None
+    m=re.search(r"締切\\s*([0-2]?\\d:[0-5]\\d)",text)
+    if m: deadline=m.group(1)
+    return {
+      "source":"kyoteibiyori-public-race",
+      "source_url":url,
+      "page_ok":bool(text.strip()),
+      "deadline":deadline,
+      "makuri_alert_mentioned":"まくりアラート" in text,
+      "front_entry_alert_mentioned":"前づけ" in text or "前付け" in text,
+      "tilt_alert_mentioned":"チルト" in text,
+      "course_st_mentioned":"コース別" in text and "ST" in text,
+    }
+
+def race_model(day, jcd, rno):
+    """Independent Hiyori model interface used by fusion_prototype.
+
+    Public HTML currently exposes race metadata but key per-boat tables are
+    dynamically loaded. Until those lane-level values are parsed independently,
+    return ready=False so the fusion stream cannot silently reuse Existing AI.
+    """
+    try:
+        signals=race_signals(day,jcd,rno)
+    except Exception as e:
+        return {"ready":False,"reason":f"fetch_error:{type(e).__name__}",
+                "source_url":race_url(day,jcd,rno),"signals":None,"trifecta":[]}
+    return {
+      "ready":False,
+      "reason":"lane_level_hiyori_dynamic_data_not_parsed",
+      "source_url":signals["source_url"],
+      "signals":signals,
+      "trifecta":[],
+    }
