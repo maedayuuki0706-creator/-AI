@@ -70,6 +70,8 @@ def _post_webhook(url, payload):
 
 def deliver_prototypes(record, now=None):
     """Deliver prototype 1/2/3 exactly once, retrying only unconfirmed streams."""
+    if os.getenv("PROTOTYPE_DELIVERY_DISABLED", "").strip() == "1":
+        return
     now = now or now_jst()
     start_day = os.getenv('PROTOTYPE_DELIVERY_START_DAY', '').strip()
     if start_day and record['day'] < start_day:
