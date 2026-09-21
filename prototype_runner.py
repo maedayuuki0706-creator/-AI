@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
+import json
 import os
 import time
 import urllib.request
@@ -23,6 +24,79 @@ def status(day, jcd, rno, state, **details):
     key = trial.identity(day, jcd, rno)
     trial.write_json(trial.ROOT/day/'status'/f'{key}.json',
                      {'key': key, 'state': state, 'updated_at': now_jst().isoformat(), **details})
+
+
+def _delivery_path(record, stream):
+    return trial.ROOT/record['day']/'deliveries'/stream/f"{record['key']}.json"
+
+
+def _prototype_message(record, stream):
+    model = record['models'][stream]
+    weight = model['weights']
+    picks = ' / '.join(model['picks'])
+    title = 'プロトタイプ1｜既存AI優先' if stream == 'prototype1' else 'プロトタイプ2｜日和AI優先'
+    return (
+        f"🧪 **{title}**\n"
+        f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
+        f"⚖️ 既存 {int(weight['existing']*100)}% / 日和 {int(weight['hiyori']*100)}%\n"
+        f"🎯 **買い目 {model['point_count']}点**\n"
+        f"`{picks}`\n"
+        f"📊 Grade {model['grade']}｜比較テスト配信"
+    )
+
+
+def _post_webhook(url, payload):
+    body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+    request = urllib.request.Request(
+        url, data=body,
+        headers={'Content-Type': 'application/json', 'User-Agent': base.UA},
+        method='POST')
+    with urllib.request.urlopen(request, timeout=10) as response:
+        if not 200 <= response.status < 300:
+            raise RuntimeError(f'Discord HTTP {response.status}')
+
+
+def deliver_prototypes(record, now=None):
+    """Deliver prototype 1/2 exactly once, retrying only unconfirmed streams."""
+    now = now or now_jst()
+    start_day = os.getenv('PROTOTYPE_DELIVERY_START_DAY', '').strip()
+    if start_day and record['day'] < start_day:
+        return
+    # Predictions are useful only before the race. Do not create late Discord noise.
+    if not trial.before_deadline(record['day'], record['deadline'], now):
+        return
+    mapping = {
+        'prototype1': ('PROTO1_DISCORD_WEBHOOK_URL', 'プロトタイプ1'),
+        'prototype2': ('PROTO2_DISCORD_WEBHOOK_URL', 'プロトタイプ2'),
+    }
+    for stream, (env_name, username) in mapping.items():
+        receipt = _delivery_path(record, stream)
+        if receipt.exists():
+            continue
+        url = os.getenv(env_name, '').strip()
+        if not url:
+            raise RuntimeError(f'{env_name} is not configured')
+        try:
+            _post_webhook(url, {'username': username, 'content': _prototype_message(record, stream)})
+            trial.write_json(receipt, {
+                'key': record['key'], 'stream': stream, 'delivered_at': now_jst().isoformat(),
+                'prediction_digest': record['digest'],
+            })
+            print(f"prototype delivery confirmed {record['key']} {stream}", flush=True)
+        except Exception as exc:
+            print(f"prototype delivery pending {record['key']} {stream}: {type(exc).__name__}", flush=True)
+
+
+def deliver_pending(day, now=None):
+    """Retry any recorded race whose Discord receipt is still missing."""
+    now = now or now_jst()
+    root = trial.ROOT/day/'predictions'
+    if not root.exists():
+        return
+    for path in sorted(root.glob('*.json')):
+        record = trial.read(path)
+        if trial.before_deadline(record['day'], record['deadline'], now):
+            deliver_prototypes(record, now)
 
 
 def collect_race(day, jcd, rno, deadline, clock=now_jst):
@@ -56,6 +130,7 @@ def collect_race(day, jcd, rno, deadline, clock=now_jst):
             status(day, jcd, rno, 'missed_deadline', deadline=deadline)
             return 'missed_deadline'
         trial.persist(bundle, request, source, hy)
+        deliver_prototypes(bundle, clock())
         status(day, jcd, rno, 'recorded', deadline=deadline, digest=bundle['digest'])
         print(f'four-way recorded {key}: 10 points x 4; weights 70/30 and 30/70', flush=True)
         return 'recorded'
@@ -185,6 +260,8 @@ def run(watch_seconds=0):
         due.sort(key=lambda item: item[3])
         with ThreadPoolExecutor(max_workers=4) as pool:
             list(pool.map(lambda args: collect_race(*args), due))
+        # A Discord/network hiccup must not turn into a permanent delivery miss.
+        deliver_pending(day, now_jst())
         if time.monotonic() - result_at >= 60:
             settle_available()
             result_at = time.monotonic()
