@@ -1,0 +1,36 @@
+name: Prototype Discord Delivery Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/prototype-discord-test.yml'
+
+jobs:
+  send-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Prototype 1 webhook
+        env:
+          WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "PROTO1_DISCORD_WEBHOOK_URL is not set"
+            exit 1
+          fi
+          curl -fsS -H "Content-Type: application/json" \
+            -d '{"username":"プロトタイプ1","content":"🧪 プロトタイプ1 配信テスト成功"}' \
+            "$WEBHOOK_URL"
+
+      - name: Test Prototype 2 webhook
+        env:
+          WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "PROTO2_DISCORD_WEBHOOK_URL is not set"
+            exit 1
+          fi
+          curl -fsS -H "Content-Type: application/json" \
+            -d '{"username":"プロトタイプ2","content":"🧪 プロトタイプ2 配信テスト成功"}' \
+            "$WEBHOOK_URL"
