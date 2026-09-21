@@ -34,22 +34,11 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_four_way_prototype.py' -v
           python -m py_compile prototype_runner.py four_way_prototype.py
-      - name: Verify prototype Discord secrets
-        env:
-          PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
-          PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
-          PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
-        run: |
-          test -n "$PROTO1_DISCORD_WEBHOOK_URL"
-          test -n "$PROTO2_DISCORD_WEBHOOK_URL"
-          test -n "$PROTO3_DISCORD_WEBHOOK_URL"
       - name: Capture first five-way checkpoint
         env:
           TZ: Asia/Tokyo
-          PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
-          PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
-          PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
           PROTOTYPE_DELIVERY_START_DAY: '20260922'
+          PROTOTYPE_DELIVERY_DISABLED: '1'
         run: PROTOTYPE_CODE_SHA="$(git rev-parse HEAD)" python -u prototype_runner.py --watch-seconds 0
       - name: Persist first checkpoint
         if: success()
@@ -66,10 +55,8 @@ jobs:
       - name: Watch near-deadline races and settle all five methods
         env:
           TZ: Asia/Tokyo
-          PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
-          PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
-          PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
           PROTOTYPE_DELIVERY_START_DAY: '20260922'
+          PROTOTYPE_DELIVERY_DISABLED: '1'
         run: PROTOTYPE_CODE_SHA="$(git rev-parse HEAD)" python -u prototype_runner.py --watch-seconds 240
       - name: Preserve four-way records as execution artifact
         if: always()
