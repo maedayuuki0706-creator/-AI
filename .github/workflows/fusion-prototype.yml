@@ -1,4 +1,4 @@
-name: Four Way Prototype Comparison
+name: Five Way Prototype Comparison
 
 on:
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify four-way comparison invariants
+      - name: Verify five-way comparison invariants
         run: |
           python -m unittest discover -s tests -p 'test_four_way_prototype.py' -v
           python -m py_compile prototype_runner.py four_way_prototype.py
@@ -38,14 +38,17 @@ jobs:
         env:
           PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
           PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
+          PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
         run: |
           test -n "$PROTO1_DISCORD_WEBHOOK_URL"
           test -n "$PROTO2_DISCORD_WEBHOOK_URL"
-      - name: Capture first four-way checkpoint
+          test -n "$PROTO3_DISCORD_WEBHOOK_URL"
+      - name: Capture first five-way checkpoint
         env:
           TZ: Asia/Tokyo
           PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
           PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
+          PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
           PROTOTYPE_DELIVERY_START_DAY: '20260922'
         run: PROTOTYPE_CODE_SHA="$(git rev-parse HEAD)" python -u prototype_runner.py --watch-seconds 0
       - name: Persist first checkpoint
@@ -55,23 +58,24 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git add data/prototypes/
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Record prospective four-way prototype checkpoint'
+          git commit -m 'Record prospective five-way prototype checkpoint'
           for attempt in 1 2 3; do
             git pull --rebase origin main && git push origin HEAD:main && exit 0
           done
           exit 1
-      - name: Watch near-deadline races and settle all four methods
+      - name: Watch near-deadline races and settle all five methods
         env:
           TZ: Asia/Tokyo
           PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
           PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
+          PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
           PROTOTYPE_DELIVERY_START_DAY: '20260922'
         run: PROTOTYPE_CODE_SHA="$(git rev-parse HEAD)" python -u prototype_runner.py --watch-seconds 240
       - name: Preserve four-way records as execution artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: four-way-comparison-${{ github.run_id }}-${{ github.run_attempt }}
+          name: five-way-comparison-${{ github.run_id }}-${{ github.run_attempt }}
           path: data/prototypes/
           if-no-files-found: warn
       - name: Persist final predictions, results and missing-race ledger
@@ -82,7 +86,7 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git add data/prototypes/
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Record prospective four-way predictions and results'
+          git commit -m 'Record prospective five-way predictions and results'
           for attempt in 1 2 3; do
             git pull --rebase origin main && git push origin HEAD:main && exit 0
           done
