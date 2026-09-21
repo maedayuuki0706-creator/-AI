@@ -1,0 +1,25 @@
+name: Hiyori AI Discord
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+concurrency:
+  group: hiyori-ai-discord
+  cancel-in-progress: false
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run Hiyori notifier
+        env:
+          HIYORI_DISCORD_WEBHOOK_URL: ${{ secrets.HIYORI_DISCORD_WEBHOOK_URL }}
+          TZ: Asia/Tokyo
+        run: python hiyori_notifier.py
