@@ -399,7 +399,7 @@ def _build_payload(venue, rno, deadline, analysis, kind):
             for row in picks
         ],
         "message": _message(venue, rno, deadline, analysis, picks, kind, score, breakdown),
-        "mode": "calibration_all_races",
+        "mode": "sniper_candidates_logged_all_races",
         "score_version": "opportunity-score-v1",
     }
 
@@ -417,6 +417,42 @@ def _is_selected_mid(payload):
             ev = _num(row.get("odds")) * _num(row.get("probability"))
         best_ev = max(best_ev, _num(ev))
     return best_ev >= 1.05
+
+
+
+def _is_selected_longshot(payload, analysis):
+    """Sniper mode: log every race, but only send longshots with a concrete upset signal."""
+    picks = payload.get("picks") or []
+    score = int(payload.get("score") or 0)
+    if score < 80 or not picks or len(picks) > 10:
+        return False
+
+    best_ev = max((_num(row.get("expected_value")) or (_num(row.get("odds")) * _num(row.get("probability")))) for row in picks)
+    if best_ev < 1.20:
+        return False
+
+    preview = analysis.get("preview") or {}
+    heads = analysis.get("heads") or {}
+    one_head = _num(heads.get("1"))
+    non_one = max((_num(value) for lane, value in heads.items() if str(lane) != "1"), default=0.0)
+    wind = _num(preview.get("wind_speed"))
+
+    # Two sniper patterns:
+    # A) 1-drop / outside attack: non-1 head is genuinely live.
+    attack_pattern = non_one >= 0.14 and (one_head <= 0.52 or wind >= 5.0)
+
+    # B) 1-escape + rough followers: keep the head solid, but require a high-odds
+    # 1-x-y ticket with enough model probability/EV rather than spraying every race.
+    escape_rough = any(
+        str(row.get("combination") or "").startswith("1-")
+        and _num(row.get("odds")) >= 80.0
+        and _num(row.get("probability")) >= 0.009
+        and (_num(row.get("expected_value")) or (_num(row.get("odds")) * _num(row.get("probability")))) >= 1.15
+        for row in picks
+    )
+    escape_pattern = one_head >= 0.34 and escape_rough
+
+    return attack_pattern or escape_pattern
 
 
 def _selected_mid_message(message):
@@ -525,8 +561,26 @@ def install(app):
         ):
             payload = cached[label]
             selected_mid = label == "mid" and _is_selected_mid(payload)
+            selected_longshot = label == "long" and _is_selected_longshot(payload, analysis={
+                "preview": record.get("preview") or {},
+                "heads": record.get("heads") or {},
+            })
             target_env = "DISCORD_WEBHOOK_MID_ODDS_SELECTED" if selected_mid else env_name
             message = _selected_mid_message(payload["message"]) if selected_mid else payload["message"]
+
+            # Longshot sniper mode: keep every candidate in the journal for learning,
+            # but do not post weak/all-race hole predictions to Discord.
+            if label == "long" and not selected_longshot:
+                _append_log({
+                    "day": record.get("day"), "jcd": record.get("jcd"), "venue": record.get("venue"),
+                    "rno": record.get("rno"), "deadline": record.get("deadline"), "sent_at": sent_at,
+                    "stream": "longshot", "selected": False, "delivery_env": None,
+                    "score": payload["score"], "confidence": payload["confidence"],
+                    "score_breakdown": payload["breakdown"], "picks": payload["picks"],
+                    "point_count": len(payload["picks"]), "mode": payload["mode"],
+                    "score_version": payload["score_version"], "status": "sniper_skip",
+                })
+                continue
             try:
                 _send(target_env, message)
                 _append_log({
