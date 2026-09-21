@@ -89,26 +89,8 @@ def install(app):
 
 
 def make_payload(request, analysis, rows):
-    combos = [row['combination'] for row in rows]
-    head = max(analysis['heads'], key=analysis['heads'].get)
-    lead = next(feature for feature in analysis['features'] if feature['lane'] == int(head))
-    rate = lead.get('course_win_rate')
-    explanation = f"{head}号艇を軸候補。"
-    if rate is not None:
-        explanation += f"日和の{lead['course']}コース1着率 {rate*100:.1f}%（{int(lead['course_samples'])}走）。"
-    if lead.get('course_st') is not None:
-        explanation += f"コース別平均ST {lead['course_st']:.2f}。"
-    text = (f"🧪 **日和AI・比較テスト｜{base.VENUES[request['jcd']]} {request['rno']}R**\n"
-            f"締切 {request['deadline']}｜日和データ追加版\n"
-            f"**買い目 {len(combos)}点**\n" + ' ／ '.join(combos) + '\n'
-            + explanation + '\n'
-            + '**同時点の既存予想**\n' + ' ／ '.join(r['combination'] for r in request['baseline_rows'])
-            + format_support_note(analysis)
-            + '\n※検証用。表示確率・期待値は未校正の参考値です。\n'
-            + analysis['source_url'])
-    if len(text.encode('utf-16-le')) // 2 > 2000:
-        raise ValueError('Hiyori card exceeds Discord text limit')
-    return {'content': text, 'allowed_mentions': {'parse': []}, 'flags': 4096}
+    from hiyori_format import make_payload as format_card
+    return format_card(request, analysis, rows)
 
 
 def process(request):
