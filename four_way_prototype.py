@@ -1,4 +1,4 @@
-"""Prospective, fixed-budget Existing / Hiyori / Prototype 1 / Prototype 2 trial.
+"""Prospective Existing / Hiyori / Prototype 1 / Prototype 2 / Prototype 3 trial.
 
 This is a separate shadow experiment, not a Discord delivery record. The two
 controls are rebuilt from the SAME official snapshot at ten points each.
@@ -20,15 +20,18 @@ from zoneinfo import ZoneInfo
 
 import bridge_learning
 import detailed_discord_notify as cards
+import mid_value_selection
+import opportunity_alerts
 
 JST = ZoneInfo('Asia/Tokyo')
-VERSION = 'four-way-70-30-10points-v1'
+VERSION = 'five-way-p3-hiyori-mid-v1'
 POINTS = 10
 UNIT_YEN = 100
-STREAMS = ('existing', 'hiyori', 'prototype1', 'prototype2')
+STREAMS = ('existing', 'hiyori', 'prototype1', 'prototype2', 'prototype3')
 LABELS = {'existing': '既存', 'hiyori': '日和',
           'prototype1': 'プロトタイプ1（既存優先）',
-          'prototype2': 'プロトタイプ2（日和優先）'}
+          'prototype2': 'プロトタイプ2（日和優先）',
+          'prototype3': 'プロトタイプ3（日和本線＋中穴抑え）'}
 WEIGHTS = {'existing': (1.0, 0.0), 'hiyori': (0.0, 1.0),
            'prototype1': (0.7, 0.3), 'prototype2': (0.3, 0.7)}
 COMBINATIONS = frozenset('-'.join(map(str, p)) for p in permutations(range(1, 7), 3))
@@ -121,6 +124,58 @@ def _card(rows, parent, stream, odds):
             'bridge': analysis.get('bridge_learning') if use_bridge else None}
 
 
+
+def _prototype3_card(hiyori, odds, native_hiyori):
+    """Keep Hiyori's native card as the main line and add only non-duplicate mid-odds cover."""
+    analysis = deepcopy(hiyori)
+    for row in analysis['trifecta']:
+        odd = odds.get(row['combination'])
+        row['odds'] = odd
+        row['expected_value'] = row['probability'] * odd if odd is not None else None
+
+    main = list(dict.fromkeys(native_hiyori))[:16]
+    if not main:
+        raise ValueError('Prototype 3 requires a Hiyori main card')
+
+    # Use the current 中穴 policy, but let Hiyori probabilities drive the cover candidates.
+    mid_value_selection.install(opportunity_alerts)
+    candidates = opportunity_alerts._candidate_rows(analysis, 'mid')
+    cover_rows = opportunity_alerts._coherent_selection(candidates, 'mid', analysis)
+    room = max(0, 16 - len(main))
+    main_set = set(main)
+    cover = []
+    for row in cover_rows:
+        combo = row.get('combination')
+        if combo and combo not in main_set and combo not in cover:
+            cover.append(combo)
+            if len(cover) >= room:
+                break
+
+    picks = main + cover
+    row_by_combo = {row['combination']: row for row in analysis['trifecta']}
+    chosen = [row_by_combo[pick] for pick in picks]
+    odds_complete = all(row.get('odds') is not None for row in chosen)
+    estimated = (sum(UNIT_YEN * row['expected_value'] for row in chosen)
+                 if odds_complete else None)
+    return {
+        'label': LABELS['prototype3'],
+        'weights': {'hiyori_main': 1.0, 'mid_cover_policy': 1.0},
+        'selection_policy': 'hiyori-native-main-plus-mid-on-hiyori-cover-cap16',
+        'main_picks': main,
+        'cover_picks': cover,
+        'picks': picks,
+        'point_count': len(picks),
+        'stake_yen': len(picks) * UNIT_YEN,
+        'heads': analysis['heads'],
+        'grade': analysis['grade'],
+        'probability_mass': sum(row['probability'] for row in chosen),
+        'estimated_return_yen': estimated,
+        'odds_complete': odds_complete,
+        'trifecta': analysis['trifecta'],
+        'structure': analysis.get('conviction_structure'),
+        'bridge': None,
+    }
+
 def build_bundle(request, hiyori, source, now=None):
     now = aware(now or datetime.now(JST))
     day, jcd, rno = request['day'], str(request['jcd']).zfill(2), int(request['rno'])
@@ -151,12 +206,6 @@ def build_bundle(request, hiyori, source, now=None):
                 odds[row['combination']] = odd
         except (ValueError, TypeError):
             pass
-    models = {}
-    for stream in STREAMS:
-        a, b = WEIGHTS[stream]
-        mixed = fuse(base['trifecta'], hiyori['trifecta'], a, b)
-        parent = base if stream in ('existing', 'prototype1') else hiyori
-        models[stream] = _card(mixed, parent, stream, odds)
     native = {}
     for stream, analysis in (('existing', base), ('hiyori', hiyori)):
         copied = deepcopy(analysis)
@@ -164,6 +213,13 @@ def build_bundle(request, hiyori, source, now=None):
         if stream == 'existing':
             selected = bridge_learning._reallocate(copied, selected)
         native[stream] = [r['combination'] for r in selected]
+    models = {}
+    for stream in WEIGHTS:
+        a, b = WEIGHTS[stream]
+        mixed = fuse(base['trifecta'], hiyori['trifecta'], a, b)
+        parent = base if stream in ('existing', 'prototype1') else hiyori
+        models[stream] = _card(mixed, parent, stream, odds)
+    models['prototype3'] = _prototype3_card(hiyori, odds, native['hiyori'])
     record = {'version': VERSION, 'mode': 'prospective_shadow', 'key': key,
               'day': day, 'jcd': jcd, 'rno': rno, 'venue': base['venue'],
               'deadline': request['deadline'], 'captured_at': captured.isoformat(),
@@ -173,7 +229,7 @@ def build_bundle(request, hiyori, source, now=None):
               'source_models': {'existing': base.get('model_version'), 'hiyori': hiyori.get('model_version')},
               'source_url': source.get('source_url'), 'features': deepcopy(hiyori['features']),
               'models': models, 'native_candidate_picks': native,
-              'comparison_note': 'Both controls use the shared input snapshot at 10 points; these are not Discord delivery receipts.'}
+              'comparison_note': 'Existing/Hiyori/P1/P2 use the shared 10-point comparison card; P3 preserves Hiyori native main picks and adds non-duplicate mid-odds cover up to 16 total points.'}
     record['digest'] = sha256(json.dumps(record, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     return record
 
@@ -285,6 +341,8 @@ def summarize(day):
                 'neither': sum(not r['models'][a]['hit'] and not r['models'][b]['hit'] for r in cohort)}
     report = {'day': day, 'version': VERSION, 'mode': 'prospective_shadow',
               'generated_at': datetime.now(JST).isoformat(), 'point_count': POINTS, 'unit_yen': UNIT_YEN,
+              'point_policy': {'existing': POINTS, 'hiyori': POINTS, 'prototype1': POINTS,
+                               'prototype2': POINTS, 'prototype3': 'hiyori-native-plus-mid-cover-cap16'},
               'recorded': len(predictions), 'pending': len(predictions)-len(results),
               'excluded_refunds_void_special': len(results)-len(cohort),
               'cohort': [r['key'] for r in cohort], 'totals': totals, 'pairs': pairs}
