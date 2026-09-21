@@ -1,0 +1,56 @@
+name: Prototype 3 Discord Delivery
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'prototype3_delivery.py'
+      - 'four_way_prototype.py'
+      - '.github/workflows/prototype3-delivery.yml'
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: prototype3-discord-delivery
+  cancel-in-progress: false
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify Prototype 3 delivery configuration
+        env:
+          PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
+        run: |
+          python -m py_compile prototype3_delivery.py four_way_prototype.py
+          test -n "$PROTO3_DISCORD_WEBHOOK_URL"
+      - name: Deliver Prototype 3
+        env:
+          TZ: Asia/Tokyo
+          PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
+          PROTOTYPE3_WATCH_SECONDS: '210'
+        run: python -u prototype3_delivery.py
+      - name: Persist Prototype 3 delivery receipts
+        if: always()
+        run: |
+          if [ ! -d data/prototype3_delivery ]; then exit 0; fi
+          git config user.name 'boat-ai-delivery-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add data/prototype3_delivery/
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Record prototype 3 delivery receipts'
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+          done
+          exit 1
