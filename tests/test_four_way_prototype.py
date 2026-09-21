@@ -47,18 +47,27 @@ class ModelTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             trial.fuse(rows, rows, .7, .7)
 
-    def test_four_cards_same_budget_and_parents_unchanged(self):
+    def test_five_cards_keep_legacy_budget_and_p3_structure(self):
         req, hy, src, now = prepared()
         original = deepcopy((req, hy, src))
         record = trial.build_bundle(req, hy, src, now)
         self.assertEqual((req, hy, src), original)
         self.assertEqual(set(record['models']), set(trial.STREAMS))
-        for stream, card in record['models'].items():
+        for stream in ('existing', 'hiyori', 'prototype1', 'prototype2'):
+            card = record['models'][stream]
             self.assertEqual(len(set(card['picks'])), 10)
             self.assertEqual(card['stake_yen'], 1000)
             self.assertTrue(card['odds_complete'])
             self.assertEqual({r['odds'] for r in card['trifecta']}, {20.0})
             self.assertAlmostEqual(sum(r['probability'] for r in card['trifecta']), 1)
+        p3 = record['models']['prototype3']
+        self.assertGreaterEqual(p3['point_count'], 1)
+        self.assertLessEqual(p3['point_count'], 16)
+        self.assertEqual(p3['main_picks'], record['native_candidate_picks']['hiyori'][:16])
+        self.assertFalse(set(p3['main_picks']) & set(p3['cover_picks']))
+        self.assertEqual(p3['picks'], p3['main_picks'] + p3['cover_picks'])
+        self.assertEqual(p3['stake_yen'], 100 * p3['point_count'])
+        self.assertTrue(p3['odds_complete'])
         self.assertEqual(record['models']['prototype1']['weights'], {'existing': .7, 'hiyori': .3})
         self.assertEqual(record['models']['prototype2']['weights'], {'existing': .3, 'hiyori': .7})
 
@@ -68,8 +77,9 @@ class ModelTests(unittest.TestCase):
             for row in analysis['trifecta']:
                 row['probability'] = 1/120
         record = trial.build_bundle(req, hy, src, now)
-        for card in record['models'].values():
-            self.assertEqual(len(card['picks']), 10)
+        for stream in ('existing', 'hiyori', 'prototype1', 'prototype2'):
+            self.assertEqual(len(record['models'][stream]['picks']), 10)
+        self.assertLessEqual(len(record['models']['prototype3']['picks']), 16)
 
     def test_missing_odds_are_unknown_not_zero(self):
         req, hy, src, now = prepared()
@@ -147,9 +157,10 @@ class StorageAndSettlementTests(unittest.TestCase):
         record = self.record()
         void = trial.evaluate(record, {'status': 'void', 'payouts': {}, 'refund_lanes': []})
         self.assertFalse(void['comparable'])
-        self.assertTrue(all(m['return_yen'] == 1000 and not m['hit'] for m in void['models'].values()))
+        self.assertTrue(all(m['return_yen'] == m['stake_yen'] and not m['hit'] for m in void['models'].values()))
         special = trial.evaluate(record, {'status': 'special', 'payouts': {}, 'special_per_100': 70})
-        self.assertTrue(all(m['return_yen'] == 700 for m in special['models'].values()))
+        self.assertTrue(all(m['return_yen'] == 70 * len(record['models'][stream]['picks'])
+                            for stream, m in special['models'].items()))
         # Full refund for one strategy means this race is outside the shared cohort.
         record['models']['existing']['picks'] = [c for c in sorted(trial.COMBINATIONS) if c.startswith('1-')][:10]
         partial = trial.evaluate(record, {'status': 'settled', 'payouts': {'4-5-6': 5000}, 'refund_lanes': [1]})
@@ -175,7 +186,7 @@ class StorageAndSettlementTests(unittest.TestCase):
         self.assertEqual(state, 'missed_deadline')
         writer.assert_not_called()
 
-    def test_source_failure_never_creates_four_baseline_copies(self):
+    def test_source_failure_never_creates_five_baseline_copies(self):
         req, hy, src, now = prepared()
         with patch.object(runner.base, 'analyze_official', return_value=req['official']), \
              patch.object(runner.hiyori_source, 'fetch_race', side_effect=ValueError), \

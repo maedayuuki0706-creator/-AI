@@ -1,4 +1,4 @@
-"""Continuously collect and settle the four-way prospective shadow experiment."""
+"""Continuously collect and settle the five-way prospective shadow experiment."""
 from __future__ import annotations
 
 import argparse
@@ -32,6 +32,18 @@ def _delivery_path(record, stream):
 
 def _prototype_message(record, stream):
     model = record['models'][stream]
+    if stream == 'prototype3':
+        main = ' / '.join(model.get('main_picks') or [])
+        cover = ' / '.join(model.get('cover_picks') or [])
+        return (
+            f"🧪 **プロトタイプ3｜日和本線＋中穴抑え**\n"
+            f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
+            f"🎯 **本線・日和（{len(model.get('main_picks') or [])}点）**\n"
+            f"`{main}`\n"
+            f"🔥 **抑え・中穴くん＋日和（{len(model.get('cover_picks') or [])}点）**\n"
+            f"`{cover or 'なし'}`\n"
+            f"📊 計{model['point_count']}点｜Grade {model['grade']}｜比較テスト配信"
+        )
     weight = model['weights']
     picks = ' / '.join(model['picks'])
     title = 'プロトタイプ1｜既存AI優先' if stream == 'prototype1' else 'プロトタイプ2｜日和AI優先'
@@ -57,7 +69,7 @@ def _post_webhook(url, payload):
 
 
 def deliver_prototypes(record, now=None):
-    """Deliver prototype 1/2 exactly once, retrying only unconfirmed streams."""
+    """Deliver prototype 1/2/3 exactly once, retrying only unconfirmed streams."""
     now = now or now_jst()
     start_day = os.getenv('PROTOTYPE_DELIVERY_START_DAY', '').strip()
     if start_day and record['day'] < start_day:
@@ -68,6 +80,7 @@ def deliver_prototypes(record, now=None):
     mapping = {
         'prototype1': ('PROTO1_DISCORD_WEBHOOK_URL', 'プロトタイプ1'),
         'prototype2': ('PROTO2_DISCORD_WEBHOOK_URL', 'プロトタイプ2'),
+        'prototype3': ('PROTO3_DISCORD_WEBHOOK_URL', 'プロトタイプ3'),
     }
     for stream, (env_name, username) in mapping.items():
         receipt = _delivery_path(record, stream)
@@ -132,7 +145,7 @@ def collect_race(day, jcd, rno, deadline, clock=now_jst):
         trial.persist(bundle, request, source, hy)
         deliver_prototypes(bundle, clock())
         status(day, jcd, rno, 'recorded', deadline=deadline, digest=bundle['digest'])
-        print(f'four-way recorded {key}: 10 points x 4; weights 70/30 and 30/70', flush=True)
+        print(f'five-way recorded {key}: P1/P2 fixed 10; P3 Hiyori main + mid cover cap16', flush=True)
         return 'recorded'
     except Exception as exc:
         status(day, jcd, rno, 'data_error', deadline=deadline, error_type=type(exc).__name__)
@@ -168,9 +181,9 @@ def settle_one(path):
         if result is not None:
             import json
             trial.write_once(target, (json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2)+'\n').encode())
-            print(f"four-way settled {record['key']} comparable={result['comparable']}", flush=True)
+            print(f"five-way settled {record['key']} comparable={result['comparable']}", flush=True)
     except Exception as exc:
-        print(f"four-way result pending {record['key']}: {type(exc).__name__}", flush=True)
+        print(f"five-way result pending {record['key']}: {type(exc).__name__}", flush=True)
 
 
 def settle_available(now=None):
@@ -268,7 +281,7 @@ def run(watch_seconds=0):
         now = now_jst()
         c = coverage(day, schedules, errors, now, started_at)
         report = trial.summarize(day)
-        print(f"four-way coverage {c['counts']} pending_results={report['pending']} judged={len(report['cohort'])}", flush=True)
+        print(f"five-way coverage {c['counts']} pending_results={report['pending']} judged={len(report['cohort'])}", flush=True)
         if time.monotonic() >= end:
             break
         time.sleep(min(20, max(0, end-time.monotonic())))
