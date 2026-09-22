@@ -1,0 +1,45 @@
+name: X Post Discord Test
+
+on:
+  push:
+    paths:
+      - ".github/workflows/x_post_test.yml"
+  workflow_dispatch:
+
+jobs:
+  send-test-post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send X intro draft to Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.X_POST_DISCORD_WEBHOOK_URL }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          webhook = os.environ.get("WEBHOOK_URL")
+          if not webhook:
+              raise SystemExit("X_POST_DISCORD_WEBHOOK_URL is not set")
+
+          message = """🚤 はじめまして！「競艇AIナビ」です🤖
+展示・気象・モーター・選手データを見ながら、狙えるレースを厳選して無料予想を公開します。
+
+🟡 中穴狙い / 🔴 穴狙い
+✅ 的中もハズレも結果まで公開
+
+AIと一緒に毎日アップデートしていきます🔥
+
+#競艇 #ボートレース #競艇予想 #無料予想"""
+
+          data = json.dumps({"content": message}, ensure_ascii=False).encode("utf-8")
+          req = urllib.request.Request(
+              webhook,
+              data=data,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=15) as res:
+              print(f"Discord webhook status: {res.status}")
+          PY
