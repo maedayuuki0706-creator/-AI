@@ -63,19 +63,23 @@ def post_webhook(url, payload):
 
 def model_message(record, stream):
     model = record["models"][stream]
-    picks = " / ".join(model["picks"])
     if stream == "prototype1":
-        title = "プロトタイプ1｜既存AI優先"
-        ratio = "既存70% / 日和30%"
+        title = "プロトタイプ1｜PT3ベース"
+        ratio = "日和本線4点 / 中穴迎え6点"
     else:
-        title = "プロトタイプ2｜日和AI優先"
-        ratio = "既存30% / 日和70%"
+        title = "プロトタイプ2｜PT3ベース"
+        ratio = "日和本線6点 / 中穴迎え4点"
+    main = " / ".join(model.get("main_picks") or model["picks"][:4 if stream == "prototype1" else 6])
+    cover = " / ".join(model.get("cover_picks") or model["picks"][4 if stream == "prototype1" else 6:])
     return (
         f"🧪 **{title}**\n"
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
         f"⚖️ {ratio}\n"
-        f"🎯 **買い目 {model['point_count']}点**\n"
-        f"`{picks}`\n"
+        f"◎ **本線 {len(model.get('main_picks') or [])}点**\n"
+        f"`{main}`\n"
+        f"○ **迎え {len(model.get('cover_picks') or [])}点**\n"
+        f"`{cover}`\n"
+        f"🎯 **合計 {model['point_count']}点**\n"
         f"📊 Grade {model['grade']}｜比較テスト配信"
     )
 
@@ -103,11 +107,15 @@ def build_record(day, jcd, rno, deadline):
         except (TypeError, ValueError, KeyError):
             pass
 
+    native_hiyori = [row["combination"] for row in base.displayed_picks_variable(
+        hiyori, True)] if hasattr(base, "displayed_picks_variable") else [
+            row["combination"] for row in trial.cards.displayed_picks_variable(hiyori, True)]
+
     models = {}
-    for stream, weights in (("prototype1", (0.7, 0.3)), ("prototype2", (0.3, 0.7))):
-        mixed = trial.fuse(official["trifecta"], hiyori["trifecta"], *weights)
-        parent = official if stream == "prototype1" else hiyori
-        models[stream] = trial._card(mixed, parent, stream, odds)
+    for stream in ("prototype1", "prototype2"):
+        main_points = 4 if stream == "prototype1" else 6
+        models[stream] = trial._prototype3_variant(
+            hiyori, odds, native_hiyori, main_points, 10 - main_points, stream)
 
     key = key_for(day, jcd, rno)
     record = {

@@ -24,16 +24,16 @@ import mid_value_selection
 import opportunity_alerts
 
 JST = ZoneInfo('Asia/Tokyo')
-VERSION = 'five-way-p3-hiyori-mid-v1'
+VERSION = 'pt3-base-pt1-4-pt2-6-v1'
 POINTS = 10
 UNIT_YEN = 100
 STREAMS = ('existing', 'hiyori', 'prototype1', 'prototype2', 'prototype3')
 LABELS = {'existing': '既存', 'hiyori': '日和',
-          'prototype1': 'プロトタイプ1（既存優先）',
-          'prototype2': 'プロトタイプ2（日和優先）',
+          'prototype1': 'プロトタイプ1（PT3ベース・本線4点）',
+          'prototype2': 'プロトタイプ2（PT3ベース・本線6点）',
           'prototype3': 'プロトタイプ3（日和本線＋中穴抑え）'}
 WEIGHTS = {'existing': (1.0, 0.0), 'hiyori': (0.0, 1.0),
-           'prototype1': (0.7, 0.3), 'prototype2': (0.3, 0.7)}
+           'prototype1': (0.0, 1.0), 'prototype2': (0.0, 1.0)}
 COMBINATIONS = frozenset('-'.join(map(str, p)) for p in permutations(range(1, 7), 3))
 ROOT = Path('data/prototypes') / VERSION
 
@@ -124,16 +124,15 @@ def _card(rows, parent, stream, odds):
             'bridge': analysis.get('bridge_learning') if use_bridge else None}
 
 
-
-def _prototype3_card(hiyori, odds, native_hiyori):
-    """Keep Hiyori's native card as the main line and add only non-duplicate mid-odds cover."""
+def _prototype3_variant(hiyori, odds, native_hiyori, main_points, cover_points=None, stream='prototype3'):
+    """Use PT3's Hiyori-main and 中穴-cover selection with a point split."""
     analysis = deepcopy(hiyori)
     for row in analysis['trifecta']:
         odd = odds.get(row['combination'])
         row['odds'] = odd
         row['expected_value'] = row['probability'] * odd if odd is not None else None
 
-    main = list(dict.fromkeys(native_hiyori))[:16]
+    main = list(dict.fromkeys(native_hiyori))[:main_points if cover_points is not None else 16]
     if not main:
         raise ValueError('Prototype 3 requires a Hiyori main card')
 
@@ -141,7 +140,7 @@ def _prototype3_card(hiyori, odds, native_hiyori):
     mid_value_selection.install(opportunity_alerts)
     candidates = opportunity_alerts._candidate_rows(analysis, 'mid')
     cover_rows = opportunity_alerts._coherent_selection(candidates, 'mid', analysis)
-    room = max(0, 16 - len(main))
+    room = max(0, 16 - len(main)) if cover_points is None else cover_points
     main_set = set(main)
     cover = []
     for row in cover_rows:
@@ -158,9 +157,11 @@ def _prototype3_card(hiyori, odds, native_hiyori):
     estimated = (sum(UNIT_YEN * row['expected_value'] for row in chosen)
                  if odds_complete else None)
     return {
-        'label': LABELS['prototype3'],
+        'label': LABELS[stream],
         'weights': {'hiyori_main': 1.0, 'mid_cover_policy': 1.0},
-        'selection_policy': 'hiyori-native-main-plus-mid-on-hiyori-cover-cap16',
+        'selection_policy': ('hiyori-native-main-plus-mid-on-hiyori-cover-cap16'
+                             if cover_points is None else
+                             f'hiyori-native-main-{main_points}-plus-mid-cover-{cover_points}'),
         'main_picks': main,
         'cover_picks': cover,
         'picks': picks,
@@ -175,6 +176,11 @@ def _prototype3_card(hiyori, odds, native_hiyori):
         'structure': analysis.get('conviction_structure'),
         'bridge': None,
     }
+
+
+def _prototype3_card(hiyori, odds, native_hiyori):
+    """Keep the original PT3 selection unchanged."""
+    return _prototype3_variant(hiyori, odds, native_hiyori, 16, None, 'prototype3')
 
 def build_bundle(request, hiyori, source, now=None):
     now = aware(now or datetime.now(JST))
@@ -214,11 +220,15 @@ def build_bundle(request, hiyori, source, now=None):
             selected = bridge_learning._reallocate(copied, selected)
         native[stream] = [r['combination'] for r in selected]
     models = {}
-    for stream in WEIGHTS:
+    for stream in ('existing', 'hiyori'):
         a, b = WEIGHTS[stream]
         mixed = fuse(base['trifecta'], hiyori['trifecta'], a, b)
-        parent = base if stream in ('existing', 'prototype1') else hiyori
+        parent = base if stream == 'existing' else hiyori
         models[stream] = _card(mixed, parent, stream, odds)
+    for stream in ('prototype1', 'prototype2'):
+        main_points = 4 if stream == 'prototype1' else 6
+        models[stream] = _prototype3_variant(
+            hiyori, odds, native['hiyori'], main_points, 10 - main_points, stream)
     models['prototype3'] = _prototype3_card(hiyori, odds, native['hiyori'])
     record = {'version': VERSION, 'mode': 'prospective_shadow', 'key': key,
               'day': day, 'jcd': jcd, 'rno': rno, 'venue': base['venue'],
@@ -229,7 +239,7 @@ def build_bundle(request, hiyori, source, now=None):
               'source_models': {'existing': base.get('model_version'), 'hiyori': hiyori.get('model_version')},
               'source_url': source.get('source_url'), 'features': deepcopy(hiyori['features']),
               'models': models, 'native_candidate_picks': native,
-              'comparison_note': 'Existing/Hiyori/P1/P2 use the shared 10-point comparison card; P3 preserves Hiyori native main picks and adds non-duplicate mid-odds cover up to 16 total points.'}
+              'comparison_note': 'PT1/PT2 use the PT3 Hiyori-main plus 中穴-cover base with 4+6 and 6+4 point splits; PT3 remains unchanged.'}
     record['digest'] = sha256(json.dumps(record, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     return record
 
