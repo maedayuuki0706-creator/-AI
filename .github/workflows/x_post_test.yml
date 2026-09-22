@@ -29,11 +29,13 @@ jobs:
           req = urllib.request.Request(
               webhook,
               data=data,
-              headers={"Content-Type": "application/json"},
+              headers={
+                  "Content-Type": "application/json",
+                  "Accept": "application/json",
+                  "User-Agent": "Boat-AI-Navi/1.0",
+              },
               method="POST",
           )
           with urllib.request.urlopen(req, timeout=15) as res:
               print(f"Discord webhook status: {res.status}")
           PY
-
-# Test trigger: resend X profile intro
