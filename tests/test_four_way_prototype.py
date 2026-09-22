@@ -68,8 +68,14 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(p3['picks'], p3['main_picks'] + p3['cover_picks'])
         self.assertEqual(p3['stake_yen'], 100 * p3['point_count'])
         self.assertTrue(p3['odds_complete'])
-        self.assertEqual(record['models']['prototype1']['weights'], {'existing': .7, 'hiyori': .3})
-        self.assertEqual(record['models']['prototype2']['weights'], {'existing': .3, 'hiyori': .7})
+        self.assertEqual(record['models']['prototype1']['weights'], {'hiyori_main': 1.0, 'mid_cover_policy': 1.0})
+        self.assertEqual(record['models']['prototype2']['weights'], {'hiyori_main': 1.0, 'mid_cover_policy': 1.0})
+        self.assertEqual(len(record['models']['prototype1']['main_picks']), 4)
+        self.assertEqual(len(record['models']['prototype1']['cover_picks']), 6)
+        self.assertEqual(len(record['models']['prototype2']['main_picks']), 6)
+        self.assertEqual(len(record['models']['prototype2']['cover_picks']), 4)
+        self.assertEqual(record['models']['prototype1']['main_picks'], record['native_candidate_picks']['hiyori'][:4])
+        self.assertEqual(record['models']['prototype2']['main_picks'], record['native_candidate_picks']['hiyori'][:6])
 
     def test_even_three_way_tie_has_ten_points(self):
         req, hy, src, now = prepared()
