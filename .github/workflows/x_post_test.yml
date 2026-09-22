@@ -23,15 +23,7 @@ jobs:
           if not webhook:
               raise SystemExit("X_POST_DISCORD_WEBHOOK_URL is not set")
 
-          message = """🚤 はじめまして！「競艇AIナビ」です🤖
-展示・気象・モーター・選手データを見ながら、狙えるレースを厳選して無料予想を公開します。
-
-🟡 中穴狙い / 🔴 穴狙い
-✅ 的中もハズレも結果まで公開
-
-AIと一緒に毎日アップデートしていきます🔥
-
-#競艇 #ボートレース #競艇予想 #無料予想"""
+          message = "🚤 はじめまして！「競艇AIナビ」です🤖\n展示・気象・モーター・選手データを見ながら、狙えるレースを厳選して無料予想を公開します。\n\n🟡 中穴狙い / 🔴 穴狙い\n✅ 的中もハズレも結果まで公開\n\nAIと一緒に毎日アップデートしていきます🔥\n\n#競艇 #ボートレース #競艇予想 #無料予想"
 
           data = json.dumps({"content": message}, ensure_ascii=False).encode("utf-8")
           req = urllib.request.Request(
