@@ -6,8 +6,9 @@ combination already has enough model probability and EV support.
 
 Two changes are additive:
 1. Allow a small 6-12x value-favourite window when probability + EV are strong.
-2. Keep the existing selected-mid gate, plus a looser value route that requires
-   stronger EV, scenario mass and composite-odds support.
+2. Make selected-mid a genuinely strict layer: fewer deliveries are preferred
+   over weak selections. The selected feed must clear compactness, confidence,
+   scenario-mass and EV gates together.
 
 Longshot logic is untouched.
 """
@@ -35,7 +36,6 @@ def install(opportunity_alerts_module):
         return
 
     original_candidate_rows = opportunity_alerts_module._candidate_rows
-    original_is_selected_mid = opportunity_alerts_module._is_selected_mid
 
     def candidate_rows(analysis, kind):
         rows = list(original_candidate_rows(analysis, kind))
@@ -79,30 +79,55 @@ def install(opportunity_alerts_module):
         return rows
 
     def is_selected_mid(payload):
-        # Existing high-confidence route remains intact.
-        if original_is_selected_mid(payload):
-            return True
+        """Strict selected-mid gate.
 
+        2026-09-23 policy:
+        - Prefer no alert to a weak alert.
+        - Maximum 10 tickets.
+        - Do not inherit the old score>=75 / EV>=1.05 automatic pass.
+        - Require one of three evidence-backed routes below.
+
+        This is intentionally stricter than the normal 中穴 feed. The goal is to
+        make 厳選くん a small, actionable subset rather than another broad feed.
+        """
         picks = list(payload.get("picks") or [])
-        if not picks or len(picks) > 12:
+        if not picks or len(picks) > 10:
             return False
 
         score = int(payload.get("score") or 0)
-        if score < 68:
-            return False
-
         best_ev = max((_ev(row) for row in picks), default=0.0)
         scenario_mass = sum(_num(row.get("probability")) for row in picks)
-        composite = payload.get("composite_odds")
-        composite = _num(composite, 0.0)
+        composite = _num(payload.get("composite_odds"), 0.0)
 
-        # Looser *selection volume*, not looser reasoning:
-        # below the old 75 line, demand stronger value and scenario support.
-        return (
-            best_ev >= 1.18
-            and scenario_mass >= 0.10
-            and composite >= 2.5
+        # A: genuinely high-confidence and compact.
+        high_confidence = (
+            score >= 82
+            and best_ev >= 1.18
+            and scenario_mass >= 0.14
+            and composite >= 2.8
         )
+
+        # B: slightly lower confidence is allowed only when the value case is
+        # substantially stronger and the ticket set is tighter.
+        strong_value = (
+            score >= 78
+            and len(picks) <= 9
+            and best_ev >= 1.30
+            and scenario_mass >= 0.12
+            and composite >= 3.2
+        )
+
+        # C: exceptional EV can rescue a marginal score, but only with a very
+        # compact set and enough modeled scenario coverage.
+        elite_value = (
+            score >= 75
+            and len(picks) <= 8
+            and best_ev >= 1.45
+            and scenario_mass >= 0.11
+            and composite >= 3.8
+        )
+
+        return high_confidence or strong_value or elite_value
 
     opportunity_alerts_module._candidate_rows = candidate_rows
     opportunity_alerts_module._is_selected_mid = is_selected_mid
