@@ -12,6 +12,7 @@ from prediction_recap import post_confirmed, report_destination_key
 
 LOG_PATH = Path("data/opportunity_alert_deliveries.jsonl")
 RESULT_DIR = Path("data/official_results")
+MAIN_SELECTED_DIR = Path("data/selected_metrics")
 DELIVERY_PATH = Path("data/selected_daily_report_deliveries.jsonl")
 
 
@@ -114,6 +115,37 @@ def pct(v):
     return "—" if v is None else f"{v:.1f}%"
 
 
+def main_selected_payload(day):
+    path = MAIN_SELECTED_DIR / f"{day}.json"
+    if not path.exists():
+        raise FileNotFoundError(path)
+    report = json.loads(path.read_text(encoding="utf-8"))
+    stats = report.get("selected") or {}
+    races = list(stats.get("races") or [])
+    hits = [r for r in races if r.get("prediction_hit")]
+    hit_lines = [f"🎯 {r.get('venue')} {int(r.get('rno') or 0)}R" for r in hits]
+    flat_stake = int(stats.get("flat_100_per_pick_stake_yen") or 0)
+    flat_return = int(stats.get("flat_100_per_pick_return_yen") or 0)
+    flat_profit = int(stats.get("flat_100_per_pick_profit_yen") or 0)
+    flat_roi = stats.get("flat_100_per_pick_roi")
+    rate = stats.get("prediction_hit_rate")
+    date = f"{day[:4]}/{day[4:6]}/{day[6:8]}"
+    return {"embeds": [{
+        "title": f"🔵 厳選くん（メイン）｜{date} 日報",
+        "description": "通常メイン予想の中から selection_score 75以上＋最終展示確認済み＋BET判定の厳選レースを集計。",
+        "color": 0x3498DB,
+        "fields": [
+            {"name": "📊 今日の成績", "value":
+                f"厳選 **{int(stats.get('selected_races') or 0)}R**／結果確定 **{int(stats.get('settled_races') or 0)}R**\\n"
+                f"的中 **{int(stats.get('prediction_hits') or 0)}/{int(stats.get('prediction_samples') or 0)}R＝{pct(rate)}**\\n"
+                f"投資 {flat_stake:,}円 → 払戻 {flat_return:,}円\\n"
+                f"**収支 {flat_profit:+,}円／回収率 {pct(flat_roi)}**", "inline": False},
+            {"name": "🎯 的中レース", "value": ("\\n".join(hit_lines) or "的中なし")[:1024], "inline": False},
+        ],
+        "footer": {"text": "回収率・収支は配信買い目を各点100円で購入した比較値。"},
+    }], "allowed_mentions": {"parse": []}}
+
+
 def payload(day, stream, stats):
     date = f"{day[:4]}/{day[4:6]}/{day[6:8]}"
     if stream == "longshot":
@@ -154,8 +186,20 @@ def send(day):
         for r in read_jsonl(DELIVERY_PATH)
     }
     sent = 0
-    # User requested one message each: 厳選くん first, then 中穴厳選くん.
-    for stream in ("longshot", "mid_odds"):
+    # Main selected stream is the ordinary メイン厳選くん, not the longshot sniper.
+    main_body = main_selected_payload(day)
+    main_digest = hashlib.sha256(json.dumps(main_body, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+    main_key = (day, "main_selected", main_digest, destination)
+    if main_key not in delivered:
+        message = post_confirmed(main_body)
+        append_jsonl(DELIVERY_PATH, {
+            "day": day, "stream": "main_selected", "digest": main_digest, "destination": destination,
+            "message_id": message["id"], "sent_at": datetime.now(base.JST).isoformat(),
+        })
+        sent += 1
+
+    # Keep 中穴厳選くん as the second standalone summary.
+    for stream in ("mid_odds",):
         stats = summarize(day, stream, results)
         body = payload(day, stream, stats)
         digest = hashlib.sha256(json.dumps(body, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
