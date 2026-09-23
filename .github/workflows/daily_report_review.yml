@@ -15,6 +15,7 @@ on:
       - "daily_report.py"
       - "daily_report_format.py"
       - "stake_simulation_3000.py"
+      - "selected_daily_report.py"
       - ".github/workflows/daily_report_review.yml"
 
 permissions:
@@ -95,6 +96,11 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
         run: python daily_report.py --day "$REPORT_DAY" --saved-results --send
+      - name: Send selected stream daily summaries
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
+        run: python selected_daily_report.py --day "$REPORT_DAY"
       - name: Persist acknowledged reports
         if: always()
         run: |
