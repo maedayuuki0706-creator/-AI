@@ -387,6 +387,24 @@ def build(day: str):
     official = refresh_official(day, streams)
     metrics = {name: aggregate(name, records, official) for name, records in streams.items()}
 
+    venues = {}
+    venue_names = sorted({
+        str(record.get("venue") or base.VENUES.get(str(record.get("jcd") or "").zfill(2)) or "")
+        for records in streams.values()
+        for record in records.values()
+        if record.get("venue") or record.get("jcd")
+    })
+    for venue in venue_names:
+        if not venue:
+            continue
+        venues[venue] = {}
+        for name, records in streams.items():
+            subset = {
+                key: record for key, record in records.items()
+                if str(record.get("venue") or base.VENUES.get(str(record.get("jcd") or "").zfill(2)) or "") == venue
+            }
+            venues[venue][name] = aggregate(name, subset, official)
+
     generated_at = datetime.now(base.JST).isoformat()
     result = {
         "ok": True,
@@ -395,6 +413,7 @@ def build(day: str):
         "basis": "delivered predictions only; flat 100 yen per disclosed pick; pending excluded",
         "unit_yen": UNIT_YEN,
         "streams": metrics,
+        "venues": venues,
         "totals": {
             "stream_count": len(metrics),
             "delivered": sum(item["delivered"] for item in metrics.values()),
