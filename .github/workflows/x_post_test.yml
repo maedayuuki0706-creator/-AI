@@ -2,40 +2,28 @@ name: X Post Discord Test
 
 on:
   push:
+    branches: [main]
     paths:
       - ".github/workflows/x_post_test.yml"
+      - "x_post_delivery.py"
   workflow_dispatch:
 
 jobs:
   send-test-post:
     runs-on: ubuntu-latest
     steps:
-      - name: Send X intro draft to Discord
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate X draft delivery
+        run: python -m py_compile x_post_delivery.py
+
+      - name: Send X draft smoke test to Discord
         env:
-          WEBHOOK_URL: ${{ secrets.X_POST_DISCORD_WEBHOOK_URL }}
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          import urllib.request
-
-          webhook = os.environ.get("WEBHOOK_URL")
-          if not webhook:
-              raise SystemExit("X_POST_DISCORD_WEBHOOK_URL is not set")
-
-          message = "🚤 はじめまして！「競艇AIナビ」です🤖\n展示・気象・モーター・選手データを見ながら、狙えるレースを厳選して無料予想を公開します。\n\n🟡 中穴狙い / 🔴 穴狙い\n✅ 的中もハズレも結果まで公開\n\nAIと一緒に毎日アップデートしていきます🔥\n\n#競艇 #ボートレース #競艇予想 #無料予想"
-
-          data = json.dumps({"content": message}, ensure_ascii=False).encode("utf-8")
-          req = urllib.request.Request(
-              webhook,
-              data=data,
-              headers={
-                  "Content-Type": "application/json",
-                  "Accept": "application/json",
-                  "User-Agent": "Boat-AI-Navi/1.0",
-              },
-              method="POST",
-          )
-          with urllib.request.urlopen(req, timeout=15) as res:
-              print(f"Discord webhook status: {res.status}")
-          PY
+          X_POST_DISCORD_WEBHOOK_URL: ${{ secrets.X_POST_DISCORD_WEBHOOK_URL }}
+        run: python x_post_delivery.py --smoke-test
