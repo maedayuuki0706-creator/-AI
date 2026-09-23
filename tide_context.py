@@ -208,6 +208,12 @@ def parse_omura_events(raw: str, year: int) -> list[dict]:
     return sorted(out, key=lambda x: x["time"])
 
 
+@lru_cache(maxsize=128)
+def _cached_provider_events(day: str, jcd: str) -> tuple[list[dict], str | None]:
+    profile = venue_profile(jcd)
+    return _provider_events(day, profile, fetcher=None)
+
+
 def _provider_events(day: str, profile: dict, fetcher=None) -> tuple[list[dict], str | None]:
     fetcher = fetcher or _fetch
     provider = str(profile.get("provider") or "")
@@ -353,7 +359,10 @@ def get_tide_context(day: str, jcd: str, hhmm: str | None, *, fetcher=None) -> d
             "water_type": profile.get("water_type"),
         }
 
-    events, source_url = _provider_events(day, profile, fetcher=fetcher)
+    if fetcher is None:
+        events, source_url = _cached_provider_events(day, jcd)
+    else:
+        events, source_url = _provider_events(day, profile, fetcher=fetcher)
     result = context_from_events(day, hhmm, events, profile=profile, source_url=source_url)
     result.update(
         applicable=True,
@@ -365,3 +374,4 @@ def get_tide_context(day: str, jcd: str, hhmm: str | None, *, fetcher=None) -> d
 
 def clear_cache() -> None:
     profiles.cache_clear()
+    _cached_provider_events.cache_clear()
