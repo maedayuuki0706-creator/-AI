@@ -64,13 +64,13 @@ def post_webhook(url, payload):
 def model_message(record, stream):
     model = record["models"][stream]
     if stream == "prototype1":
-        title = "プロトタイプ1｜PT3ベース"
-        ratio = "日和本線4点 / 中穴迎え6点"
+        title = "プロトタイプ1｜PT3＋穴スナイパー"
+        ratio = "PT3コア＋穴くん厳選ブースト（最大3点）"
     else:
-        title = "プロトタイプ2｜PT3ベース"
-        ratio = "日和本線6点 / 中穴迎え4点"
-    main = " / ".join(model.get("main_picks") or model["picks"][:4 if stream == "prototype1" else 6])
-    cover = " / ".join(model.get("cover_picks") or model["picks"][4 if stream == "prototype1" else 6:])
+        title = "プロトタイプ2｜PT3×既存メイン圧縮"
+        ratio = "PT3を既存メインとの一致度で7〜10点へ圧縮"
+    main = " / ".join(model.get("main_picks") or [])
+    cover = " / ".join(model.get("cover_picks") or [])
     return (
         f"🧪 **{title}**\n"
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
@@ -111,11 +111,19 @@ def build_record(day, jcd, rno, deadline):
         hiyori, True)] if hasattr(base, "displayed_picks_variable") else [
             row["combination"] for row in trial.cards.displayed_picks_variable(hiyori, True)]
 
-    models = {}
-    for stream in ("prototype1", "prototype2"):
-        main_points = 4 if stream == "prototype1" else 6
-        models[stream] = trial._prototype3_variant(
-            hiyori, odds, native_hiyori, main_points, 10 - main_points, stream)
+    existing_native = [row["combination"] for row in base.displayed_picks_variable(
+        official, True)] if hasattr(base, "displayed_picks_variable") else [
+            row["combination"] for row in trial.cards.displayed_picks_variable(official, True)]
+    existing_native = [row["combination"] for row in bridge_learning._reallocate(
+        official, [{"combination": p} for p in existing_native]
+    )] if False else existing_native
+
+    models = {
+        "prototype1": trial._prototype1_attack(
+            hiyori, official, odds, native_hiyori),
+        "prototype2": trial._prototype2_compress(
+            hiyori, official, odds, native_hiyori, existing_native),
+    }
 
     key = key_for(day, jcd, rno)
     record = {
