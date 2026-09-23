@@ -530,6 +530,21 @@ def run_once(now: datetime | None=None, *, force_test=False,dry_run=False) -> in
                     'phase':phase,'sent_at':current.isoformat(),'source':'独自AI・前日参考補正','model_version':analysis['model_version'],
                     'grade':analysis['grade'],'exhibition':analysis['preview']['exhibition_count']==6,
                     'main':combos[:3],'cover':combos[3:],'all_picks':combos,'heads':analysis['heads'],
+                    'preview':{
+                        'wind_speed':analysis.get('preview',{}).get('wind_speed'),
+                        'wave_cm':analysis.get('preview',{}).get('wave_cm'),
+                        'entry_observed':analysis.get('preview',{}).get('entry_observed'),
+                        'exhibition_count':analysis.get('preview',{}).get('exhibition_count'),
+                        'boats':analysis.get('preview',{}).get('boats',{}),
+                    },
+                    'tactical_inputs':[{
+                        'lane':b.get('lane'),
+                        'predicted_course':b.get('predicted_course') or b.get('course'),
+                        'avg_st':b.get('avg_st'),
+                        'exhibition_st':b.get('exhibition_st'),
+                        'exhibition_flying':bool(b.get('exhibition_flying')),
+                        'exhibition_grade':b.get('exhibition_grade'),
+                    } for b in (analysis.get('inputs') or [])],
                     'message_format':'formation-v1','point_count':summary['point_count'],'formation_sections':summary['sections'],
                     'previous_form':analysis['previous_form']})
                 delivered.add((day,jcd,rno,phase));sent+=1
