@@ -1,0 +1,86 @@
+{
+  "version": "venue-tactical-priors-v1",
+  "snapshot_date": "2026-09-24",
+  "policy": {
+    "production_use": "context_only_until_out_of_time_validation",
+    "note": "These venue priors describe recent official course/winning-method tendencies. They must not override live model probabilities by themselves."
+  },
+  "sources": {
+    "kiryu": "https://www.boatrace.jp/owpc/pc/data/stadium?jcd=01",
+    "miyajima": "https://www.boatrace.jp/owpc/pc/data/stadium?jcd=17",
+    "miyajima_water": "https://www.boatrace.jp/owpc/pc/site/place/stadium/br17/"
+  },
+  "venues": {
+    "17": {
+      "venue": "宮島",
+      "period": "2026-06-01/2026-08-31",
+      "course1_win_pct": 57.7,
+      "water_context": {
+        "tidal": true,
+        "max_tidal_range_over_m": 4,
+        "low_tide": "breakwater can reduce wind exposure and make the surface easier to run",
+        "high_tide": "swells can enter and races can become more unsettled",
+        "wind_note": "wind direction can change from morning to afternoon, making starts less uniform"
+      },
+      "attack_priors": {
+        "2": {
+          "win_pct": 11.5,
+          "makuri_pct": 44.6,
+          "sashi_pct": 44.6
+        },
+        "3": {
+          "win_pct": 13.2,
+          "makuri_pct": 40.5,
+          "makurizashi_pct": 40.5
+        },
+        "4": {
+          "win_pct": 10.7,
+          "makuri_pct": 60,
+          "makurizashi_pct": 26.6
+        },
+        "5": {
+          "win_pct": 6,
+          "makuri_pct": 14.7,
+          "makurizashi_pct": 73.5
+        },
+        "6": {
+          "win_pct": 1.4,
+          "makuri_pct": 37.5,
+          "makurizashi_pct": 50
+        }
+      }
+    },
+    "01": {
+      "venue": "桐生",
+      "period": "2026-06-01/2026-08-31",
+      "course1_win_pct": 54.8,
+      "attack_priors": {
+        "2": {
+          "win_pct": 11,
+          "makuri_pct": 39.4,
+          "sashi_pct": 56.3
+        },
+        "3": {
+          "win_pct": 14.4,
+          "makuri_pct": 33.3,
+          "makurizashi_pct": 44
+        },
+        "4": {
+          "win_pct": 9.5,
+          "makuri_pct": 70.4,
+          "makurizashi_pct": 19.6
+        },
+        "5": {
+          "win_pct": 7.7,
+          "makuri_pct": 16.3,
+          "makurizashi_pct": 67.3
+        },
+        "6": {
+          "win_pct": 2.9,
+          "makuri_pct": 10.5,
+          "makurizashi_pct": 63.1
+        }
+      }
+    }
+  }
+}
