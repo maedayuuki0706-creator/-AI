@@ -177,6 +177,17 @@ def _observation_features(pred: dict, report_row: dict) -> dict:
         str(report_row.get("jcd") or pred.get("jcd") or ""),
         str(tactical.get("attack_lane") or "none"),
     )
+    tide = preview.get("tide") or {}
+    tide_available = bool(tide.get("available"))
+    tide_features = {
+        "tide_applicable": "yes" if tide.get("applicable") else "no",
+        "tide_phase": str(tide.get("phase") or "unknown") if tide_available else "unknown",
+        "tide_level": str(tide.get("level_band") or "unknown") if tide_available else "unknown",
+        "tide_range": str(tide.get("range_band") or "unknown") if tide_available else "unknown",
+        "tide_near_turn": (
+            "yes" if tide.get("near_turn") else "no"
+        ) if tide_available else "unknown",
+    }
     score = int(pred.get("selection_score") or 0)
     points = len(report_row.get("picks") or pred.get("all_picks") or [])
     return {
@@ -191,6 +202,7 @@ def _observation_features(pred: dict, report_row: dict) -> dict:
         "wave": _band(preview.get("wave_cm"), [3, 7], ["0-2cm", "3-6cm", "7cm+"]),
         **tactical,
         **priors,
+        **tide_features,
         "selected": "yes" if score >= 75 and pred.get("virtual_status") == "bet" else "no",
     }
 
@@ -300,7 +312,9 @@ def mine(rows: list[dict]) -> dict:
     feature_names = [
         "venue", "grade", "event", "score", "points", "head_top", "head_gap",
         "wind", "wave", "slit_shape", "attack_lane", "attack_gap", "st_spread",
-        "outer_fast", "lane1_flying", "attack_style_prior", "tidal_venue", "selected",
+        "outer_fast", "lane1_flying", "attack_style_prior", "tidal_venue",
+        "tide_applicable", "tide_phase", "tide_level", "tide_range", "tide_near_turn",
+        "selected",
     ]
     values = {
         name: sorted({r["features"].get(name) or "unknown" for r in train})
@@ -321,6 +335,9 @@ def mine(rows: list[dict]) -> dict:
         ("venue", "attack_lane"), ("head_gap", "slit_shape"),
         ("outer_fast", "head_gap"), ("attack_gap", "head_gap"),
         ("slit_shape", "attack_style_prior"), ("tidal_venue", "wind"),
+        ("venue", "tide_phase"), ("venue", "tide_level"),
+        ("tide_phase", "slit_shape"), ("tide_phase", "wind"),
+        ("tide_level", "head_gap"), ("tide_range", "wind"),
     ]
     for a, b in pair_fields:
         for av in values[a]:
@@ -364,7 +381,7 @@ def mine(rows: list[dict]) -> dict:
     )[:MAX_RULES]
 
     return {
-        "version": "strategy-rule-miner-v2-tactical",
+        "version": "strategy-rule-miner-v3-tide-tactical",
         "definition": "settled pre-close predictions; flat 100 yen per displayed pick",
         "guardrails": {
             "min_train_samples": MIN_TRAIN,
