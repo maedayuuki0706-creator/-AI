@@ -17,7 +17,7 @@ from direct_discord_notify import JST
 
 STATE_DIR = Path("data/x_post_delivery")
 WEBHOOK_ENV = "X_POST_DISCORD_WEBHOOK_URL"
-HASHTAGS = "#競艇 #ボートレース #競艇予想 #無料予想"
+BASE_HASHTAGS = "#競艇 #ボートレース #競艇予想 #無料予想"\n\ndef _hashtags(venue: str = "") -> str:\n    venue = str(venue or "").strip()\n    local = f" #{venue} #ボートレース{venue}" if venue else ""\n    return BASE_HASHTAGS + local
 
 
 def _state_path(day: str) -> Path:
@@ -107,7 +107,7 @@ def _fit_post(lines: list[str]) -> str:
     text = "\n".join(trimmed).strip()
     if len(text) <= 280:
         return text
-    trimmed = [line for line in trimmed if line != HASHTAGS]
+    trimmed = [line for line in trimmed if not line.startswith("#")]
     text = "\n".join(trimmed).strip()
     if len(text) <= 280:
         return text
