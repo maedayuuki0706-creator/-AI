@@ -8,6 +8,7 @@ Pending races never enter hit-rate or ROI denominators.
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 import json
 from pathlib import Path
@@ -236,6 +237,7 @@ def refresh_official(day: str, streams: dict[str, dict]):
 
     base.fetch.cache_clear()
     changed = False
+    due = {}
     for key, row in sorted(races.items()):
         saved = cache.get(key)
         if isinstance(saved, dict) and saved.get("status") in {"settled", "void", "special"}:
@@ -243,19 +245,35 @@ def refresh_official(day: str, streams: dict[str, dict]):
         close = parse_close(day, row.get("deadline"))
         if close is not None and now < close:
             continue
+        due[key] = row
+
+    def fetch_one(item):
+        key, row = item
+        url = base.official_url("raceresult", day, row["jcd"], row["rno"])
         try:
-            raw = base.fetch(base.official_url("raceresult", day, row["jcd"], row["rno"]))
+            raw = base.fetch(url)
             result = daily_report.parse_payout(raw)
         except Exception as exc:
-            result = {"status": "pending", "payouts": {}, "refund_lanes": [], "error_type": type(exc).__name__}
-        if result.get("status") == "pending":
-            continue
-        cache[key] = {
-            **result,
-            "checked_at": now.isoformat(),
-            "source_url": base.official_url("raceresult", day, row["jcd"], row["rno"]),
-        }
-        changed = True
+            result = {
+                "status": "pending",
+                "payouts": {},
+                "refund_lanes": [],
+                "error_type": type(exc).__name__,
+            }
+        return key, url, result
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        jobs = [pool.submit(fetch_one, item) for item in due.items()]
+        for future in as_completed(jobs):
+            key, url, result = future.result()
+            if result.get("status") == "pending":
+                continue
+            cache[key] = {
+                **result,
+                "checked_at": now.isoformat(),
+                "source_url": url,
+            }
+            changed = True
 
     if changed or not (OFFICIAL_DIR / f"{day}.json").exists():
         write_json_if_changed(OFFICIAL_DIR / f"{day}.json", cache)
