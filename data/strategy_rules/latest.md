@@ -16,11 +16,12 @@
 ## 見送り候補
 
 - head_top=25-34% / head_gap=<5pt: 検証 35R / 的中25.7% / ROI36.2%
+- event=normal / head_gap=<5pt: 検証 36R / 的中25.0% / ROI38.9%
 - head_gap=<5pt: 検証 64R / 的中28.1% / ROI44.3%
 - grade=C / head_gap=<5pt: 検証 64R / 的中28.1% / ROI44.3%
-- event=normal / head_gap=<5pt: 検証 64R / 的中28.1% / ROI44.3%
 - points=13-14 / head_gap=<5pt: 検証 56R / 的中25.0% / ROI44.4%
 - head_top=<25%: 検証 32R / 的中28.1% / ROI48.9%
+- event=normal / head_gap=5-9pt: 検証 32R / 的中25.0% / ROI49.4%
 - score=<60 / head_gap=<5pt: 検証 44R / 的中29.5% / ROI51.9%
 - head_top=<25% / head_gap=<5pt: 検証 29R / 的中31.0% / ROI53.8%
 - points=11-12 / head_gap=10-19pt: 検証 111R / 的中45.9% / ROI63.2%
@@ -32,6 +33,5 @@
 - grade=C / head_gap=5-9pt: 検証 49R / 的中34.7% / ROI66.5%
 - score=60-74 / head_gap=5-9pt: 検証 27R / 的中37.0% / ROI69.4%
 - grade=B: 検証 207R / 的中44.4% / ROI72.3%
-- event=normal: 検証 442R / 的中42.3% / ROI73.0%
+- attack_lane=none: 検証 323R / 的中42.4% / ROI72.5%
 - selected=no: 検証 348R / 的中40.2% / ROI74.4%
-- points=<=10: 検証 168R / 的中45.2% / ROI74.6%
