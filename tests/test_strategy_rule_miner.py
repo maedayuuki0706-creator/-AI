@@ -42,7 +42,7 @@ class StrategyRuleMinerTests(unittest.TestCase):
     def test_tactical_features_unknown_without_exhibition(self):
         out = s._tactical_features({})
         self.assertEqual(out["slit_shape"], "unknown")
-        self.assertEqual(out["attack_lane"], "none")
+        self.assertEqual(out["attack_lane"], "unknown")
         self.assertEqual(out["outer_fast"], "unknown")
 
     def test_one_day_never_promotes(self):
