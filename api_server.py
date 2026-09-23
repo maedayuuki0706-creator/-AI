@@ -228,6 +228,14 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
 
+        if path == "/api/live-status":
+            payload = read_json(DATA_ROOT / "live_status" / "latest.json", {})
+            if not payload:
+                self.send_json(503, {"ok": False, "error": "live status not generated yet"})
+                return
+            self.send_json(200, payload)
+            return
+
         if path == "/api/predictions":
             query = parse_qs(parsed.query)
             try:
