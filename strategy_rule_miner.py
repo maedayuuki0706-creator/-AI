@@ -17,6 +17,7 @@ from daily_report import latest_predictions, read_jsonl
 REPORT_DIR = Path("data/daily_reports")
 PREDICTION_LOG = Path("data/prediction_log.jsonl")
 OUTPUT_DIR = Path("data/strategy_rules")
+HIYORI_REQUEST_DIR = Path("data/hiyori/requests")
 
 MIN_TRAIN = 40
 MIN_VALID = 24
@@ -44,9 +45,98 @@ def _head_features(row):
     return top, max(0.0, top - second)
 
 
+def _tactical_features(pred: dict) -> dict:
+    """Compact exhibition/slit features for out-of-time rule mining.
+
+    These are descriptive only. They do not change production weights directly;
+    a condition still has to clear the normal train/validation guardrails.
+    """
+    preview = pred.get("preview") or {}
+    raw_boats = list(pred.get("tactical_inputs") or [])
+    if not raw_boats:
+        pboats = preview.get("boats") or {}
+        if isinstance(pboats, dict):
+            for lane, row in pboats.items():
+                if not isinstance(row, dict):
+                    continue
+                item = dict(row)
+                item.setdefault("lane", lane)
+                raw_boats.append(item)
+
+    boats = {}
+    for row in raw_boats:
+        try:
+            lane = int(row.get("lane"))
+        except (TypeError, ValueError):
+            continue
+        if not 1 <= lane <= 6:
+            continue
+        boats[lane] = row
+
+    st = {}
+    flying = set()
+    for lane, row in boats.items():
+        if row.get("exhibition_flying"):
+            flying.add(lane)
+        value = row.get("exhibition_st")
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            continue
+        if 0 <= value <= 1:
+            st[lane] = value
+
+    outer_fast = [
+        lane for lane in (3, 4, 5, 6)
+        if lane in st and st[lane] <= 0.10
+    ]
+    candidates = []
+    for lane in (3, 4, 5, 6):
+        if lane not in st or (lane - 1) not in st:
+            continue
+        gap = st[lane - 1] - st[lane]
+        if st[lane] <= 0.12 and gap >= 0.05:
+            candidates.append((gap, lane))
+
+    candidates.sort(reverse=True)
+    attack_lane = str(candidates[0][1]) if candidates else "none"
+    attack_gap = candidates[0][0] if candidates else None
+
+    spread = None
+    if len(st) >= 4:
+        spread = max(st.values()) - min(st.values())
+
+    if candidates and attack_gap is not None and attack_gap >= 0.10:
+        slit_shape = f"strong_outer_attack_{attack_lane}"
+    elif candidates:
+        slit_shape = f"outer_attack_{attack_lane}"
+    elif outer_fast:
+        slit_shape = "outer_pressure"
+    elif len(st) >= 4:
+        slit_shape = "flat_or_inner"
+    else:
+        slit_shape = "unknown"
+
+    return {
+        "slit_shape": slit_shape,
+        "attack_lane": attack_lane,
+        "attack_gap": (
+            _band(attack_gap, [0.05, 0.10, 0.15], ["<5pt", "5-9pt", "10-14pt", "15pt+"])
+            if attack_gap is not None else "unknown"
+        ),
+        "st_spread": (
+            _band(spread, [0.05, 0.10, 0.15], ["<5pt", "5-9pt", "10-14pt", "15pt+"])
+            if spread is not None else "unknown"
+        ),
+        "outer_fast": "yes" if outer_fast else ("no" if len(st) >= 4 else "unknown"),
+        "lane1_flying": "yes" if 1 in flying else ("no" if boats else "unknown"),
+    }
+
+
 def _observation_features(pred: dict, report_row: dict) -> dict:
     top, gap = _head_features(pred)
     preview = pred.get("preview") or {}
+    tactical = _tactical_features(pred)
     score = int(pred.get("selection_score") or 0)
     points = len(report_row.get("picks") or pred.get("all_picks") or [])
     return {
@@ -59,8 +149,25 @@ def _observation_features(pred: dict, report_row: dict) -> dict:
         "head_gap": _band(gap, [.05, .10, .20], ["<5pt", "5-9pt", "10-19pt", "20pt+"]),
         "wind": _band(preview.get("wind_speed"), [2, 4], ["0-1m", "2-3m", "4m+"]),
         "wave": _band(preview.get("wave_cm"), [3, 7], ["0-2cm", "3-6cm", "7cm+"]),
+        **tactical,
         "selected": "yes" if score >= 75 and pred.get("virtual_status") == "bet" else "no",
     }
+
+
+def _hiyori_feature_context(day: str, key: str) -> dict:
+    try:
+        jcd, rno = key.split(":", 1)
+        path = HIYORI_REQUEST_DIR / f"{day}_{str(jcd).zfill(2)}_{int(rno):02d}.json"
+    except (TypeError, ValueError):
+        return {}
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    official = data.get("official") or {}
+    return official if isinstance(official, dict) else {}
 
 
 def load_observations() -> list[dict]:
@@ -92,7 +199,19 @@ def load_observations() -> list[dict]:
                 "stake": stake,
                 "return": ret,
                 "profit": ret - stake,
-                "features": _observation_features(pred, rr),
+                "features": _observation_features(
+                    {
+                        **_hiyori_feature_context(day, key),
+                        **pred,
+                        "preview": pred.get("preview") or _hiyori_feature_context(day, key).get("preview") or {},
+                        "tactical_inputs": (
+                            pred.get("tactical_inputs")
+                            or _hiyori_feature_context(day, key).get("inputs")
+                            or []
+                        ),
+                    },
+                    rr,
+                ),
             })
     return out
 
@@ -137,8 +256,15 @@ def _matches(row, conds):
 
 def mine(rows: list[dict]) -> dict:
     train, valid = _time_split(rows)
-    feature_names = ["venue", "grade", "event", "score", "points", "head_top", "head_gap", "wind", "selected"]
-    values = {name: sorted({r["features"].get(name) for r in train}) for name in feature_names}
+    feature_names = [
+        "venue", "grade", "event", "score", "points", "head_top", "head_gap",
+        "wind", "wave", "slit_shape", "attack_lane", "attack_gap", "st_spread",
+        "outer_fast", "lane1_flying", "selected",
+    ]
+    values = {
+        name: sorted({r["features"].get(name) or "unknown" for r in train})
+        for name in feature_names
+    }
 
     conditions = []
     for name in feature_names:
@@ -150,6 +276,9 @@ def mine(rows: list[dict]) -> dict:
         ("grade", "head_gap"), ("score", "head_gap"), ("points", "head_gap"),
         ("venue", "grade"), ("venue", "head_gap"), ("event", "head_gap"),
         ("selected", "points"), ("head_top", "head_gap"),
+        ("venue", "wind"), ("venue", "wave"), ("venue", "slit_shape"),
+        ("venue", "attack_lane"), ("head_gap", "slit_shape"),
+        ("outer_fast", "head_gap"), ("attack_gap", "head_gap"),
     ]
     for a, b in pair_fields:
         for av in values[a]:
@@ -193,7 +322,7 @@ def mine(rows: list[dict]) -> dict:
     )[:MAX_RULES]
 
     return {
-        "version": "strategy-rule-miner-v1",
+        "version": "strategy-rule-miner-v2-tactical",
         "definition": "settled pre-close predictions; flat 100 yen per displayed pick",
         "guardrails": {
             "min_train_samples": MIN_TRAIN,
