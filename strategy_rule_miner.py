@@ -18,6 +18,7 @@ REPORT_DIR = Path("data/daily_reports")
 PREDICTION_LOG = Path("data/prediction_log.jsonl")
 OUTPUT_DIR = Path("data/strategy_rules")
 HIYORI_REQUEST_DIR = Path("data/hiyori/requests")
+VENUE_PRIOR_PATH = Path("data/venue_tactical_priors.json")
 
 MIN_TRAIN = 40
 MIN_VALID = 24
@@ -133,10 +134,48 @@ def _tactical_features(pred: dict) -> dict:
     }
 
 
+def _venue_prior_features(jcd: str, attack_lane: str) -> dict:
+    try:
+        data = json.loads(VENUE_PRIOR_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {"attack_style_prior": "unknown", "tidal_venue": "unknown"}
+
+    venue = ((data.get("venues") or {}).get(str(jcd).zfill(2)) or {})
+    tidal = ((venue.get("water_context") or {}).get("tidal"))
+    priors = venue.get("attack_priors") or {}
+    row = priors.get(str(attack_lane)) or {}
+
+    methods = {
+        "makuri": row.get("makuri_pct"),
+        "sashi": row.get("sashi_pct"),
+        "makurizashi": row.get("makurizashi_pct"),
+    }
+    numeric = []
+    for name, value in methods.items():
+        try:
+            numeric.append((float(value), name))
+        except (TypeError, ValueError):
+            continue
+    if not numeric:
+        style = "unknown"
+    else:
+        top, name = max(numeric)
+        style = f"dominant_{name}" if top >= 55.0 else "mixed"
+
+    return {
+        "attack_style_prior": style,
+        "tidal_venue": "yes" if tidal is True else ("no" if tidal is False else "unknown"),
+    }
+
+
 def _observation_features(pred: dict, report_row: dict) -> dict:
     top, gap = _head_features(pred)
     preview = pred.get("preview") or {}
     tactical = _tactical_features(pred)
+    priors = _venue_prior_features(
+        str(report_row.get("jcd") or pred.get("jcd") or ""),
+        str(tactical.get("attack_lane") or "none"),
+    )
     score = int(pred.get("selection_score") or 0)
     points = len(report_row.get("picks") or pred.get("all_picks") or [])
     return {
@@ -150,6 +189,7 @@ def _observation_features(pred: dict, report_row: dict) -> dict:
         "wind": _band(preview.get("wind_speed"), [2, 4], ["0-1m", "2-3m", "4m+"]),
         "wave": _band(preview.get("wave_cm"), [3, 7], ["0-2cm", "3-6cm", "7cm+"]),
         **tactical,
+        **priors,
         "selected": "yes" if score >= 75 and pred.get("virtual_status") == "bet" else "no",
     }
 
@@ -259,7 +299,7 @@ def mine(rows: list[dict]) -> dict:
     feature_names = [
         "venue", "grade", "event", "score", "points", "head_top", "head_gap",
         "wind", "wave", "slit_shape", "attack_lane", "attack_gap", "st_spread",
-        "outer_fast", "lane1_flying", "selected",
+        "outer_fast", "lane1_flying", "attack_style_prior", "tidal_venue", "selected",
     ]
     values = {
         name: sorted({r["features"].get(name) or "unknown" for r in train})
@@ -279,6 +319,7 @@ def mine(rows: list[dict]) -> dict:
         ("venue", "wind"), ("venue", "wave"), ("venue", "slit_shape"),
         ("venue", "attack_lane"), ("head_gap", "slit_shape"),
         ("outer_fast", "head_gap"), ("attack_gap", "head_gap"),
+        ("slit_shape", "attack_style_prior"), ("tidal_venue", "wind"),
     ]
     for a, b in pair_fields:
         for av in values[a]:
