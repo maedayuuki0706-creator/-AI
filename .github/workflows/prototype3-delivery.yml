@@ -33,7 +33,7 @@ jobs:
         env:
           PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
         run: |
-          python -m py_compile prototype3_delivery.py four_way_prototype.py
+          python -m py_compile prototype3_delivery.py four_way_prototype.py prototype_scoreboard.py daily_report.py
           test -n "$PROTO3_DISCORD_WEBHOOK_URL"
       - name: Deliver Prototype 3
         env:
@@ -41,13 +41,18 @@ jobs:
           PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
           PROTOTYPE3_WATCH_SECONDS: '210'
         run: python -u prototype3_delivery.py
-      - name: Persist Prototype 3 delivery receipts
+      - name: Score delivered PT1-3 results
+        if: always()
+        env:
+          TZ: Asia/Tokyo
+        run: python -u prototype_scoreboard.py
+      - name: Persist Prototype 3 delivery receipts and PT scoreboard
         if: always()
         run: |
           if [ ! -d data/prototype3_delivery ]; then exit 0; fi
           git config user.name 'boat-ai-delivery-bot'
           git config user.email 'actions@users.noreply.github.com'
-          git add data/prototype3_delivery/
+          git add data/prototype3_delivery/ data/prototype_scoreboard/
           if git diff --cached --quiet; then exit 0; fi
           git commit -m 'Record prototype 3 delivery receipts'
           for attempt in 1 2 3; do
