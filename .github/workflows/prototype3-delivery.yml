@@ -7,6 +7,8 @@ on:
     paths:
       - 'prototype3_delivery.py'
       - 'four_way_prototype.py'
+      - 'prototype_scoreboard.py'
+      - 'tests/test_prototype_scoreboard.py'
       - '.github/workflows/prototype3-delivery.yml'
   schedule:
     - cron: '*/5 * * * *'
@@ -34,6 +36,7 @@ jobs:
           PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
         run: |
           python -m py_compile prototype3_delivery.py four_way_prototype.py prototype_scoreboard.py daily_report.py
+          python -m unittest discover -s tests -p 'test_prototype_scoreboard.py' -v
           test -n "$PROTO3_DISCORD_WEBHOOK_URL"
       - name: Deliver Prototype 3
         env:
