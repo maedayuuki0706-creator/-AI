@@ -19,6 +19,32 @@ class StrategyRuleMinerTests(unittest.TestCase):
             },
         }
 
+    def test_tactical_features_detect_outer_attack(self):
+        pred = {
+            "preview": {
+                "boats": {
+                    "1": {"exhibition_flying": True},
+                    "2": {"exhibition_st": 0.07},
+                    "3": {"exhibition_st": 0.25},
+                    "4": {"exhibition_st": 0.03},
+                    "5": {"exhibition_st": 0.07},
+                    "6": {"exhibition_st": 0.17},
+                }
+            }
+        }
+        out = s._tactical_features(pred)
+        self.assertEqual(out["attack_lane"], "4")
+        self.assertEqual(out["slit_shape"], "strong_outer_attack_4")
+        self.assertEqual(out["attack_gap"], "15pt+")
+        self.assertEqual(out["outer_fast"], "yes")
+        self.assertEqual(out["lane1_flying"], "yes")
+
+    def test_tactical_features_unknown_without_exhibition(self):
+        out = s._tactical_features({})
+        self.assertEqual(out["slit_shape"], "unknown")
+        self.assertEqual(out["attack_lane"], "none")
+        self.assertEqual(out["outer_fast"], "unknown")
+
     def test_one_day_never_promotes(self):
         rows = [self._row("20260901", True) for _ in range(100)]
         result = s.mine(rows)
