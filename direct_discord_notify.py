@@ -27,6 +27,7 @@ from zoneinfo import ZoneInfo
 from prediction_engine import analyze_race
 from race_context import previous_form
 import racer_profiles
+import tide_context
 from discord_formation import formation_summary, formation_lines
 from discord_notification_policy import message_payload
 from race_notices import withdrawal_lanes, notice_message, read_notices, record_notice
@@ -230,6 +231,12 @@ def analyze_official(day: str, jcd: str, rno: int) -> dict | None:
         odds=parse_odds(fetch(official_url('odds3t',day,jcd,rno)))
     except Exception:
         odds={}
+    try:
+        race_times = deadlines(day, jcd)
+        race_hhmm = race_times[int(rno) - 1] if len(race_times) >= int(rno) else None
+        preview["tide"] = tide_context.get_tide_context(day, jcd, race_hhmm)
+    except Exception:
+        preview["tide"] = {"applicable": False, "available": False, "status": "tide_context_error"}
     form=previous_form(day,jcd,boats)
     for boat in boats:
         boat.update(preview['boats'].get(boat['lane'],{}))
@@ -536,6 +543,7 @@ def run_once(now: datetime | None=None, *, force_test=False,dry_run=False) -> in
                         'entry_observed':analysis.get('preview',{}).get('entry_observed'),
                         'exhibition_count':analysis.get('preview',{}).get('exhibition_count'),
                         'boats':analysis.get('preview',{}).get('boats',{}),
+                        'tide':analysis.get('preview',{}).get('tide',{}),
                     },
                     'tactical_inputs':[{
                         'lane':b.get('lane'),
