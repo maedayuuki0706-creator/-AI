@@ -1,0 +1,39 @@
+name: PT3 2000 Yen Stake Simulation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pt3_stake_simulation.py'
+      - '.github/workflows/pt3-stake-simulation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify
+        run: python -m py_compile pt3_stake_simulation.py
+      - name: Simulate 2000 yen PT3 staking
+        env:
+          TZ: Asia/Tokyo
+        run: python -u pt3_stake_simulation.py --day 20260923
+      - name: Persist simulation
+        run: |
+          git config user.name 'boat-ai-simulation-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add data/pt3_stake_simulations/
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Store PT3 2000 yen simulation'
+          git pull --rebase origin main
+          git push origin HEAD:main
