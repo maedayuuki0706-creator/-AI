@@ -8,6 +8,7 @@ on:
       - 'prototype12_delivery.py'
       - 'prototype_runner.py'
       - 'four_way_prototype.py'
+      - 'tests/test_new_prototype_fusions.py'
       - '.github/workflows/prototype12-delivery.yml'
   schedule:
     - cron: '*/5 * * * *'
@@ -36,6 +37,7 @@ jobs:
           PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
         run: |
           python -m py_compile prototype12_delivery.py prototype_runner.py four_way_prototype.py
+          python -m unittest discover -s tests -p 'test_new_prototype_fusions.py' -v
           test -n "$PROTO1_DISCORD_WEBHOOK_URL"
           test -n "$PROTO2_DISCORD_WEBHOOK_URL"
       - name: Deliver Prototype 1 and 2
