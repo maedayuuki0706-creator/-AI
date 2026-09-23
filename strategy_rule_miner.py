@@ -100,11 +100,12 @@ def _tactical_features(pred: dict) -> dict:
             candidates.append((gap, lane))
 
     candidates.sort(reverse=True)
-    attack_lane = str(candidates[0][1]) if candidates else "none"
+    enough_st = len(st) >= 4
+    attack_lane = str(candidates[0][1]) if candidates else ("none" if enough_st else "unknown")
     attack_gap = candidates[0][0] if candidates else None
 
     spread = None
-    if len(st) >= 4:
+    if enough_st:
         spread = max(st.values()) - min(st.values())
 
     if candidates and attack_gap is not None and attack_gap >= 0.10:
