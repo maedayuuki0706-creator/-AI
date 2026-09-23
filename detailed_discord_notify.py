@@ -17,6 +17,7 @@ import os
 import sys
 
 import direct_discord_notify as base
+import x_post_delivery
 import morning_all_races_discord as morning
 from virtual_betting import allocate_virtual_bets, compact_virtual_text
 
@@ -438,6 +439,10 @@ def log_prediction_with_virtual(record):
     try:
         if _is_selected_record(record):
             _send_selected_discord(_selected_message(record))
+            try:
+                x_post_delivery.send_selected_record(record)
+            except Exception as exc:
+                print(f"x draft failed selected {record.get('jcd')} {record.get('rno')}R: {type(exc).__name__}")
     except Exception as exc:
         print(f"selected alert failed {record.get('jcd')} {record.get('rno')}R: {type(exc).__name__}")
     try:
