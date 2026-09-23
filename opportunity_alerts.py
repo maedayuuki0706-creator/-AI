@@ -17,6 +17,7 @@ from pathlib import Path
 import urllib.request
 
 from discord_notification_policy import message_payload
+import x_post_delivery
 
 LOG_PATH = Path("data/opportunity_alert_deliveries.jsonl")
 _CACHE: dict[tuple, dict] = {}
@@ -583,6 +584,15 @@ def install(app):
                 continue
             try:
                 _send(target_env, message)
+                if selected_mid:
+                    try:
+                        x_post_delivery.send_selected_mid(record, payload)
+                    except Exception as exc:
+                        print(
+                            f"x draft failed selected_mid {record.get('jcd')} {record.get('rno')}R: "
+                            f"{type(exc).__name__}",
+                            flush=True,
+                        )
                 _append_log({
                     "day": record.get("day"),
                     "jcd": record.get("jcd"),
