@@ -171,7 +171,7 @@ def send_selected_record(record: dict) -> bool:
         "買い目 " + " ".join(picks),
         "",
         "展示・気象・モーター等を反映した直前予想。",
-        HASHTAGS,
+        _hashtags(venue),
     ])
     return _send_once(record, "厳選くん", post)
 
@@ -192,7 +192,7 @@ def send_selected_mid(record: dict, payload: dict) -> bool:
         "買い目 " + " ".join(picks),
         "",
         "展示・気象・モーター等を反映した直前予想。",
-        HASHTAGS,
+        _hashtags(venue),
     ])
     return _send_once(record, "厳選中穴", post)
 
@@ -205,7 +205,7 @@ def smoke_test() -> None:
         "✅ 厳選くん＋厳選中穴の投稿文連携OK",
         "実運用は直前予想が厳選条件を通った時だけ自動でここに届きます。",
         "",
-        HASHTAGS,
+        _hashtags(),
     ])
     _send_discord(_wrap_for_discord(post, "接続テスト"))
     print(f"X post Discord smoke test sent at {now.isoformat()}", flush=True)
