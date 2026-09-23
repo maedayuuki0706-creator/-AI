@@ -32,6 +32,7 @@ on:
       - "sokuhou_character.py"
       - "selection_scoring.py"
       - "stake_tracking.py"
+      - "x_post_delivery.py"
 
 permissions:
   contents: write
@@ -71,6 +72,7 @@ jobs:
           DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}
           DISCORD_WEBHOOK_MID_ODDS_SELECTED: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS_SELECTED }}
           DISCORD_WEBHOOK_LONGSHOT: ${{ secrets.DISCORD_WEBHOOK_LONGSHOT }}
+          X_POST_DISCORD_WEBHOOK_URL: ${{ secrets.X_POST_DISCORD_WEBHOOK_URL }}
           NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '1380' || '1380' }}
         run: python delivery_guard_runner.py
 
