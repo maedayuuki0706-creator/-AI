@@ -24,13 +24,13 @@ import mid_value_selection
 import opportunity_alerts
 
 JST = ZoneInfo('Asia/Tokyo')
-VERSION = 'pt3-base-pt1-4-pt2-6-v1'
+VERSION = 'pt3-control-pt1-attack-pt2-compress-v2'
 POINTS = 10
 UNIT_YEN = 100
 STREAMS = ('existing', 'hiyori', 'prototype1', 'prototype2', 'prototype3')
 LABELS = {'existing': '既存', 'hiyori': '日和',
-          'prototype1': 'プロトタイプ1（PT3ベース・本線4点）',
-          'prototype2': 'プロトタイプ2（PT3ベース・本線6点）',
+          'prototype1': 'プロトタイプ1（PT3＋穴スナイパー）',
+          'prototype2': 'プロトタイプ2（PT3×既存メイン圧縮）',
           'prototype3': 'プロトタイプ3（日和本線＋中穴抑え）'}
 WEIGHTS = {'existing': (1.0, 0.0), 'hiyori': (0.0, 1.0),
            'prototype1': (0.0, 1.0), 'prototype2': (0.0, 1.0)}
@@ -182,6 +182,142 @@ def _prototype3_card(hiyori, odds, native_hiyori):
     """Keep the original PT3 selection unchanged."""
     return _prototype3_variant(hiyori, odds, native_hiyori, 16, None, 'prototype3')
 
+
+def _analysis_with_odds(analysis, odds):
+    copied = deepcopy(analysis)
+    for row in copied['trifecta']:
+        odd = odds.get(row['combination'])
+        row['odds'] = odd
+        row['expected_value'] = row['probability'] * odd if odd is not None else None
+    return copied
+
+
+def _prototype1_attack(hiyori, existing, odds, native_hiyori):
+    """PT3 core plus only longshot candidates that pass the live sniper gate."""
+    p3 = _prototype3_card(hiyori, odds, native_hiyori)
+    core_target = min(10, len(p3['picks']))
+    main = list(p3['picks'][:core_target])
+
+    attack = _analysis_with_odds(existing, odds)
+    candidates = opportunity_alerts._candidate_rows(attack, 'long')
+    long_rows = opportunity_alerts._coherent_selection(candidates, 'long', attack)
+    score, breakdown = opportunity_alerts._score(attack, long_rows, 'long')
+    payload = {
+        'score': score,
+        'picks': long_rows,
+    }
+    sniper_live = opportunity_alerts._is_selected_longshot(payload, attack)
+
+    boosts = []
+    if sniper_live:
+        for row in long_rows:
+            combo = row.get('combination')
+            ev = row.get('expected_value')
+            if ev is None and row.get('odds') is not None:
+                ev = float(row['odds']) * float(row.get('probability') or 0)
+            if (combo and combo not in main and combo not in boosts
+                    and float(row.get('odds') or 0) >= 50.0 and float(ev or 0) >= 1.20):
+                boosts.append(combo)
+                if len(boosts) >= 3:
+                    break
+
+    # If there is no sniper signal, stay as the compact PT3 core rather than
+    # manufacturing extra longshot exposure.
+    picks = main + boosts
+    row_by_combo = {row['combination']: row for row in _analysis_with_odds(hiyori, odds)['trifecta']}
+    chosen = [row_by_combo[p] for p in main if p in row_by_combo]
+    # Longshot boosts use the existing model's probability diagnostics.
+    existing_by_combo = {row['combination']: row for row in attack['trifecta']}
+    chosen += [existing_by_combo[p] for p in boosts if p in existing_by_combo]
+    odds_complete = all(row.get('odds') is not None for row in chosen)
+    return {
+        'label': LABELS['prototype1'],
+        'weights': {'pt3_core': 1.0, 'longshot_sniper': 1.0},
+        'selection_policy': 'pt3-core-10-plus-longshot-sniper-max3',
+        'main_picks': main,
+        'cover_picks': boosts,
+        'picks': picks,
+        'point_count': len(picks),
+        'stake_yen': len(picks) * UNIT_YEN,
+        'heads': p3['heads'],
+        'grade': p3['grade'],
+        'probability_mass': sum(float(row.get('probability') or 0) for row in chosen),
+        'estimated_return_yen': (sum(UNIT_YEN * float(row['expected_value']) for row in chosen)
+                                 if odds_complete and all(row.get('expected_value') is not None for row in chosen)
+                                 else None),
+        'odds_complete': odds_complete,
+        'trifecta': p3['trifecta'],
+        'structure': {
+            'core_points': len(main),
+            'sniper_points': len(boosts),
+            'sniper_live': sniper_live,
+            'sniper_score': score,
+            'sniper_breakdown': breakdown,
+        },
+        'bridge': None,
+    }
+
+
+def _prototype2_compress(hiyori, existing, odds, native_hiyori, native_existing):
+    """Compress PT3 using agreement with the existing main model."""
+    p3 = _prototype3_card(hiyori, odds, native_hiyori)
+    p3_picks = list(p3['picks'])
+    existing_set = set(native_existing)
+    hiyori_rank = {combo: i for i, combo in enumerate(native_hiyori)}
+    p3_rank = {combo: i for i, combo in enumerate(p3_picks)}
+
+    # High-conviction races should need fewer tickets. Uncertain races retain
+    # more coverage, but never exceed ten points.
+    target = {'A': 7, 'B': 8, 'C': 10}.get(p3.get('grade'), 8)
+    target = min(target, len(p3_picks))
+
+    consensus = [p for p in p3_picks if p in existing_set]
+    protected = list(dict.fromkeys(native_hiyori[:4]))
+    pool = list(dict.fromkeys(consensus + protected + p3_picks))
+    pool.sort(key=lambda p: (
+        0 if p in consensus else 1,
+        hiyori_rank.get(p, 999),
+        p3_rank.get(p, 999),
+        p,
+    ))
+    picks = pool[:target]
+
+    # Keep the split visible in Discord: consensus is "main", remaining PT3
+    # support is the compressed cover.
+    main = [p for p in picks if p in existing_set]
+    if not main:
+        main = picks[:min(3, len(picks))]
+    main_set = set(main)
+    cover = [p for p in picks if p not in main_set]
+
+    analysis = _analysis_with_odds(hiyori, odds)
+    row_by_combo = {row['combination']: row for row in analysis['trifecta']}
+    chosen = [row_by_combo[p] for p in picks]
+    odds_complete = all(row.get('odds') is not None for row in chosen)
+    return {
+        'label': LABELS['prototype2'],
+        'weights': {'pt3': 1.0, 'existing_consensus': 1.0},
+        'selection_policy': 'pt3-existing-consensus-compress-grade-7-8-10',
+        'main_picks': main,
+        'cover_picks': cover,
+        'picks': picks,
+        'point_count': len(picks),
+        'stake_yen': len(picks) * UNIT_YEN,
+        'heads': p3['heads'],
+        'grade': p3['grade'],
+        'probability_mass': sum(row['probability'] for row in chosen),
+        'estimated_return_yen': (sum(UNIT_YEN * row['expected_value'] for row in chosen)
+                                 if odds_complete else None),
+        'odds_complete': odds_complete,
+        'trifecta': analysis['trifecta'],
+        'structure': {
+            'target_points': target,
+            'consensus_points': len([p for p in picks if p in existing_set]),
+            'native_existing_points': len(native_existing),
+        },
+        'bridge': None,
+    }
+
 def build_bundle(request, hiyori, source, now=None):
     now = aware(now or datetime.now(JST))
     day, jcd, rno = request['day'], str(request['jcd']).zfill(2), int(request['rno'])
@@ -225,10 +361,10 @@ def build_bundle(request, hiyori, source, now=None):
         mixed = fuse(base['trifecta'], hiyori['trifecta'], a, b)
         parent = base if stream == 'existing' else hiyori
         models[stream] = _card(mixed, parent, stream, odds)
-    for stream in ('prototype1', 'prototype2'):
-        main_points = 4 if stream == 'prototype1' else 6
-        models[stream] = _prototype3_variant(
-            hiyori, odds, native['hiyori'], main_points, 10 - main_points, stream)
+    models['prototype1'] = _prototype1_attack(
+        hiyori, base, odds, native['hiyori'])
+    models['prototype2'] = _prototype2_compress(
+        hiyori, base, odds, native['hiyori'], native['existing'])
     models['prototype3'] = _prototype3_card(hiyori, odds, native['hiyori'])
     record = {'version': VERSION, 'mode': 'prospective_shadow', 'key': key,
               'day': day, 'jcd': jcd, 'rno': rno, 'venue': base['venue'],
@@ -239,7 +375,7 @@ def build_bundle(request, hiyori, source, now=None):
               'source_models': {'existing': base.get('model_version'), 'hiyori': hiyori.get('model_version')},
               'source_url': source.get('source_url'), 'features': deepcopy(hiyori['features']),
               'models': models, 'native_candidate_picks': native,
-              'comparison_note': 'PT1/PT2 use the PT3 Hiyori-main plus 中穴-cover base with 4+6 and 6+4 point splits; PT3 remains unchanged.'}
+              'comparison_note': 'PT1 uses a compact PT3 core plus live longshot-sniper boosts; PT2 compresses PT3 by agreement with the existing main model; PT3 remains unchanged.'}
     record['digest'] = sha256(json.dumps(record, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     return record
 
@@ -351,8 +487,10 @@ def summarize(day):
                 'neither': sum(not r['models'][a]['hit'] and not r['models'][b]['hit'] for r in cohort)}
     report = {'day': day, 'version': VERSION, 'mode': 'prospective_shadow',
               'generated_at': datetime.now(JST).isoformat(), 'point_count': POINTS, 'unit_yen': UNIT_YEN,
-              'point_policy': {'existing': POINTS, 'hiyori': POINTS, 'prototype1': POINTS,
-                               'prototype2': POINTS, 'prototype3': 'hiyori-native-plus-mid-cover-cap16'},
+              'point_policy': {'existing': POINTS, 'hiyori': POINTS,
+                               'prototype1': 'pt3-core-10-plus-longshot-sniper-max3',
+                               'prototype2': 'pt3-existing-consensus-grade-7-8-10',
+                               'prototype3': 'hiyori-native-plus-mid-cover-cap16'},
               'recorded': len(predictions), 'pending': len(predictions)-len(results),
               'excluded_refunds_void_special': len(results)-len(cohort),
               'cohort': [r['key'] for r in cohort], 'totals': totals, 'pairs': pairs}
