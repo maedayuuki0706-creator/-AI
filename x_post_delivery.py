@@ -52,6 +52,27 @@ def _save(day: str, state: dict) -> None:
     )
 
 
+def _archive_post(record: dict, source: str, post: str, *, resend: bool = False) -> None:
+    day = str(record.get("day") or "")
+    if not day:
+        return
+    path = STATE_DIR / f"{day}_posts.jsonl"
+    row = {
+        "day": day,
+        "jcd": str(record.get("jcd") or "").zfill(2),
+        "rno": int(record.get("rno") or 0),
+        "venue": record.get("venue"),
+        "deadline": record.get("deadline"),
+        "source": source,
+        "format_version": FORMAT_VERSION,
+        "resend": bool(resend),
+        "post": post,
+        "sent_at": datetime.now(JST).isoformat(),
+    }
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+
+
 def _race_key(record: dict) -> str:
     day = str(record.get("day") or "")
     jcd = str(record.get("jcd") or "").zfill(2)
@@ -231,6 +252,7 @@ def _send_once(record: dict, source: str, post: str) -> bool:
         return False
 
     _send_discord(_wrap_for_discord(post, source))
+    _archive_post(record, source, post)
     sent.add(key)
     state["sent_races"] = sorted(sent)
     _save(day, state)
@@ -279,6 +301,40 @@ def send_selected_mid(record: dict, payload: dict) -> bool:
     return _send_once(record, "厳選中穴", post)
 
 
+def resend_live_race(day: str, jcd: str, rno: int) -> None:
+    """Rebuild one live existing-main card and resend it in X v2 format."""
+    import direct_discord_notify as base
+    import detailed_discord_notify as cards
+
+    jcd = str(jcd).zfill(2)
+    rno = int(rno)
+    analysis = base.analyze_official(day, jcd, rno)
+    if not analysis:
+        raise RuntimeError("live analysis unavailable")
+    if int((analysis.get("preview") or {}).get("exhibition_count") or 0) < 6:
+        raise RuntimeError("exhibition is not complete")
+
+    times = base.deadlines(day, jcd)
+    deadline = times[rno - 1] if len(times) >= rno else "--:--"
+    selected = cards.displayed_picks_variable(analysis, True)
+    picks = [row.get("combination") for row in selected if row.get("combination")]
+    venue = base.VENUES.get(jcd, jcd)
+    post = _build_post(venue, rno, deadline, picks, label="厳選くん")
+    if not post:
+        raise RuntimeError("no X picks generated")
+
+    record = {
+        "day": day,
+        "jcd": jcd,
+        "rno": rno,
+        "venue": venue,
+        "deadline": deadline,
+    }
+    _send_discord(_wrap_for_discord(post, "厳選くん｜再送"))
+    _archive_post(record, "厳選くん", post, resend=True)
+    print(f"X post {FORMAT_VERSION} resent {day} {jcd} {rno}R", flush=True)
+
+
 def smoke_test() -> None:
     now = datetime.now(JST)
     sample = [
@@ -297,6 +353,14 @@ def smoke_test() -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke-test", action="store_true")
+    parser.add_argument("--resend-race", action="store_true")
+    parser.add_argument("--day")
+    parser.add_argument("--jcd")
+    parser.add_argument("--rno", type=int)
     args = parser.parse_args()
-    if args.smoke_test:
+    if args.resend_race:
+        if not (args.day and args.jcd and args.rno):
+            parser.error("--resend-race requires --day --jcd --rno")
+        resend_live_race(args.day, args.jcd, args.rno)
+    elif args.smoke_test:
         smoke_test()
