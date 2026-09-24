@@ -18,6 +18,7 @@ from direct_discord_notify import JST
 STATE_DIR = Path("data/x_post_delivery")
 WEBHOOK_ENV = "X_POST_DISCORD_WEBHOOK_URL"
 BASE_HASHTAGS = "#競艇 #ボートレース #競艇予想 #無料予想"
+FORMAT_VERSION = "v2-formation"
 
 def _hashtags(venue: str = "") -> str:
     venue = str(venue or "").strip()
@@ -215,7 +216,7 @@ def _fit_post(lines: list[str]) -> str:
 
 def _wrap_for_discord(post: str, source: str) -> str:
     fence = chr(96) * 3
-    return f"📱 **X投稿用｜{source}**\nコピーしてそのまま投稿👇\n{fence}text\n{post}\n{fence}"
+    return f"📱 **X投稿用 v2｜{source}**\nコピーしてそのまま投稿👇\n{fence}text\n{post}\n{fence}"
 
 
 def _send_once(record: dict, source: str, post: str) -> bool:
@@ -237,68 +238,60 @@ def _send_once(record: dict, source: str, post: str) -> bool:
     return True
 
 
-def send_selected_record(record: dict) -> bool:
-    picks = _compact_picks(_record_picks(record))
-    if not picks:
-        return False
-    venue = record.get("venue") or str(record.get("jcd") or "")
-    rno = int(record.get("rno") or 0)
-    deadline = str(record.get("deadline") or "--:--")
-    post = _fit_post([
+def _build_post(venue: str, rno: int, deadline: str, picks, *, label: str, score: int | None = None) -> str:
+    compact = _compact_picks(picks)
+    if not compact:
+        return ""
+    title = f"🟡 厳選中穴｜期待度 {int(score or 0)}/100" if score is not None else "🔥 AI厳選"
+    return _fit_post([
         f"🚤無料予想｜{venue} {rno}R",
         f"⏰締切 {deadline}",
         "",
-        "🔥 AI厳選",
+        title,
         "🎯 買い目",
-        *picks,
+        *compact,
         "",
         "📊 展示・気象・モーター反映済",
         _hashtags(venue),
     ])
+
+
+def send_selected_record(record: dict) -> bool:
+    raw_picks = _record_picks(record)
+    if not raw_picks:
+        return False
+    venue = record.get("venue") or str(record.get("jcd") or "")
+    rno = int(record.get("rno") or 0)
+    deadline = str(record.get("deadline") or "--:--")
+    post = _build_post(venue, rno, deadline, raw_picks, label="厳選くん")
     return _send_once(record, "厳選くん", post)
 
 
 def send_selected_mid(record: dict, payload: dict) -> bool:
-    picks = _compact_picks(payload.get("picks") or [])
-    if not picks:
+    raw_picks = payload.get("picks") or []
+    if not raw_picks:
         return False
     venue = record.get("venue") or str(record.get("jcd") or "")
     rno = int(record.get("rno") or 0)
     deadline = str(record.get("deadline") or "--:--")
     score = int(payload.get("score") or 0)
-    post = _fit_post([
-        f"🚤無料予想｜{venue} {rno}R",
-        f"⏰締切 {deadline}",
-        "",
-        f"🟡 厳選中穴｜期待度 {score}/100",
-        "🎯 買い目",
-        *picks,
-        "",
-        "📊 展示・気象・モーター反映済",
-        _hashtags(venue),
-    ])
+    post = _build_post(venue, rno, deadline, raw_picks, label="厳選中穴", score=score)
     return _send_once(record, "厳選中穴", post)
 
 
 def smoke_test() -> None:
     now = datetime.now(JST)
-    sample = _compact_picks([
+    sample = [
         "1-2-3", "1-2-4", "1-3-2", "1-3-4", "1-4-2", "1-4-3",
         "2-1-3", "2-1-4", "1-5-2", "1-5-3",
-    ])
-    post = _fit_post([
-        "🚤無料予想｜常滑 8R",
-        "⏰締切 14:32",
-        "",
-        "🔥 AI厳選",
-        "🎯 買い目",
-        *sample,
-        "",
-        "📊 展示・気象・モーター反映済",
-        _hashtags("常滑"),
-    ])
-    _send_discord(_wrap_for_discord(post, "新フォーマットテスト"))
-    print(f"X post Discord smoke test sent at {now.isoformat()}", flush=True)
+    ]
+    post = _build_post("常滑", 8, "14:32", sample, label="厳選くん")
+    expected = ["1-234-234", "2-1-34", "1-5-23"]
+    for line in expected:
+        if line not in post:
+            raise RuntimeError(f"X v2 formation missing: {line}")
+    _send_discord(_wrap_for_discord(post, "新フォーマット確認"))
+    print(f"X post Discord {FORMAT_VERSION} smoke test sent at {now.isoformat()}", flush=True)
 
 
 if __name__ == "__main__":
