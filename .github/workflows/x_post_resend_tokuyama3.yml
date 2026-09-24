@@ -1,0 +1,24 @@
+name: X Post Resend Tokuyama 3R
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/x_post_resend_tokuyama3.yml"
+  workflow_dispatch:
+
+jobs:
+  resend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate
+        run: python -m py_compile x_post_delivery.py
+      - name: Resend Tokuyama 3R in X v2 format
+        env:
+          X_POST_DISCORD_WEBHOOK_URL: ${{ secrets.X_POST_DISCORD_WEBHOOK_URL }}
+        run: python x_post_delivery.py --resend-race --day 20260924 --jcd 18 --rno 3
