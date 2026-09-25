@@ -400,8 +400,9 @@ def _build_payload(venue, rno, deadline, analysis, kind):
             for row in picks
         ],
         "message": _message(venue, rno, deadline, analysis, picks, kind, score, breakdown),
+        "race_shape": dict(analysis.get("race_shape") or {}),
         "mode": "sniper_candidates_logged_all_races",
-        "score_version": "opportunity-score-v1",
+        "score_version": "opportunity-score-v2-race-shape",
     }
 
 
@@ -438,9 +439,32 @@ def _is_selected_longshot(payload, analysis):
     non_one = max((_num(value) for lane, value in heads.items() if str(lane) != "1"), default=0.0)
     wind = _num(preview.get("wind_speed"))
 
+    shape = payload.get("race_shape") or analysis.get("race_shape") or {}
+    shape_confidence = _num(shape.get("data_confidence"))
+    upset_risk = _num(shape.get("upset_risk"))
+    attack_pressure = _num(shape.get("attack_pressure"))
+    inside_trust = _num(shape.get("inside_trust"))
+    best_attack_lane = str(shape.get("best_attack_lane") or "")
+    shape_pattern = str(shape.get("pattern") or "")
+    pick_heads = {
+        str(row.get("combination") or "").split("-")[0]
+        for row in picks
+        if str(row.get("combination") or "")
+    }
+
     # Two sniper patterns:
-    # A) 1-drop / outside attack: non-1 head is genuinely live.
+    # A) 1-drop / outside attack: non-1 head is genuinely live. When enough
+    # historical/live shape data exists, the identified attacker must agree
+    # with the ticket head and the race must clear the upset-pressure gate.
     attack_pattern = non_one >= 0.14 and (one_head <= 0.52 or wind >= 5.0)
+    if shape_confidence >= 0.35:
+        attack_pattern = (
+            attack_pattern
+            and upset_risk >= 42.0
+            and attack_pressure >= 38.0
+            and (not best_attack_lane or best_attack_lane in pick_heads)
+            and shape_pattern in ("course2_sashi", "center_attack", "dash_attack", "mixed")
+        )
 
     # B) 1-escape + rough followers: keep the head solid, but require a high-odds
     # 1-x-y ticket with enough model probability/EV rather than spraying every race.
@@ -452,6 +476,12 @@ def _is_selected_longshot(payload, analysis):
         for row in picks
     )
     escape_pattern = one_head >= 0.34 and escape_rough
+    if shape_confidence >= 0.35:
+        escape_pattern = (
+            escape_pattern
+            and inside_trust >= 45.0
+            and shape_pattern in ("inside_escape", "inside_escape_rough_followers")
+        )
 
     return attack_pattern or escape_pattern
 
