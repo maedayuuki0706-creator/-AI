@@ -165,7 +165,16 @@ def _condition_adjustment(boat: Mapping[str, Any], race: Mapping[str, Any]) -> f
     score = 0.5
     wind_speed = float(race.get("wind_speed") or 0.0)
     wind_dir = str(race.get("wind_direction") or "").lower()
-    tide = str(race.get("tide") or "").lower()
+    tide_raw = race.get("tide")
+    if isinstance(tide_raw, Mapping):
+        if tide_raw.get("available"):
+            phase = str(tide_raw.get("phase") or "").lower()
+            level = str(tide_raw.get("level_band") or "").lower()
+            tide = " ".join([phase, level])
+        else:
+            tide = ""
+    else:
+        tide = str(tide_raw or "").lower()
     night = bool(race.get("night"))
 
     if wind_speed >= 4:
@@ -185,10 +194,12 @@ def _condition_adjustment(boat: Mapping[str, Any], race: Mapping[str, Any]) -> f
         elif wind_speed >= 5 and course == 1:
             score -= 0.05
 
-    if any(k in tide for k in ("干潮", "下げ", "ebb", "low")):
+    if any(k in tide for k in ("干潮", "下げ", "ebb", "low", "falling")):
         if course in (3, 4, 5):
             score += 0.04
-    elif any(k in tide for k in ("満潮", "上げ", "flood", "high")):
+        elif course == 1:
+            score -= 0.02
+    elif any(k in tide for k in ("満潮", "上げ", "flood", "high", "rising")):
         if course in (1, 2):
             score += 0.04
 
@@ -230,6 +241,14 @@ def score_boat(boat: Mapping[str, Any], race: Mapping[str, Any]) -> Dict[str, An
         + 0.20 * _norm_rate(boat.get("motor_top3_rate"))
         + 0.35 * _grade(boat.get("motor_grade"))
     )
+    # BOAT RACE publishes separate hull/boat performance beside motor stats.
+    # Blend it lightly so the more stable motor history remains dominant.
+    if boat.get("boat_top2_rate") is not None or boat.get("boat_top3_rate") is not None:
+        hull = (
+            0.60 * _norm_rate(boat.get("boat_top2_rate"))
+            + 0.40 * _norm_rate(boat.get("boat_top3_rate"))
+        )
+        motor = 0.90 * motor + 0.10 * hull
     exhibition = (
         0.30 * _grade(boat.get("exhibition_grade"))
         + 0.25 * _grade(boat.get("turn_grade"))
