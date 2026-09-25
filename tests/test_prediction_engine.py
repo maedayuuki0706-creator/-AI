@@ -46,6 +46,31 @@ class PredictionEngineTests(unittest.TestCase):
         )
         self.assertLess(windy["components"]["conditions"], calm["components"]["conditions"])
 
+    def test_shared_history_refines_inside_and_attack_scores(self):
+        boats = self._boats()
+
+        neutral_inside = score_boat(dict(boats[0]), {"venue": "大村"})
+        strong_inside = dict(boats[0])
+        strong_inside.update({
+            "course_history_samples": 30,
+            "course_history_avg_st": 0.13,
+            "in_escape_rate": 75.0,
+        })
+        strong_inside_score = score_boat(strong_inside, {"venue": "大村"})
+        self.assertGreater(strong_inside_score["score"], neutral_inside["score"])
+        self.assertGreater(strong_inside_score["components"]["history"], 0.5)
+
+        neutral_three = score_boat(dict(boats[2]), {"venue": "福岡"})
+        attack_three = dict(boats[2])
+        attack_three.update({
+            "course_history_samples": 30,
+            "course_history_avg_st": 0.13,
+            "course_attack_rate": 30.0,
+        })
+        attack_three_score = score_boat(attack_three, {"venue": "福岡"})
+        self.assertGreater(attack_three_score["score"], neutral_three["score"])
+        self.assertGreater(attack_three_score["components"]["history"], 0.5)
+
     def test_expected_value_is_calculated(self):
         boats = self._boats()
         out = analyze_race({
