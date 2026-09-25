@@ -50,6 +50,8 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(preview['boats'][5]['predicted_course'],4)
         self.assertTrue(preview['boats'][1]['exhibition_flying'])
         self.assertNotIn('exhibition_st',preview['boats'][1])
+        self.assertLess(preview['boats'][1]['exhibition_st_timing'], 0)
+        self.assertGreater(preview['boats'][1]['exhibition_f_depth'], 0)
         self.assertEqual(preview['air_temp_c'],25.0)
         self.assertEqual(preview['water_temp_c'],28.0)
         self.assertIn('exhibition_delta',preview['boats'][5])
