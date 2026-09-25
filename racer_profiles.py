@@ -110,6 +110,34 @@ def apply_profile(boat: dict, jcd: str | None = None) -> dict:
     boat["racer_profile_win_methods"] = dict(profile.get("win_methods") or {})
     boat["racer_profile_course_win_methods"] = dict(course_methods)
     boat["racer_profile_avg_st"] = profile.get("avg_st")
+    boat["racer_profile_course_avg_st"] = course_row.get("avg_st")
     boat["racer_profile_best_courses"] = best_courses[:3]
     boat["racer_profile_years"] = dict(profile.get("years") or {})
+
+    # Shared historical race-pattern features. These are intentionally raw,
+    # transparent rates; prediction_engine applies sample-size shrinkage so
+    # every downstream stream (main/mid/long/selected/PT/Hiyori) consumes the
+    # same history without letting a tiny sample dominate live information.
+    if raw_starts > 0:
+        methods = dict(course_row.get("win_methods") or {})
+        boat["course_history_samples"] = raw_starts
+        boat["course_history_avg_st"] = course_row.get("avg_st")
+        if course == 1:
+            escape_wins = int(methods.get("逃げ") or 0)
+            boat["in_escape_rate"] = round(100.0 * escape_wins / raw_starts, 2)
+            boat["in_loss_rate"] = round(
+                100.0 * max(0, raw_starts - int(course_row.get("wins") or 0)) / raw_starts,
+                2,
+            )
+        else:
+            sashi = int(methods.get("差し") or 0)
+            makuri = int(methods.get("まくり") or 0)
+            makurisashi = int(methods.get("まくり差し") or 0)
+            boat["course_sashi_rate"] = round(100.0 * sashi / raw_starts, 2)
+            boat["course_makuri_rate"] = round(100.0 * makuri / raw_starts, 2)
+            boat["course_makurisashi_rate"] = round(100.0 * makurisashi / raw_starts, 2)
+            boat["course_attack_rate"] = round(
+                100.0 * (sashi + makuri + makurisashi) / raw_starts,
+                2,
+            )
     return boat
