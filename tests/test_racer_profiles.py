@@ -90,6 +90,46 @@ class RacerProfileTests(unittest.TestCase):
         finally:
             p.profile_for = original
 
+    def test_apply_profile_exposes_shared_inside_and_attack_history(self):
+        original = p.profile_for
+        try:
+            profile = {
+                "starts": 80,
+                "avg_st": .14,
+                "win_methods": {"逃げ": 10, "まくり": 2, "まくり差し": 1},
+                "course_win_methods": {},
+                "courses": {
+                    "1": {
+                        "starts": 20, "wins": 12, "top2": 16,
+                        "weighted_starts": 20.0, "weighted_wins": 12.0, "weighted_top2": 16.0,
+                        "avg_st": .13, "win_methods": {"逃げ": 10, "抜き": 2},
+                    },
+                    "3": {
+                        "starts": 20, "wins": 4, "top2": 8,
+                        "weighted_starts": 20.0, "weighted_wins": 4.0, "weighted_top2": 8.0,
+                        "avg_st": .15, "win_methods": {"まくり": 2, "まくり差し": 1, "抜き": 1},
+                    },
+                },
+                "venues": {"24": {"starts": 10}},
+                "years": {"2026": {"starts": 40}},
+            }
+            p.profile_for = lambda _: profile
+
+            inside = {"racer_id": "4001", "lane": 1, "predicted_course": 1}
+            p.apply_profile(inside, "24")
+            self.assertEqual(inside["course_history_samples"], 20)
+            self.assertAlmostEqual(inside["course_history_avg_st"], .13)
+            self.assertAlmostEqual(inside["in_escape_rate"], 50.0)
+            self.assertAlmostEqual(inside["in_loss_rate"], 40.0)
+
+            attacker = {"racer_id": "4001", "lane": 3, "predicted_course": 3}
+            p.apply_profile(attacker, "24")
+            self.assertAlmostEqual(attacker["course_makuri_rate"], 10.0)
+            self.assertAlmostEqual(attacker["course_makurisashi_rate"], 5.0)
+            self.assertAlmostEqual(attacker["course_attack_rate"], 15.0)
+        finally:
+            p.profile_for = original
+
     def test_three_year_backfill_floor_and_cursor(self):
         state = {"backfill": {"next_day": "20221231"}}
         out = l.run_backfill(
