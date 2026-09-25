@@ -332,6 +332,121 @@ def trifecta_probabilities(scored: Iterable[Mapping[str, Any]]) -> List[Dict[str
     return rows
 
 
+def _race_shape(
+    boats: Iterable[Mapping[str, Any]],
+    scored: Iterable[Mapping[str, Any]],
+    trifectas: Iterable[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    """Describe *how* a race may break, separately from ticket selection.
+
+    This diagnostic is shared by every downstream stream. It deliberately
+    combines model head probability with only small historical/exhibition
+    refinements, so it can explain an upset scenario without becoming a second
+    independent prediction engine.
+    """
+    raw_boats = list(boats)
+    scored_rows = list(scored)
+    trifecta_rows = list(trifectas)
+    head_mass = {
+        lane: sum(
+            float(row.get("probability") or 0.0)
+            for row in trifecta_rows
+            if str(row.get("combination") or "").startswith(f"{lane}-")
+        )
+        for lane in range(1, 7)
+    }
+    by_lane = {int(row.get("lane") or 0): row for row in raw_boats}
+    course_to_lane = {
+        int(row.get("predicted_course") or row.get("course") or row.get("lane") or 0):
+        int(row.get("lane") or 0)
+        for row in raw_boats
+        if 1 <= int(row.get("predicted_course") or row.get("course") or row.get("lane") or 0) <= 6
+    }
+    inside_lane = course_to_lane.get(1, 1)
+    inside = by_lane.get(inside_lane, {})
+
+    inside_head = head_mass.get(inside_lane, 0.0)
+    inside_history = _historical_course_signal(inside, 1) if inside else 0.0
+    inside_trust = 100.0 * inside_head + 10.0 * inside_history
+
+    inside_st = inside.get("exhibition_st")
+    if inside_st is None:
+        inside_st = _blended_historical_st(inside)
+    try:
+        if inside_st is not None:
+            inside_trust += 5.0 * (2.0 * _norm_st(inside_st) - 1.0)
+    except (TypeError, ValueError):
+        pass
+    inside_trust = max(0.0, min(100.0, inside_trust))
+
+    best_attack_lane = None
+    best_attack_course = None
+    best_attack_score = 0.0
+    attack_details = []
+    for course in range(2, 7):
+        lane = course_to_lane.get(course)
+        if not lane:
+            continue
+        boat = by_lane.get(lane, {})
+        history_signal = _historical_course_signal(boat, course)
+        pressure = 200.0 * head_mass.get(lane, 0.0) + 10.0 * history_signal
+        ex_st = boat.get("exhibition_st")
+        if ex_st is not None and inside_st is not None:
+            try:
+                # Reward an attacker that actually showed a better exhibition ST.
+                pressure += max(-5.0, min(5.0, (float(inside_st) - float(ex_st)) * 100.0))
+            except (TypeError, ValueError):
+                pass
+        pressure = max(0.0, min(100.0, pressure))
+        attack_details.append({
+            "lane": lane,
+            "course": course,
+            "pressure": round(pressure, 1),
+            "head_probability": round(head_mass.get(lane, 0.0), 4),
+            "history_signal": round(history_signal, 3),
+        })
+        if pressure > best_attack_score:
+            best_attack_score = pressure
+            best_attack_lane = lane
+            best_attack_course = course
+
+    upset_risk = 0.55 * (100.0 - inside_trust) + 0.45 * best_attack_score
+    upset_risk = max(0.0, min(100.0, upset_risk))
+
+    inside_samples = int(inside.get("course_history_samples") or inside.get("racer_profile_course_samples") or 0)
+    attacker = by_lane.get(best_attack_lane or 0, {})
+    attack_samples = int(attacker.get("course_history_samples") or attacker.get("racer_profile_course_samples") or 0)
+    sample_confidence = min(1.0, (inside_samples + attack_samples) / 40.0)
+    live_confidence = 1.0 if inside.get("exhibition_st") is not None else 0.6
+    data_confidence = max(0.0, min(1.0, 0.7 * sample_confidence + 0.3 * live_confidence))
+
+    if inside_trust >= 58 and best_attack_score < 42:
+        pattern = "inside_escape"
+    elif inside_trust >= 48 and best_attack_score >= 42:
+        pattern = "inside_escape_rough_followers"
+    elif best_attack_score >= 45 and best_attack_course == 2:
+        pattern = "course2_sashi"
+    elif best_attack_score >= 45 and best_attack_course in (3, 4):
+        pattern = "center_attack"
+    elif best_attack_score >= 45 and best_attack_course in (5, 6):
+        pattern = "dash_attack"
+    else:
+        pattern = "mixed"
+
+    return {
+        "inside_lane": inside_lane,
+        "inside_trust": round(inside_trust, 1),
+        "attack_pressure": round(best_attack_score, 1),
+        "upset_risk": round(upset_risk, 1),
+        "best_attack_lane": best_attack_lane,
+        "best_attack_course": best_attack_course,
+        "pattern": pattern,
+        "data_confidence": round(data_confidence, 3),
+        "head_probabilities": {str(k): round(v, 4) for k, v in head_mass.items()},
+        "attack_details": attack_details,
+    }
+
+
 def analyze_race(payload: Mapping[str, Any]) -> Dict[str, Any]:
     race = payload.get("race") if isinstance(payload.get("race"), Mapping) else payload
     boats = payload.get("boats") or race.get("boats") or []
@@ -361,12 +476,14 @@ def analyze_race(payload: Mapping[str, Any]) -> Dict[str, Any]:
     top_score = scored[0]["score"] if scored else 0.0
     second_score = scored[1]["score"] if len(scored) > 1 else top_score
     confidence = _clip(0.5 + (top_score - second_score) * 2.5)
+    race_shape = _race_shape(boats, scored, trifectas)
 
     return {
-        "model_version": "kyoutei-navi-course-v3-shared-history-unvalidated",
+        "model_version": "kyoutei-navi-course-v4-race-shape-unvalidated",
         "venue": race.get("venue"),
         "boats": scored,
         "trifecta": trifectas,
         "value_bets": value_bets[:20],
         "confidence": round(confidence, 3),
+        "race_shape": race_shape,
     }
