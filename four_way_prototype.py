@@ -205,6 +205,7 @@ def _prototype1_attack(hiyori, existing, odds, native_hiyori):
     payload = {
         'score': score,
         'picks': long_rows,
+        'race_shape': dict(attack.get('race_shape') or {}),
     }
     sniper_live = opportunity_alerts._is_selected_longshot(payload, attack)
 
