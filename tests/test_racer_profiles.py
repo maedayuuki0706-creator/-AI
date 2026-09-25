@@ -130,6 +130,64 @@ class RacerProfileTests(unittest.TestCase):
         finally:
             p.profile_for = original
 
+    def test_start_correction_learns_late_exhibition_to_fast_race_start(self):
+        state = {
+            "racers": {},
+            "processed_races": [],
+            "start_correction_processed_races": [],
+            "weight_anchor_day": "20260925",
+        }
+        result = {
+            "day": "20260925",
+            "jcd": "08",
+            "method": "まくり",
+            "finish": [{
+                "racer_id": "4001", "name": "選手A", "lane": 4, "course": 4,
+                "st": .08, "exhibition_st_timing": .22,
+                "finish": 1, "status": "finished",
+            }],
+        }
+        learned = l.update_start_correction_from_result(state, result)
+        self.assertEqual(learned, 1)
+        row = state["racers"]["4001"]["start_correction_courses"]["4"]
+        self.assertAlmostEqual(row["late_avg_correction"], .14)
+        self.assertEqual(row["late_to_fast"], 1)
+        self.assertEqual(row["late_to_zero"], 1)
+        self.assertEqual(row["late_makuri_wins"], 1)
+
+    def test_profile_exposes_start_correction_by_course(self):
+        original = p.profile_for
+        try:
+            p.profile_for = lambda _: {
+                "starts": 40,
+                "avg_st": .13,
+                "courses": {"4": {
+                    "starts": 10, "wins": 2, "top2": 4,
+                    "weighted_starts": 10, "weighted_wins": 2, "weighted_top2": 4,
+                    "avg_st": .12, "win_methods": {"まくり": 2},
+                }},
+                "venues": {},
+                "years": {},
+                "win_methods": {"まくり": 2},
+                "course_win_methods": {"4": {"まくり": 2}},
+                "start_correction": {"samples": 10, "avg_correction": .04},
+                "start_correction_courses": {"4": {
+                    "samples": 8, "avg_correction": .05,
+                    "late_samples": 5, "late_avg_correction": .09,
+                    "late_to_fast": 4, "late_to_zero": 2,
+                    "late_makuri_wins": 2, "late_makurisashi_wins": 0,
+                }},
+            }
+            boat = {"racer_id": "4001", "lane": 4, "predicted_course": 4}
+            p.apply_profile(boat, "08")
+            self.assertEqual(boat["start_correction_samples"], 8)
+            self.assertEqual(boat["late_exhibition_samples"], 5)
+            self.assertAlmostEqual(boat["late_start_correction_avg"], .09)
+            self.assertAlmostEqual(boat["late_to_fast_rate"], 80.0)
+            self.assertAlmostEqual(boat["late_makuri_win_rate"], 40.0)
+        finally:
+            p.profile_for = original
+
     def test_three_year_backfill_floor_and_cursor(self):
         state = {"backfill": {"next_day": "20221231"}}
         out = l.run_backfill(
