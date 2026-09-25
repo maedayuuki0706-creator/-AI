@@ -1,0 +1,31 @@
+name: Start Correction Feature Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "direct_discord_notify.py"
+      - "racer_profile_learning.py"
+      - "racer_profiles.py"
+      - "prediction_engine.py"
+      - "tests/test_direct_discord_notify.py"
+      - "tests/test_racer_profiles.py"
+      - "tests/test_prediction_engine.py"
+      - ".github/workflows/start-correction-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run focused start-correction tests
+        run: |
+          python3 -m unittest \
+            tests.test_direct_discord_notify.DeliveryTests.test_real_exhibition_entry_and_f_are_parsed \
+            tests.test_racer_profiles \
+            tests.test_prediction_engine -v
