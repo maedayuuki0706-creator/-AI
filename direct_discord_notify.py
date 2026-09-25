@@ -185,8 +185,20 @@ def parse_beforeinfo(raw: str) -> dict:
             item["predicted_course"] = course
             st = textify(value)
             item["exhibition_flying"] = st.startswith("F")
-            if re.fullmatch(r"(?:0)?\.\d+",st):
-                item["exhibition_st"] = float(st)
+            # Preserve the signed exhibition start timing for learning.
+            # Normal .12 => +0.12, F.03 => -0.03. F timings are not used as a
+            # live speed bonus; they are kept separately so we can learn how
+            # each racer corrects from exhibition to the actual start.
+            if re.fullmatch(r"(?:0)?\.\d+", st):
+                timing = float(st)
+                item["exhibition_st"] = timing
+                item["exhibition_st_timing"] = timing
+            else:
+                flying_match = re.fullmatch(r"F(?:0)?\.(\d+)", st)
+                if flying_match:
+                    timing = -float("0." + flying_match.group(1))
+                    item["exhibition_st_timing"] = timing
+                    item["exhibition_f_depth"] = abs(timing)
     text = textify(raw)
     for key,label,unit in (("wind_speed","風速","m"),("wave_cm","波高","cm"),
                            ("air_temp_c","気温","°C"),("water_temp_c","水温","°C")):
