@@ -96,6 +96,42 @@ class PredictionEngineTests(unittest.TestCase):
         self.assertGreater(attack_three_score["score"], neutral_three["score"])
         self.assertGreater(attack_three_score["components"]["history"], 0.5)
 
+    def test_late_exhibition_corrector_is_not_treated_like_a_normal_late_starter(self):
+        base = self._boats()[3]
+        late = dict(base)
+        late["exhibition_st"] = .22
+        no_history = score_boat(late, {"venue": "福岡"})
+
+        corrector = dict(late)
+        corrector.update({
+            "late_exhibition_samples": 12,
+            "late_start_correction_avg": .10,
+            "late_to_fast_rate": 75.0,
+        })
+        corrected = score_boat(corrector, {"venue": "福岡"})
+        self.assertLess(corrected["projected_exhibition_st"], .22)
+        self.assertGreater(corrected["components"]["start"], no_history["components"]["start"])
+        self.assertGreater(corrected["score"], no_history["score"])
+
+    def test_race_shape_keeps_makuri_method_for_late_start_corrector(self):
+        boats = self._boats()
+        attacker = boats[3]
+        attacker.update({
+            "exhibition_st": .21,
+            "late_exhibition_samples": 12,
+            "late_start_correction_avg": .10,
+            "late_to_fast_rate": 80.0,
+            "course_history_samples": 30,
+            "course_attack_rate": 30.0,
+            "course_sashi_rate": 2.0,
+            "course_makuri_rate": 18.0,
+            "course_makurisashi_rate": 10.0,
+        })
+        out = analyze_race({"race": {"venue": "福岡"}, "boats": boats})
+        detail = next(x for x in out["race_shape"]["attack_details"] if x["lane"] == 4)
+        self.assertLess(detail["projected_st"], .21)
+        self.assertEqual(detail["likely_method"], "まくり")
+
     def test_expected_value_is_calculated(self):
         boats = self._boats()
         out = analyze_race({
