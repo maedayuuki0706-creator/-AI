@@ -75,6 +75,74 @@ def _norm_st(value: Any, default: float = 0.5) -> float:
     return _clip((0.35 - st) / 0.30)
 
 
+def _history_sample_weight(value: Any) -> float:
+    """Require a useful sample before historical race style can move the model."""
+    try:
+        samples = int(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    if samples < 6:
+        return 0.0
+    return _clip((samples - 5) / 25.0)
+
+
+# Model baselines, not claims about any one current race. They match the
+# conservative course priors used by racer_profiles and keep the new feature
+# bounded until prospective results justify recalibration.
+_HISTORY_METHOD_BASELINE = {1: 55.0, 2: 15.0, 3: 13.0, 4: 11.0, 5: 5.0, 6: 2.0}
+
+
+def _historical_course_signal(boat: Mapping[str, Any], course: int) -> float:
+    """Return -1..1 historical style signal with strong sample shrinkage."""
+    weight = _history_sample_weight(
+        boat.get("course_history_samples") or boat.get("racer_profile_course_samples")
+    )
+    if weight <= 0 or course not in _HISTORY_METHOD_BASELINE:
+        return 0.0
+
+    key = "in_escape_rate" if course == 1 else "course_attack_rate"
+    value = boat.get(key)
+    if value is None:
+        return 0.0
+    try:
+        rate = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if not 0 <= rate <= 100:
+        return 0.0
+
+    baseline = _HISTORY_METHOD_BASELINE[course]
+    # A 20-point deviation is a full signal. The final score adjustment below
+    # is still deliberately small, so exhibition/motor/current form stay primary.
+    signal = _clip((rate - baseline) / 20.0, -1.0, 1.0)
+    return signal * weight
+
+
+def _blended_historical_st(boat: Mapping[str, Any]) -> Any:
+    """Blend course-specific historical ST into the current published average."""
+    current = boat.get("avg_st")
+    course_st = boat.get("course_history_avg_st")
+    weight = _history_sample_weight(
+        boat.get("course_history_samples") or boat.get("racer_profile_course_samples")
+    )
+    if course_st is None or weight <= 0:
+        return current
+    try:
+        historical = float(course_st)
+        if not 0 <= historical <= 1:
+            return current
+        if current is None:
+            return historical
+        current_value = float(current)
+        if not 0 <= current_value <= 1:
+            return historical
+    except (TypeError, ValueError):
+        return current
+    # Never let history replace live/current form; cap it at 35%.
+    historical_weight = 0.35 * weight
+    return (1.0 - historical_weight) * current_value + historical_weight * historical
+
+
 def _grade(value: Any, default: float = 0.5) -> float:
     if value is None:
         return default
@@ -151,7 +219,7 @@ def score_boat(boat: Mapping[str, Any], race: Mapping[str, Any]) -> Dict[str, An
         + 0.30 * _norm_rate(boat.get("course_top2_rate"))
     )
     start = (
-        0.55 * _norm_st(boat.get("avg_st"))
+        0.55 * _norm_st(_blended_historical_st(boat))
         + 0.45 * _norm_st(boat.get("exhibition_st"))
     )
     if boat.get("flying"):
@@ -196,6 +264,12 @@ def score_boat(boat: Mapping[str, Any], race: Mapping[str, Any]) -> Dict[str, An
     }
     raw = sum(parts[name] * WEIGHTS[name] for name in WEIGHTS)
     raw *= _venue_multiplier(str(race.get("venue") or ""), course)
+
+    # Shared historical race-style adjustment. This is intentionally capped at
+    # +/-0.008 raw score; it refines the current model rather than overriding it.
+    history_signal = _historical_course_signal(boat, course)
+    raw += 0.008 * history_signal
+    parts["history"] = 0.5 + 0.5 * history_signal
 
     if course == 1:
         raw *= 1.06
@@ -270,7 +344,7 @@ def analyze_race(payload: Mapping[str, Any]) -> Dict[str, Any]:
     confidence = _clip(0.5 + (top_score - second_score) * 2.5)
 
     return {
-        "model_version": "kyoutei-navi-course-v2-unvalidated",
+        "model_version": "kyoutei-navi-course-v3-shared-history-unvalidated",
         "venue": race.get("venue"),
         "boats": scored,
         "trifecta": trifectas,
