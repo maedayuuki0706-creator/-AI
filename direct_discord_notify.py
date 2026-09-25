@@ -139,7 +139,9 @@ def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
         lane = int(lane_match[1])
         if not ((nums[0] is None or 0 <= nums[0] <= 1)
                 and (nums[1] is None or 0 <= nums[1] <= 10)
-                and all(nums[i] is None or 0 <= nums[i] <= 100 for i in (2,3,5,6,8,9))):
+                and all(nums[i] is None or 0 <= nums[i] <= 100 for i in (2,3,5,6,8,9,11,12))
+                and (nums[7] is None or 1 <= nums[7] <= 999)
+                and (nums[10] is None or 1 <= nums[10] <= 999)):
             return []
         boats.append({
             "lane": lane, "course": lane, "predicted_course": lane,
@@ -148,13 +150,19 @@ def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
             "win_rate": nums[1], "top2_rate": nums[2], "top3_rate": nums[3],
             "local_win_rate": nums[4] if any(nums[4:7]) else None,
             "local_top2_rate": nums[5] if any(nums[4:7]) else None,
-            "motor_number": int(nums[7]) if nums[7] is not None else None, "motor_top2_rate": nums[8], "motor_top3_rate": nums[9],
+            "motor_number": int(nums[7]) if nums[7] is not None else None,
+            "motor_top2_rate": nums[8], "motor_top3_rate": nums[9],
+            "boat_number": int(nums[10]) if nums[10] is not None else None,
+            "boat_top2_rate": nums[11], "boat_top3_rate": nums[12],
         })
     return sorted(boats, key=lambda x: x["lane"]) if {b["lane"] for b in boats} == set(range(1,7)) and len(boats)==6 else []
 
 
 def parse_beforeinfo(raw: str) -> dict:
-    result = {"boats": {}, "wind_speed": None, "wave_cm": None, "entry_observed": False}
+    result = {
+        "boats": {}, "wind_speed": None, "wave_cm": None, "entry_observed": False,
+        "air_temp_c": None, "water_temp_c": None,
+    }
     for body in re.findall(r"<tbody\b[^>]*>(.*?)</tbody>", raw, re.I | re.S):
         cells = re.findall(r"<td\b[^>]*>(.*?)</td>", body, re.I | re.S)
         lane = re.search(r'is-boatColor([1-6])', body)
@@ -180,17 +188,33 @@ def parse_beforeinfo(raw: str) -> dict:
             if re.fullmatch(r"(?:0)?\.\d+",st):
                 item["exhibition_st"] = float(st)
     text = textify(raw)
-    for key,label,unit in (("wind_speed","風速","m"),("wave_cm","波高","cm")):
-        match = re.search(label+r"\s+(\d+(?:\.\d+)?)"+unit,text)
+    for key,label,unit in (("wind_speed","風速","m"),("wave_cm","波高","cm"),
+                           ("air_temp_c","気温","°C"),("water_temp_c","水温","°C")):
+        match = re.search(label+r"\s+(\d+(?:\.\d+)?)"+re.escape(unit),text)
         if match:
             result[key] = float(match[1])
     result["exhibition_count"] = sum("exhibition_time" in row for row in result["boats"].values())
     times = [row["exhibition_time"] for row in result["boats"].values() if "exhibition_time" in row]
     if len(times)==6:
-        # Relative time only; missing turn/straight/pit grades remain unknown.
+        # Preserve both relative rank/delta and a bounded grade.
         average = sum(times)/6
+        fastest = min(times)
+        ranked = sorted(times)
         for row in result["boats"].values():
+            if "exhibition_time" not in row:
+                continue
+            row["exhibition_delta"] = round(row["exhibition_time"] - fastest, 3)
+            row["exhibition_rank"] = ranked.index(row["exhibition_time"]) + 1
             row["exhibition_grade"] = max(0,min(1,.5+(average-row["exhibition_time"])*2))
+    sts = [row["exhibition_st"] for row in result["boats"].values() if row.get("exhibition_st") is not None]
+    if len(sts) >= 4:
+        best_st = min(sts)
+        ranked_st = sorted(sts)
+        for row in result["boats"].values():
+            if row.get("exhibition_st") is None:
+                continue
+            row["exhibition_st_delta"] = round(row["exhibition_st"] - best_st, 3)
+            row["exhibition_st_rank"] = ranked_st.index(row["exhibition_st"]) + 1
     return result
 
 
@@ -240,12 +264,23 @@ def analyze_official(day: str, jcd: str, rno: int) -> dict | None:
     form=previous_form(day,jcd,boats)
     for boat in boats:
         boat.update(preview['boats'].get(boat['lane'],{}))
+        actual_course = int(boat.get("predicted_course") or boat.get("course") or boat["lane"])
+        boat["entry_shift"] = int(boat["lane"]) - actual_course
+        boat["front_entry"] = actual_course < int(boat["lane"])
         # Persistent individual tendencies: actual-course history, course
         # strength, venue exposure, ST and winning-method profile.
         racer_profiles.apply_profile(boat, str(jcd).zfill(2))
         if boat['lane'] in form:
             boat['previous_day_score_delta']=form[boat['lane']]['score_delta']
-    result=analyze_race({'race':{'venue':VENUES[jcd],'wind_speed':preview['wind_speed']},'boats':boats,'trifecta_odds':odds})
+    race_context = {
+        'venue': VENUES[jcd],
+        'wind_speed': preview['wind_speed'],
+        'wave_cm': preview.get('wave_cm'),
+        'tide': preview.get('tide'),
+        'air_temp_c': preview.get('air_temp_c'),
+        'water_temp_c': preview.get('water_temp_c'),
+    }
+    result=analyze_race({'race':race_context,'boats':boats,'trifecta_odds':odds})
     heads={lane:sum(p['probability'] for p in result['trifecta'] if p['combination'].startswith(f'{lane}-')) for lane in range(1,7)}
     ranking=sorted(heads,key=heads.get,reverse=True)
     top,gap=heads[ranking[0]],heads[ranking[0]]-heads[ranking[1]]
