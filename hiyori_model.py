@@ -89,8 +89,18 @@ def analyze(official, source, day, jcd, rno):
         for boat, feature in zip(boats, features):
             boat['motor_grade'] = min(1, max(0, (boat.get('motor_grade', .5)) + max(-.05, min(.05, (average - feature['zenken_time']) * .2))))
     odds = {row['combination']: row.get('odds') for row in official['trifecta'] if row.get('odds') is not None}
-    result = analyze_race({'race': {'venue': official['venue'], 'wind_speed': official['preview'].get('wind_speed')},
-                           'boats': boats, 'trifecta_odds': odds})
+    result = analyze_race({
+        'race': {
+            'venue': official['venue'],
+            'wind_speed': official['preview'].get('wind_speed'),
+            'wave_cm': official['preview'].get('wave_cm'),
+            'tide': official['preview'].get('tide'),
+            'air_temp_c': official['preview'].get('air_temp_c'),
+            'water_temp_c': official['preview'].get('water_temp_c'),
+        },
+        'boats': boats,
+        'trifecta_odds': odds,
+    })
     heads = {lane: sum(r['probability'] for r in result['trifecta'] if r['combination'].startswith(f'{lane}-')) for lane in range(1, 7)}
     ranking = sorted(heads, key=heads.get, reverse=True)
     top, gap = heads[ranking[0]], heads[ranking[0]] - heads[ranking[1]]
