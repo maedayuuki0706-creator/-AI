@@ -114,6 +114,36 @@ def apply_profile(boat: dict, jcd: str | None = None) -> dict:
     boat["racer_profile_best_courses"] = best_courses[:3]
     boat["racer_profile_years"] = dict(profile.get("years") or {})
 
+    # Exhibition -> actual-race start correction profile. Prefer the same
+    # course; fall back to the racer's overall behavior only when course
+    # history is still sparse.
+    correction_row = (profile.get("start_correction_courses") or {}).get(str(course), {})
+    overall_correction = profile.get("start_correction") or {}
+    if int(correction_row.get("samples") or 0) < 4:
+        correction_row = overall_correction
+    correction_samples = int(correction_row.get("samples") or 0)
+    if correction_samples > 0:
+        boat["start_correction_samples"] = correction_samples
+        boat["start_correction_avg"] = correction_row.get("avg_correction")
+        boat["late_exhibition_samples"] = int(correction_row.get("late_samples") or 0)
+        boat["late_start_correction_avg"] = correction_row.get("late_avg_correction")
+        late_samples = int(correction_row.get("late_samples") or 0)
+        if late_samples:
+            boat["late_to_fast_rate"] = round(
+                100.0 * int(correction_row.get("late_to_fast") or 0) / late_samples, 2
+            )
+            boat["late_to_zero_rate"] = round(
+                100.0 * int(correction_row.get("late_to_zero") or 0) / late_samples, 2
+            )
+            boat["late_makuri_win_rate"] = round(
+                100.0 * int(correction_row.get("late_makuri_wins") or 0) / late_samples, 2
+            )
+            boat["late_makurisashi_win_rate"] = round(
+                100.0 * int(correction_row.get("late_makurisashi_wins") or 0) / late_samples, 2
+            )
+        boat["exhibition_f_samples"] = int(correction_row.get("exhibition_f_samples") or 0)
+        boat["exhibition_f_avg_retreat"] = correction_row.get("exhibition_f_avg_retreat")
+
     # Shared historical race-pattern features. These are intentionally raw,
     # transparent rates; prediction_engine applies sample-size shrinkage so
     # every downstream stream (main/mid/long/selected/PT/Hiyori) consumes the
