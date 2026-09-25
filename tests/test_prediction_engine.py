@@ -46,6 +46,31 @@ class PredictionEngineTests(unittest.TestCase):
         )
         self.assertLess(windy["components"]["conditions"], calm["components"]["conditions"])
 
+    def test_boat_performance_is_a_small_motor_refinement(self):
+        boat = self._boats()[2]
+        base = score_boat(dict(boat), {"venue": "福岡"})
+        stronger_hull = dict(boat)
+        stronger_hull.update({"boat_top2_rate": 60, "boat_top3_rate": 80})
+        improved = score_boat(stronger_hull, {"venue": "福岡"})
+        self.assertGreater(improved["components"]["motor"], base["components"]["motor"])
+        self.assertGreater(improved["score"], base["score"])
+
+    def test_structured_tide_context_reaches_condition_score(self):
+        inside = self._boats()[0]
+        outside = self._boats()[3]
+        neutral_inside = score_boat(inside, {"venue": "福岡"})
+        falling_inside = score_boat(inside, {
+            "venue": "福岡",
+            "tide": {"available": True, "phase": "falling", "level_band": "low"},
+        })
+        neutral_outside = score_boat(outside, {"venue": "福岡"})
+        falling_outside = score_boat(outside, {
+            "venue": "福岡",
+            "tide": {"available": True, "phase": "falling", "level_band": "low"},
+        })
+        self.assertLess(falling_inside["components"]["conditions"], neutral_inside["components"]["conditions"])
+        self.assertGreater(falling_outside["components"]["conditions"], neutral_outside["components"]["conditions"])
+
     def test_shared_history_refines_inside_and_attack_scores(self):
         boats = self._boats()
 
