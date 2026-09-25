@@ -143,6 +143,39 @@ def _blended_historical_st(boat: Mapping[str, Any]) -> Any:
     return (1.0 - historical_weight) * current_value + historical_weight * historical
 
 
+def _projected_exhibition_st(boat: Mapping[str, Any]) -> Any:
+    """Project race ST from a late exhibition ST using the racer's own history.
+
+    A late exhibition is not automatically a weak race start. With enough
+    samples, racers who repeatedly move earlier in the actual race get part of
+    that historical correction back. The adjustment is deliberately capped.
+    """
+    raw = boat.get("exhibition_st")
+    if raw is None:
+        return None
+    try:
+        st = float(raw)
+    except (TypeError, ValueError):
+        return raw
+    if not 0 <= st <= 1 or st < 0.18:
+        return st
+
+    try:
+        late_samples = int(boat.get("late_exhibition_samples") or 0)
+        correction = float(boat.get("late_start_correction_avg"))
+        fast_rate = float(boat.get("late_to_fast_rate") or 0.0)
+    except (TypeError, ValueError):
+        return st
+    if late_samples < 4:
+        return st
+
+    sample_weight = _clip((late_samples - 3) / 12.0)
+    correction = max(-0.03, min(0.12, correction))
+    behavior_weight = 0.35 + 0.30 * _clip(fast_rate / 100.0)
+    applied = correction * sample_weight * behavior_weight
+    return max(0.0, min(1.0, st - applied))
+
+
 def _grade(value: Any, default: float = 0.5) -> float:
     if value is None:
         return default
@@ -229,9 +262,10 @@ def score_boat(boat: Mapping[str, Any], race: Mapping[str, Any]) -> Dict[str, An
         0.70 * _norm_rate(boat.get("course_win_rate"))
         + 0.30 * _norm_rate(boat.get("course_top2_rate"))
     )
+    projected_exhibition_st = _projected_exhibition_st(boat)
     start = (
         0.55 * _norm_st(_blended_historical_st(boat))
-        + 0.45 * _norm_st(boat.get("exhibition_st"))
+        + 0.45 * _norm_st(projected_exhibition_st)
     )
     if boat.get("flying"):
         start *= 0.92
@@ -303,6 +337,10 @@ def score_boat(boat: Mapping[str, Any], race: Mapping[str, Any]) -> Dict[str, An
         "lane": lane,
         "predicted_course": course,
         "score": round(_clip(raw), 6),
+        "projected_exhibition_st": (
+            round(float(projected_exhibition_st), 4)
+            if projected_exhibition_st is not None else None
+        ),
         "components": {k: round(v, 4) for k, v in parts.items()},
     }
 
@@ -369,7 +407,7 @@ def _race_shape(
     inside_history = _historical_course_signal(inside, 1) if inside else 0.0
     inside_trust = 100.0 * inside_head + 10.0 * inside_history
 
-    inside_st = inside.get("exhibition_st")
+    inside_st = _projected_exhibition_st(inside)
     if inside_st is None:
         inside_st = _blended_historical_st(inside)
     try:
@@ -390,7 +428,7 @@ def _race_shape(
         boat = by_lane.get(lane, {})
         history_signal = _historical_course_signal(boat, course)
         pressure = 200.0 * head_mass.get(lane, 0.0) + 10.0 * history_signal
-        ex_st = boat.get("exhibition_st")
+        ex_st = _projected_exhibition_st(boat)
         if ex_st is not None and inside_st is not None:
             try:
                 # Reward an attacker that actually showed a better exhibition ST.
@@ -398,12 +436,24 @@ def _race_shape(
             except (TypeError, ValueError):
                 pass
         pressure = max(0.0, min(100.0, pressure))
+        method_rates = {
+            "差し": float(boat.get("course_sashi_rate") or 0.0),
+            "まくり": float(boat.get("course_makuri_rate") or 0.0),
+            "まくり差し": float(boat.get("course_makurisashi_rate") or 0.0),
+        }
+        likely_method = max(method_rates, key=method_rates.get) if any(method_rates.values()) else None
         attack_details.append({
             "lane": lane,
             "course": course,
             "pressure": round(pressure, 1),
             "head_probability": round(head_mass.get(lane, 0.0), 4),
             "history_signal": round(history_signal, 3),
+            "projected_st": round(float(ex_st), 3) if ex_st is not None else None,
+            "raw_exhibition_st": boat.get("exhibition_st"),
+            "late_exhibition_samples": int(boat.get("late_exhibition_samples") or 0),
+            "late_to_fast_rate": boat.get("late_to_fast_rate"),
+            "likely_method": likely_method,
+            "method_rates": {k: round(v, 2) for k, v in method_rates.items()},
         })
         if pressure > best_attack_score:
             best_attack_score = pressure
@@ -419,6 +469,13 @@ def _race_shape(
     sample_confidence = min(1.0, (inside_samples + attack_samples) / 40.0)
     live_confidence = 1.0 if inside.get("exhibition_st") is not None else 0.6
     data_confidence = max(0.0, min(1.0, 0.7 * sample_confidence + 0.3 * live_confidence))
+
+    best_attack_method = None
+    if best_attack_lane is not None:
+        for detail in attack_details:
+            if detail.get("lane") == best_attack_lane:
+                best_attack_method = detail.get("likely_method")
+                break
 
     if inside_trust >= 58 and best_attack_score < 42:
         pattern = "inside_escape"
@@ -440,6 +497,7 @@ def _race_shape(
         "upset_risk": round(upset_risk, 1),
         "best_attack_lane": best_attack_lane,
         "best_attack_course": best_attack_course,
+        "best_attack_method": best_attack_method,
         "pattern": pattern,
         "data_confidence": round(data_confidence, 3),
         "head_probabilities": {str(k): round(v, 4) for k, v in head_mass.items()},
@@ -479,7 +537,7 @@ def analyze_race(payload: Mapping[str, Any]) -> Dict[str, Any]:
     race_shape = _race_shape(boats, scored, trifectas)
 
     return {
-        "model_version": "kyoutei-navi-course-v4-race-shape-unvalidated",
+        "model_version": "kyoutei-navi-course-v5-start-correction-unvalidated",
         "venue": race.get("venue"),
         "boats": scored,
         "trifecta": trifectas,
