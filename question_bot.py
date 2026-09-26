@@ -641,6 +641,107 @@ def fetch_racer_course_stats_sync(toban: str, course: int):
     raise RuntimeError(str(last_error or "コース別成績を取得できませんでした"))
 
 
+
+def fetch_race_result_sync(day: str, venue: str, rno: int) -> dict:
+    jcd = VENUE_TO_JCD.get(venue)
+    if not jcd:
+        raise RuntimeError("場コードが見つかりません")
+    cache_key = f"result:{day}:{jcd}:{rno}"
+    cached = _cache_get(cache_key, 60)
+    if cached is not None:
+        return cached
+
+    url = (
+        "https://www.boatrace.jp/owpc/pc/race/raceresult"
+        f"?rno={rno}&jcd={jcd}&hd={day}"
+    )
+    raw = _fetch_html_sync(url, timeout=10)
+    finish = []
+    for row in re.findall(r"<tr\b[^>]*>(.*?)</tr>", raw, re.S | re.I):
+        cells = re.findall(r"<td\b[^>]*>(.*?)</td>", row, re.S | re.I)
+        if len(cells) != 4 or not re.search(r"is-boatColor[1-6]", row):
+            continue
+        position = _textify_fragment(cells[0])
+        lane = _textify_fragment(cells[1])
+        racer = _textify_fragment(cells[2])
+        m = re.match(r"(\d{4})\s+(.+)", racer)
+        if not m or lane not in "123456" or len(lane) != 1:
+            continue
+        finish.append({
+            "position": int(position) if position in list("123456") else None,
+            "status": "finished" if position in list("123456") else position,
+            "lane": int(lane),
+            "toban": m.group(1),
+            "name": m.group(2).replace(" ", ""),
+        })
+
+    text = _textify_fragment(raw)
+    method_m = re.search(r"決まり手\s+(逃げ|差し|まくり差し|まくり|抜き|恵まれ)", text)
+    payout_m = re.search(
+        r"3連単\s+([1-6])\s*-\s*([1-6])\s*-\s*([1-6])\s+[¥￥]([\d,]+)",
+        text,
+    )
+    if not payout_m:
+        return _cache_set(cache_key, {
+            "status": "pending",
+            "venue": venue,
+            "rno": rno,
+            "url": url,
+        })
+
+    result = {
+        "status": "settled",
+        "venue": venue,
+        "rno": rno,
+        "finish": sorted(
+            [row for row in finish if isinstance(row.get("position"), int)],
+            key=lambda row: row["position"],
+        ),
+        "trifecta": "-".join(payout_m.group(i) for i in (1, 2, 3)),
+        "payout": int(payout_m.group(4).replace(",", "")),
+        "method": method_m.group(1) if method_m else None,
+        "url": url,
+    }
+    return _cache_set(cache_key, result)
+
+
+def race_result_answer_sync(question: str) -> Optional[str]:
+    if "結果" not in question and "着順" not in question and "払戻" not in question and "払い戻し" not in question:
+        return None
+    context = _race_context_from_text(question)
+    if context is None:
+        return None
+    venue, rno = context
+    day = datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y%m%d")
+    result = fetch_race_result_sync(day, venue, rno)
+    if result.get("status") != "settled":
+        return f"🏁 **{venue}{rno}R** は、公式結果がまだ確定していないか取得待ちです。"
+
+    lines = [f"🏁 **{venue}{rno}R 結果**"]
+    for row in (result.get("finish") or [])[:3]:
+        lines.append(f"{row['position']}着 {row['lane']}号艇 {row['name']}")
+    lines.append(
+        f"3連単 **{result['trifecta']}**｜**{result['payout']:,}円**"
+    )
+    if result.get("method"):
+        lines.append(f"決まり手: **{result['method']}**")
+    lines.append("※BOAT RACE公式の当日結果を参照。")
+    return "\n".join(lines)
+
+
+async def maybe_answer_race_result(question: str) -> Optional[str]:
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(race_result_answer_sync, question),
+            timeout=12,
+        )
+    except asyncio.TimeoutError:
+        return "公式結果の取得に時間がかかったので一度止めました。少し時間を置いてもう一度聞いてください。"
+    except Exception as e:
+        print(f"[race-result] {type(e).__name__}: {e}", flush=True)
+        return None
+
+
 def fetch_national_course_first_rate_sync(course: int) -> Optional[float]:
     cache_key = f"national:first:{course}"
     cached = _cache_get(cache_key, 3600)
@@ -931,6 +1032,9 @@ def live_venue_answer_sync(question: str) -> Optional[str]:
     venue = _venue_from_question(question)
     if not venue:
         return None
+    # Race-specific "結果" belongs to the official race-result handler.
+    if _race_context_from_text(question) is not None and any(k in q for k in ["結果", "着順", "払戻", "払い戻し"]):
+        return None
     if not any(k in q for k in ["的中率", "回収率", "roi", "成績", "調子", "今どう", "現状", "結果"]):
         return None
 
@@ -1159,7 +1263,9 @@ async def on_message(message: discord.Message):
                     effective_question = f"{ctx[0]} {question}"
 
             # Fast-path answers that do not need a Discord history scan.
-            quick = await live_venue_answer(effective_question)
+            quick = await maybe_answer_race_result(effective_question)
+            if quick is None:
+                quick = await live_venue_answer(effective_question)
             if quick is None:
                 quick = await maybe_answer_course_stats(effective_question, "", message.author.id)
             if quick is None:
@@ -1182,7 +1288,9 @@ async def on_message(message: discord.Message):
 
             source = message_text(source_message) if source_message else ""
             resolve_race_context(message.author.id, effective_question, source)
-            answer = await maybe_answer_course_stats(effective_question, source, message.author.id)
+            answer = await maybe_answer_race_result(effective_question)
+            if answer is None:
+                answer = await maybe_answer_course_stats(effective_question, source, message.author.id)
             if answer is None:
                 answer = await maybe_answer_racer_data(effective_question, source, message.author.id)
             if answer is None:
