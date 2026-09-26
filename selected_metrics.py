@@ -8,6 +8,11 @@ from pathlib import Path
 
 from direct_discord_notify import JST
 from daily_report import disclosed_picks, latest_predictions, read_jsonl, totals
+from selection_scoring import (
+    SELECTED_THRESHOLD,
+    STRONG_SELECTED_THRESHOLD,
+    passes_stability_gate,
+)
 
 PREDICTION_LOG = Path("data/prediction_log.jsonl")
 REPORT_DIR = Path("data/daily_reports")
@@ -56,19 +61,34 @@ def settle_equal_3000(prediction: dict, settled: dict) -> dict:
 
 
 
-def selected_record(row: dict, threshold: int = 75) -> bool:
-    return (
+def selected_record(
+    row: dict,
+    threshold: int = SELECTED_THRESHOLD,
+    require_stability: bool = True,
+) -> bool:
+    base = (
         row.get("phase") == "final"
         and bool(row.get("exhibition"))
         and int(row.get("selection_score") or 0) >= threshold
         and row.get("virtual_status") == "bet"
     )
+    if not base:
+        return False
+    return (
+        passes_stability_gate(row.get("selection_score_breakdown") or {})
+        if require_stability else True
+    )
 
 
-def subset_summary(records: dict[str, dict], settled_by_key: dict[str, dict], threshold: int) -> dict:
+def subset_summary(
+    records: dict[str, dict],
+    settled_by_key: dict[str, dict],
+    threshold: int,
+    require_stability: bool = True,
+) -> dict:
     selected = {
         key: row for key, row in records.items()
-        if selected_record(row, threshold)
+        if selected_record(row, threshold, require_stability=require_stability)
     }
     settled = [settled_by_key[key] for key in selected if key in settled_by_key]
     base = totals(settled)
@@ -84,6 +104,9 @@ def subset_summary(records: dict[str, dict], settled_by_key: dict[str, dict], th
     budget_3000_return = sum(row["return_yen"] for row in budget_3000_rows.values())
     return {
         "threshold": threshold,
+        "stability_gate": bool(require_stability),
+        "min_exhibition_st_component": 12.0 if require_stability else None,
+        "min_ev_component": 13.0 if require_stability else None,
         "selected_races": len(selected),
         "settled_races": len(settled),
         "prediction_hits": prediction_hits,
@@ -140,9 +163,16 @@ def build(day: str) -> dict:
     }
     result = {
         "day": day,
-        "definition": "final + exhibition complete + selection_score threshold + virtual_status=bet",
-        "selected": subset_summary(latest, settled_by_key, 75),
-        "strong_selected": subset_summary(latest, settled_by_key, 85),
+        "definition": "final + exhibition complete + score threshold + stability gate + virtual_status=bet",
+        "candidate_selected_75": subset_summary(
+            latest, settled_by_key, 75, require_stability=False
+        ),
+        "selected": subset_summary(
+            latest, settled_by_key, SELECTED_THRESHOLD, require_stability=True
+        ),
+        "strong_selected": subset_summary(
+            latest, settled_by_key, STRONG_SELECTED_THRESHOLD, require_stability=True
+        ),
         "generated_at": datetime.now(JST).isoformat(),
     }
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
