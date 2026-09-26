@@ -27,13 +27,13 @@ PREDICTION_CHANNEL_NAMES = {
 }
 
 MESSAGE_LINK_RE = re.compile(
-    r"https?://(?:ptb\\.|canary\\.)?discord(?:app)?\\.com/channels/"
-    r"(?P<guild>\\d+)/(?P<channel>\\d+)/(?P<message>\\d+)"
+    r"https?://(?:ptb\.|canary\.)?discord(?:app)?\.com/channels/"
+    r"(?P<guild>\d+)/(?P<channel>\d+)/(?P<message>\d+)"
 )
 FORMATION_RE = re.compile(
-    r"(?<!\\d)([1-6]+)\\s*[-－ー]\\s*([1-6]+)\\s*[-－ー]\\s*([1-6]+)(?!\\d)"
+    r"(?<!\d)([1-6]+)\s*[-－ー]\s*([1-6]+)\s*[-－ー]\s*([1-6]+)(?!\d)"
 )
-RACE_RE = re.compile(r"(?<!\\d)(1[0-2]|[1-9])\\s*[RrＲ](?!\\w)")
+RACE_RE = re.compile(r"(?<!\d)(1[0-2]|[1-9])\s*[RrＲ](?!\w)")
 
 VENUES = [
     "桐生", "戸田", "江戸川", "平和島", "多摩川", "浜名湖", "蒲郡", "常滑",
