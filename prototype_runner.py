@@ -36,7 +36,7 @@ def _prototype_message(record, stream):
         main = ' / '.join(model.get('main_picks') or [])
         cover = ' / '.join(model.get('cover_picks') or [])
         return (
-            f"🏆 **PT3予想家｜日和本線＋中穴抑え**\n"
+            f"🏆 **新人予想家 ゆうき｜日和本線＋中穴抑え**\n"
             f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
             f"🎯 **本線・日和（{len(model.get('main_picks') or [])}点）**\n"
             f"`{main}`\n"
@@ -82,7 +82,7 @@ def deliver_prototypes(record, now=None):
     mapping = {
         'prototype1': ('PROTO1_DISCORD_WEBHOOK_URL', 'プロトタイプ1'),
         'prototype2': ('PROTO2_DISCORD_WEBHOOK_URL', 'プロトタイプ2'),
-        'prototype3': ('PT3_DISCORD_WEBHOOK_URL', 'PT3予想家'),
+        'prototype3': ('PT3_DISCORD_WEBHOOK_URL', '新人予想家 ゆうき'),
     }
     for stream, (env_name, username) in mapping.items():
         receipt = _delivery_path(record, stream)
