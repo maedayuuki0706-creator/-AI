@@ -22,6 +22,8 @@ from selected_metrics import selected_record
 ROOT = Path("data/live_status")
 OFFICIAL_DIR = ROOT / "official"
 UNIT_YEN = 100
+BUDGET_3000_YEN = 3000
+BUDGET_3000_UNITS = BUDGET_3000_YEN // UNIT_YEN
 
 LABELS = {
     "main": "メイン",
@@ -321,14 +323,64 @@ def score_one(record: dict, official: dict | None):
     }
 
 
+def score_equal_3000(record: dict, official: dict | None):
+    """Settle one race using a fixed 3,000-yen budget spread as evenly as possible."""
+    if not isinstance(official, dict):
+        return None
+    status = official.get("status")
+    if status not in {"settled", "void", "special"}:
+        return None
+    picks = unique_picks(record.get("picks") or [])
+    if not picks:
+        return None
+    if len(picks) > BUDGET_3000_UNITS:
+        raise ValueError(f"Too many picks for {BUDGET_3000_YEN} yen budget: {len(picks)}")
+
+    base_units, extra = divmod(BUDGET_3000_UNITS, len(picks))
+    units = {
+        pick: base_units + (1 if index < extra else 0)
+        for index, pick in enumerate(picks)
+    }
+    payouts = official.get("payouts") or {}
+    refunds = set(map(int, official.get("refund_lanes") or []))
+    returned = 0
+    active = []
+    for pick in picks:
+        count = units[pick]
+        lanes = set(map(int, pick.split("-")))
+        if status == "void" or lanes & refunds:
+            returned += count * UNIT_YEN
+        elif status == "special":
+            returned += count * int(official.get("special_per_100") or 0)
+        else:
+            active.append(pick)
+            returned += count * int(payouts.get(pick, 0) or 0)
+
+    winning = [pick for pick in active if int(payouts.get(pick, 0) or 0) > 0]
+    stake = sum(units.values()) * UNIT_YEN
+    return {
+        "eligible": status == "settled" and bool(active),
+        "hit": bool(winning),
+        "stake_yen": stake,
+        "return_yen": returned,
+        "profit_yen": returned - stake,
+        "torigami": bool(winning) and returned < stake,
+    }
+
+
 def aggregate(stream: str, records: dict, official: dict):
     scored = []
+    budget_3000_scored = []
     hit_races = []
     for key, record in sorted(records.items()):
         score = score_one(record, official.get(key))
         if score is None:
             continue
         scored.append(score)
+        if stream == "selected":
+            budget_score = score_equal_3000(record, official.get(key))
+            if budget_score is not None:
+                budget_3000_scored.append(budget_score)
         if score["hit"]:
             hit_races.append({
                 "key": key,
@@ -345,7 +397,7 @@ def aggregate(stream: str, records: dict, official: dict):
     returned = sum(int(row["return_yen"]) for row in scored)
     delivered = len(records)
     resolved = len(scored)
-    return {
+    result = {
         "label": LABELS[stream],
         "delivered": delivered,
         "resolved": resolved,
@@ -365,6 +417,22 @@ def aggregate(stream: str, records: dict, official: dict):
         ),
         "hit_races": hit_races,
     }
+    if stream == "selected":
+        budget_rows = [row for row in budget_3000_scored if row["eligible"]]
+        budget_stake = sum(int(row["stake_yen"]) for row in budget_3000_scored)
+        budget_return = sum(int(row["return_yen"]) for row in budget_3000_scored)
+        result["budget_3000"] = {
+            "allocation_rule": "all picks; as-even-as-possible 100-yen units",
+            "budget_per_race_yen": BUDGET_3000_YEN,
+            "judged": len(budget_rows),
+            "hits": sum(bool(row["hit"]) for row in budget_rows),
+            "stake_yen": budget_stake,
+            "return_yen": budget_return,
+            "profit_yen": budget_return - budget_stake,
+            "roi": 100 * budget_return / budget_stake if budget_stake else None,
+            "torigami": sum(bool(row["torigami"]) for row in budget_rows),
+        }
+    return result
 
 
 def build(day: str):
