@@ -1,4 +1,4 @@
-name: Prototype 3 Discord Delivery
+name: 新人予想家 ゆうき Discord Delivery
 
 on:
   workflow_dispatch:
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify Prototype 3 delivery configuration
+      - name: Verify 新人予想家 ゆうき delivery configuration
         env:
           PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL }}
           PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
@@ -39,7 +39,7 @@ jobs:
           python -m py_compile prototype3_delivery.py four_way_prototype.py prototype_scoreboard.py daily_report.py
           python -m unittest discover -s tests -p 'test_prototype_scoreboard.py' -v
           test -n "$PT3_DISCORD_WEBHOOK_URL$PROTO3_DISCORD_WEBHOOK_URL"
-      - name: Deliver Prototype 3
+      - name: Deliver 新人予想家 ゆうき
         env:
           TZ: Asia/Tokyo
           PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL }}
@@ -51,7 +51,7 @@ jobs:
         env:
           TZ: Asia/Tokyo
         run: python -u prototype_scoreboard.py
-      - name: Persist Prototype 3 delivery receipts and PT scoreboard
+      - name: Persist 新人予想家 ゆうき delivery receipts and PT scoreboard
         if: always()
         run: |
           if [ ! -d data/prototype3_delivery ]; then exit 0; fi
