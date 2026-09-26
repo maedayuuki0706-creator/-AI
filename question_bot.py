@@ -1,4 +1,5 @@
 import asyncio
+import html
 import json
 import os
 import re
@@ -6,8 +7,11 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime
+from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import discord
 
@@ -35,12 +39,24 @@ FORMATION_RE = re.compile(
     r"(?<!\d)([1-6]+)\s*[-－ー]\s*([1-6]+)\s*[-－ー]\s*([1-6]+)(?!\d)"
 )
 RACE_RE = re.compile(r"(?<!\d)(1[0-2]|[1-9])\s*[RrＲ](?!\w)")
+RACE_JP_RE = re.compile(r"(?<!\d)(1[0-2]|[1-9])\s*レース")
+BOAT_RE = re.compile(r"(?<!\d)([1-6])\s*号艇")
+COURSE_RE = re.compile(r"(?<!\d)([1-6])\s*コース")
+TOBAN_RE = re.compile(r"(?<!\d)(\d{4})(?!\d)")
 
 VENUES = [
     "桐生", "戸田", "江戸川", "平和島", "多摩川", "浜名湖", "蒲郡", "常滑",
     "津", "三国", "びわこ", "住之江", "尼崎", "鳴門", "丸亀", "児島",
     "宮島", "徳山", "下関", "若松", "芦屋", "福岡", "唐津", "大村",
 ]
+VENUE_TO_JCD = {
+    "桐生": "01", "戸田": "02", "江戸川": "03", "平和島": "04",
+    "多摩川": "05", "浜名湖": "06", "蒲郡": "07", "常滑": "08",
+    "津": "09", "三国": "10", "びわこ": "11", "住之江": "12",
+    "尼崎": "13", "鳴門": "14", "丸亀": "15", "児島": "16",
+    "宮島": "17", "徳山": "18", "下関": "19", "若松": "20",
+    "芦屋": "21", "福岡": "22", "唐津": "23", "大村": "24",
+}
 
 GLOSSARY = {
     "pt3": "PT3は、既存予想を軸に日和データを補助材料として融合する予想系統。現在は点数を絞りつつ、本線と迎えを分けて精度・回収の両立を狙う位置づけです。",
@@ -71,6 +87,8 @@ GLOSSARY = {
 }
 
 _last_reply_by_user: dict[int, float] = {}
+_race_context_by_user: dict[int, tuple[str, int, float]] = {}
+_stats_cache: dict[str, tuple[float, object]] = {}
 _startup_test_sent = False
 
 
@@ -154,8 +172,359 @@ def glossary_answer(question: str, source: str = "") -> Optional[str]:
 def race_hints(text: str):
     venues = [v for v in VENUES if v in text]
     races = RACE_RE.findall(text)
+    if not races:
+        races = RACE_JP_RE.findall(text)
     race = f"{races[0]}R" if races else None
     return venues, race
+
+
+class TableRowsParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.rows: list[list[str]] = []
+        self._row: list[str] = []
+        self._cell: list[str] | None = None
+        self._links: list[tuple[str, str]] = []
+        self._href: str | None = None
+        self._link_text: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs_dict = dict(attrs)
+        if tag == "tr":
+            self._row = []
+        elif tag in ("td", "th"):
+            self._cell = []
+        elif tag == "a":
+            self._href = attrs_dict.get("href")
+            self._link_text = []
+
+    def handle_data(self, data):
+        if self._cell is not None:
+            self._cell.append(data)
+        if self._href is not None:
+            self._link_text.append(data)
+
+    def handle_endtag(self, tag):
+        if tag in ("td", "th") and self._cell is not None:
+            value = re.sub(r"\s+", " ", html.unescape("".join(self._cell))).strip()
+            self._row.append(value)
+            self._cell = None
+        elif tag == "tr":
+            if self._row:
+                self.rows.append(self._row)
+            self._row = []
+        elif tag == "a" and self._href is not None:
+            value = re.sub(r"\s+", " ", html.unescape("".join(self._link_text))).strip()
+            self._links.append((self._href, value))
+            self._href = None
+            self._link_text = []
+
+
+def _cache_get(key: str, ttl: float = 600.0):
+    item = _stats_cache.get(key)
+    if not item:
+        return None
+    saved_at, value = item
+    if time.monotonic() - saved_at > ttl:
+        _stats_cache.pop(key, None)
+        return None
+    return value
+
+
+def _cache_set(key: str, value):
+    _stats_cache[key] = (time.monotonic(), value)
+    return value
+
+
+def _fetch_html_sync(url: str, timeout: int = 15) -> str:
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; BoatAIQuestionBot/1.0)",
+            "Accept-Language": "ja,en;q=0.8",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        charset = resp.headers.get_content_charset() or "utf-8"
+        return resp.read().decode(charset, errors="replace")
+
+
+def _number(text: str) -> Optional[float]:
+    m = re.search(r"-?\d+(?:\.\d+)?", text.replace(",", ""))
+    return float(m.group(0)) if m else None
+
+
+def _integer(text: str) -> Optional[int]:
+    value = _number(text)
+    return int(value) if value is not None else None
+
+
+def _row_first_value(rows: list[list[str]], label: str) -> Optional[str]:
+    wanted = re.sub(r"\s+", "", label)
+    for row in rows:
+        if not row:
+            continue
+        first = re.sub(r"\s+", "", row[0])
+        if first == wanted and len(row) >= 2:
+            return row[1]
+    return None
+
+
+def fetch_race_entries_sync(day: str, venue: str, rno: int):
+    jcd = VENUE_TO_JCD.get(venue)
+    if not jcd:
+        return None
+    cache_key = f"entries:{day}:{jcd}:{rno}"
+    cached = _cache_get(cache_key, 300)
+    if cached is not None:
+        return cached
+
+    url = (
+        "https://www.boatrace.jp/owpc/pc/race/racelist"
+        f"?rno={rno}&jcd={jcd}&hd={day}"
+    )
+    page = _fetch_html_sync(url)
+    parser = TableRowsParser()
+    parser.feed(page)
+
+    racers: list[dict[str, str | int]] = []
+    seen: set[str] = set()
+    for href, link_text in parser._links:
+        m = re.search(r"profile\?toban=(\d{4})", href or "")
+        if not m:
+            continue
+        toban = m.group(1)
+        if toban in seen:
+            continue
+        seen.add(toban)
+        name = re.sub(r"\s+", "", link_text)
+        racers.append({"boat": len(racers) + 1, "toban": toban, "name": name})
+        if len(racers) == 6:
+            break
+
+    if len(racers) != 6:
+        raise RuntimeError(f"出走表の選手情報を6艇分取得できませんでした（{len(racers)}艇）")
+    return _cache_set(cache_key, racers)
+
+
+def fetch_racer_course_stats_sync(toban: str, course: int):
+    cache_key = f"course:{toban}:{course}"
+    cached = _cache_get(cache_key, 900)
+    if cached is not None:
+        return cached
+
+    urls = [
+        f"https://www.boatfrontier.jp/racer/{toban}/course/{course}",
+        f"https://boatfrontier.jp/racer/{toban}/course/{course}",
+    ]
+    last_error = None
+    for url in urls:
+        try:
+            page = _fetch_html_sync(url)
+            parser = TableRowsParser()
+            parser.feed(page)
+            rows = parser.rows
+
+            starts = _integer(_row_first_value(rows, "出走数") or "")
+            firsts = _integer(_row_first_value(rows, "1着") or "")
+            first_rate = _number(_row_first_value(rows, "1着率") or "")
+            second_rate = _number(_row_first_value(rows, "2連対率") or "")
+            third_rate = _number(_row_first_value(rows, "3連対率") or "")
+            counts = {
+                "逃げ": _integer(_row_first_value(rows, "逃げ") or ""),
+                "差し": _integer(_row_first_value(rows, "差し") or ""),
+                "まくり": _integer(_row_first_value(rows, "まくり") or ""),
+                "まくり差し": _integer(_row_first_value(rows, "まくり差し") or ""),
+                "抜き": _integer(_row_first_value(rows, "抜き") or ""),
+                "恵まれ": _integer(_row_first_value(rows, "恵まれ") or ""),
+            }
+            if starts is None or first_rate is None:
+                raise RuntimeError("コース別成績テーブルを解析できませんでした")
+            result = {
+                "starts": starts,
+                "firsts": firsts,
+                "first_rate": first_rate,
+                "second_rate": second_rate,
+                "third_rate": third_rate,
+                "counts": counts,
+                "source_url": url,
+                "period": "直近12カ月",
+            }
+            return _cache_set(cache_key, result)
+        except Exception as e:
+            last_error = e
+    raise RuntimeError(str(last_error or "コース別成績を取得できませんでした"))
+
+
+def fetch_national_course_first_rate_sync(course: int) -> Optional[float]:
+    cache_key = f"national:first:{course}"
+    cached = _cache_get(cache_key, 3600)
+    if cached is not None:
+        return cached
+    try:
+        page = _fetch_html_sync("https://kyotei-japan.com/course.html")
+        parser = TableRowsParser()
+        parser.feed(page)
+        text = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", page)))
+        patterns = [
+            rf"{course}\s*コース\s*1着率\s*(\d+(?:\.\d+)?)\s*%",
+            rf"{course}コース.{0,80}?1着率.{0,40}?(\d+(?:\.\d+)?)\s*%",
+        ]
+        for pattern in patterns:
+            m = re.search(pattern, text, re.S)
+            if m:
+                return _cache_set(cache_key, float(m.group(1)))
+    except Exception:
+        pass
+    return None
+
+
+def requested_stats_metric(question: str) -> Optional[str]:
+    q = question.replace("捲り差し", "まくり差し").replace("捲り", "まくり")
+    aliases = [
+        ("まくり差し率", ["まくり差し率"]),
+        ("まくり率", ["まくり率"]),
+        ("差し率", ["差し率"]),
+        ("逃げ率", ["逃げ率"]),
+        ("3連対率", ["3連対率", "3連率"]),
+        ("2連対率", ["2連対率", "2連率"]),
+        ("1着率", ["1着率", "一着率"]),
+        ("出走数", ["出走数", "何走"]),
+    ]
+    for metric, words in aliases:
+        if any(word in q for word in words):
+            return metric
+    return None
+
+
+def _race_context_from_text(text: str):
+    venues, race = race_hints(text)
+    if not venues or not race:
+        return None
+    return venues[0], int(race[:-1])
+
+
+def resolve_race_context(user_id: int, question: str, source: str = ""):
+    context = _race_context_from_text(question)
+    if context is None and source:
+        context = _race_context_from_text(source)
+    if context is not None:
+        _race_context_by_user[user_id] = (context[0], context[1], time.monotonic())
+        return context
+
+    previous = _race_context_by_user.get(user_id)
+    if previous and time.monotonic() - previous[2] <= 1800:
+        return previous[0], previous[1]
+    return None
+
+
+def course_stats_answer_sync(question: str, race_context):
+    metric = requested_stats_metric(question)
+    if not metric:
+        return None
+
+    boat_m = BOAT_RE.search(question)
+    course_m = COURSE_RE.search(question)
+    boat_no = int(boat_m.group(1)) if boat_m else None
+    stat_course = int(course_m.group(1)) if course_m else None
+
+    toban_m = TOBAN_RE.search(question)
+    toban = toban_m.group(1) if toban_m else None
+    racer_name = ""
+
+    if race_context:
+        venue, rno = race_context
+        if boat_no is None and stat_course is not None:
+            boat_no = stat_course
+        if boat_no is not None:
+            day = datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y%m%d")
+            entries = fetch_race_entries_sync(day, venue, rno)
+            racer = entries[boat_no - 1]
+            toban = str(racer["toban"])
+            racer_name = str(racer["name"])
+        if stat_course is None and boat_no is not None:
+            stat_course = boat_no
+    else:
+        venue = ""
+        rno = 0
+
+    if stat_course is None:
+        return None
+
+    if toban is None:
+        if metric == "1着率":
+            rate = fetch_national_course_first_rate_sync(stat_course)
+            if rate is not None:
+                return (
+                    f"全国集計では、**{stat_course}コースの1着率は約{rate:.1f}%**です。"
+                    " レースや選手を指定すると、その選手のコース別成績まで見にいけます。"
+                )
+        return None
+
+    stats = fetch_racer_course_stats_sync(toban, stat_course)
+    prefix = ""
+    if race_context and boat_no is not None:
+        prefix = f"{venue}{rno}Rの{boat_no}号艇・{racer_name}（{toban}）"
+    elif racer_name:
+        prefix = f"{racer_name}（{toban}）"
+    else:
+        prefix = f"登録番号{toban}"
+
+    if metric == "1着率":
+        detail = f"**{stats['first_rate']:.1f}%**"
+        if stats["starts"] is not None and stats["firsts"] is not None:
+            detail += f"（{stats['starts']}走・1着{stats['firsts']}回）"
+        return (
+            f"{prefix}の、**{stat_course}コース進入時の1着率は{detail}**です。"
+            f" 集計は{stats['period']}。実際の進入が変わった場合は、そのコース側の数字を見るのが大事です。"
+        )
+
+    if metric in ("2連対率", "3連対率"):
+        key = "second_rate" if metric == "2連対率" else "third_rate"
+        value = stats.get(key)
+        if value is None:
+            return None
+        return (
+            f"{prefix}の、**{stat_course}コース進入時の{metric}は{value:.1f}%**です。"
+            f" 集計は{stats['period']}です。"
+        )
+
+    if metric == "出走数":
+        return (
+            f"{prefix}は、{stats['period']}で**{stat_course}コースから{stats['starts']}走**しています。"
+        )
+
+    if metric in ("逃げ率", "差し率", "まくり率", "まくり差し率"):
+        method = metric[:-1]
+        count = stats["counts"].get(method)
+        starts = stats["starts"]
+        if count is None or not starts:
+            return None
+        rate = count / starts * 100.0
+        return (
+            f"{prefix}の、{stats['period']}の**{stat_course}コースでの{method}は"
+            f"{count}回／{starts}走（約{rate:.1f}%）**です。"
+        )
+
+    return None
+
+
+async def maybe_answer_course_stats(question: str, source: str, user_id: int):
+    metric = requested_stats_metric(question)
+    if not metric:
+        return None
+    context = resolve_race_context(user_id, question, source)
+    try:
+        return await asyncio.to_thread(course_stats_answer_sync, question, context)
+    except Exception as e:
+        print(f"[stats] {type(e).__name__}: {e}", flush=True)
+        if context:
+            venue, rno = context
+            return (
+                f"{venue}{rno}Rまでは特定できたけど、コース別の数値取得に失敗しました。"
+                " 少し時間を置いてもう一度聞いてください。"
+            )
+        return None
 
 
 async def fetch_linked_message(message: discord.Message) -> Optional[discord.Message]:
@@ -385,7 +754,10 @@ async def on_message(message: discord.Message):
             context_label = "同一サーバー内の最近の予想メッセージ"
 
         source = message_text(source_message) if source_message else ""
-        answer = await answer_question(question, source, context_label)
+        resolve_race_context(message.author.id, question, source)
+        answer = await maybe_answer_course_stats(question, source, message.author.id)
+        if answer is None:
+            answer = await answer_question(question, source, context_label)
 
         if source_message and source_message.jump_url:
             answer = f"{answer}\n\n↪ 参照: {source_message.jump_url}"
