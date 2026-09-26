@@ -21,7 +21,7 @@ STREAMS = ("prototype1", "prototype2", "prototype3")
 LABELS = {
     "prototype1": "PT1（PT3ベース・日和本線4点＋中穴迎え6点）",
     "prototype2": "PT2（PT3ベース・日和本線6点＋中穴迎え4点）",
-    "prototype3": "PT3（日和本線＋中穴抑え）",
+    "prototype3": "新人予想家 ゆうき（日和本線＋中穴抑え）",
 }
 P12_ROOT = Path("data/prototype12_delivery")
 P3_ROOT = Path("data/prototype3_delivery")
