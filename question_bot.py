@@ -352,8 +352,9 @@ async def on_message(message: discord.Message):
 def main():
     start_health_server()
     if not BOT_TOKEN:
-        print("[fatal] DISCORD_BOT_TOKEN is not configured", flush=True)
-        raise SystemExit(2)
+        print("[waiting] DISCORD_BOT_TOKEN is not configured; health server remains online", flush=True)
+        while True:
+            time.sleep(3600)
     client.run(BOT_TOKEN, log_handler=None)
 
 
