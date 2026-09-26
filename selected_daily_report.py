@@ -128,6 +128,11 @@ def main_selected_payload(day):
     flat_return = int(stats.get("flat_100_per_pick_return_yen") or 0)
     flat_profit = int(stats.get("flat_100_per_pick_profit_yen") or 0)
     flat_roi = stats.get("flat_100_per_pick_roi")
+    budget_3000_races = int(stats.get("budget_3000_races") or 0)
+    budget_3000_stake = int(stats.get("budget_3000_stake_yen") or 0)
+    budget_3000_return = int(stats.get("budget_3000_return_yen") or 0)
+    budget_3000_profit = int(stats.get("budget_3000_profit_yen") or 0)
+    budget_3000_roi = stats.get("budget_3000_roi")
     rate = stats.get("prediction_hit_rate")
     date = f"{day[:4]}/{day[4:6]}/{day[6:8]}"
     return {"embeds": [{
@@ -140,9 +145,13 @@ def main_selected_payload(day):
                 f"的中 **{int(stats.get('prediction_hits') or 0)}/{int(stats.get('prediction_samples') or 0)}R＝{pct(rate)}**\\n"
                 f"投資 {flat_stake:,}円 → 払戻 {flat_return:,}円\\n"
                 f"**収支 {flat_profit:+,}円／回収率 {pct(flat_roi)}**", "inline": False},
+            {"name": "💴 1R3,000円 資金配分", "value":
+                f"対象 **{budget_3000_races}R**／1R **3,000円固定**\\n"
+                f"投資 {budget_3000_stake:,}円 → 払戻 {budget_3000_return:,}円\\n"
+                f"**収支 {budget_3000_profit:+,}円／回収率 {pct(budget_3000_roi)}**", "inline": False},
             {"name": "🎯 的中レース", "value": ("\\n".join(hit_lines) or "的中なし")[:1024], "inline": False},
         ],
-        "footer": {"text": "回収率・収支は配信買い目を各点100円で購入した比較値。"},
+        "footer": {"text": "通常成績は各点100円平買い。資金配分は1R3,000円固定で全買い目へ100円単位のできるだけ均等配分。"},
     }], "allowed_mentions": {"parse": []}}
 
 
