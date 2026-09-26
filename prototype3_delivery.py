@@ -251,6 +251,29 @@ def selected_receipt_path(key):
     return ROOT / "selected_deliveries" / f"{key}.json"
 
 
+def enrich_selection(record):
+    """Backfill the selected gate for predictions saved before selection was introduced."""
+    current = record.get("selection")
+    if isinstance(current, dict) and "selected" in current:
+        return record, False
+
+    official = base.analyze_official(record["day"], record["jcd"], int(record["rno"]))
+    if not official:
+        return record, False
+
+    existing_copy = json.loads(json.dumps(official, ensure_ascii=False))
+    native_existing_rows = cards.displayed_picks_variable(existing_copy, True)
+    native_existing = [row["combination"] for row in native_existing_rows]
+    record["selection"] = selection_info(official, record["model"], native_existing)
+
+    digest_source = dict(record)
+    digest_source.pop("digest", None)
+    record["digest"] = sha256(
+        json.dumps(digest_source, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    return record, True
+
+
 def deliver(record):
     key = record["key"]
     receipt = receipt_path(key)
@@ -302,7 +325,16 @@ def process_race(day, jcd, rno, deadline):
     path = prediction_path(key)
 
     if path.exists():
-        deliver(read(path))
+        record = read(path)
+        record, changed = enrich_selection(record)
+        if changed:
+            trial.write_json(path, record)
+            print(
+                f"prototype3 selection backfilled {key} "
+                f"selected={bool((record.get('selection') or {}).get('selected'))}",
+                flush=True,
+            )
+        deliver(record)
         return
 
     if not trial.before_deadline(day, deadline, now_jst()):
@@ -349,8 +381,13 @@ def retry_saved(day):
         return
     for path in sorted(folder.glob(f"{day}_*.json")):
         record = read(path)
-        if not receipt_path(record["key"]).exists():
-            deliver(record)
+        record, changed = enrich_selection(record)
+        if changed:
+            trial.write_json(path, record)
+        # deliver() is receipt-aware for both normal and selected channels.
+        # Always call it so an already-delivered race can still reach a
+        # dedicated selected channel after selection is backfilled.
+        deliver(record)
 
 
 def run(watch_seconds=210):
