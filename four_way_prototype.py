@@ -31,7 +31,7 @@ STREAMS = ('existing', 'hiyori', 'prototype1', 'prototype2', 'prototype3')
 LABELS = {'existing': '既存', 'hiyori': '日和',
           'prototype1': 'プロトタイプ1（PT3＋穴スナイパー）',
           'prototype2': 'プロトタイプ2（PT3×既存メイン圧縮）',
-          'prototype3': 'PT3予想家（日和本線＋中穴抑え）'}
+          'prototype3': '新人予想家 ゆうき（日和本線＋中穴抑え）'}
 WEIGHTS = {'existing': (1.0, 0.0), 'hiyori': (0.0, 1.0),
            'prototype1': (0.0, 1.0), 'prototype2': (0.0, 1.0)}
 COMBINATIONS = frozenset('-'.join(map(str, p)) for p in permutations(range(1, 7), 3))
