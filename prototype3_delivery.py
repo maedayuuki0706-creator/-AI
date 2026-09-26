@@ -22,7 +22,8 @@ import hiyori_model
 import hiyori_source
 
 ROOT = Path("data/prototype3_delivery")
-WEBHOOK_ENV = "PT3_DISCORD_WEBHOOK_URL"\nLEGACY_WEBHOOK_ENV = "PROTO3_DISCORD_WEBHOOK_URL"
+WEBHOOK_ENV = "PT3_DISCORD_WEBHOOK_URL"
+LEGACY_WEBHOOK_ENV = "PROTO3_DISCORD_WEBHOOK_URL"
 
 
 def now_jst():
@@ -124,9 +125,9 @@ def deliver(record):
     if not trial.before_deadline(record["day"], record["deadline"], now_jst()):
         return
 
-    url = os.getenv(WEBHOOK_ENV, "").strip()
+    url = os.getenv(WEBHOOK_ENV, "").strip() or os.getenv(LEGACY_WEBHOOK_ENV, "").strip()
     if not url:
-        raise RuntimeError(f"{WEBHOOK_ENV} is not configured")
+        raise RuntimeError(f"{WEBHOOK_ENV} / {LEGACY_WEBHOOK_ENV} is not configured")
 
     try:
         post_webhook(url, {"username": "新人予想家 ゆうき", "content": message(record)})
@@ -197,8 +198,8 @@ def retry_saved(day):
 
 
 def run(watch_seconds=210):
-    if not os.getenv(WEBHOOK_ENV, "").strip():
-        raise RuntimeError(f"{WEBHOOK_ENV} is not configured")
+    if not (os.getenv(WEBHOOK_ENV, "").strip() or os.getenv(LEGACY_WEBHOOK_ENV, "").strip()):
+        raise RuntimeError(f"{WEBHOOK_ENV} / {LEGACY_WEBHOOK_ENV} is not configured")
 
     end = time.monotonic() + max(0, watch_seconds)
     schedules = {}
