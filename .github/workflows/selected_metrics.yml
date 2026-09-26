@@ -38,10 +38,22 @@ jobs:
           INPUT_DAY: ${{ github.event_name == 'workflow_dispatch' && inputs.day || '' }}
         run: |
           if [ -n "$INPUT_DAY" ]; then
-            python selected_metrics.py --day "$INPUT_DAY"
+            TARGET_DAY="$INPUT_DAY"
           else
-            python selected_metrics.py
+            TARGET_DAY="$(TZ=Asia/Tokyo date +%Y%m%d)"
+            JST_HOUR="$(TZ=Asia/Tokyo date +%H)"
+            if [ "$JST_HOUR" -lt 6 ]; then
+              TARGET_DAY="$(TZ=Asia/Tokyo date -d yesterday +%Y%m%d)"
+            fi
           fi
+
+          REPORT="data/daily_reports/${TARGET_DAY}.json"
+          if [ ! -f "$REPORT" ]; then
+            echo "Daily report not ready yet: $REPORT; skip without failure."
+            exit 0
+          fi
+
+          python selected_metrics.py --day "$TARGET_DAY"
       - name: Persist metrics
         run: |
           if [ -z "$(git status --porcelain data/selected_metrics/)" ]; then
