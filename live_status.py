@@ -115,7 +115,7 @@ def base_streams(day: str):
             "picks": picks,
         }
         main[key] = item
-        if selected_record(row, 75):
+        if selected_record(row):
             selected[key] = {**item, "selection_score": int(row.get("selection_score") or 0)}
     return main, selected
 
