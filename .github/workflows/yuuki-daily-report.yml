@@ -1,0 +1,72 @@
+name: 新人予想家 ゆうき Daily Report
+
+on:
+  workflow_dispatch:
+    inputs:
+      day:
+        description: 'YYYYMMDD (blank = automatic)'
+        required: false
+        default: ''
+      force:
+        description: 'Resend even if already sent'
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    # 00:15 JST
+    - cron: '15 15 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: yuuki-daily-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build latest PT scoreboard
+        env:
+          TZ: Asia/Tokyo
+        run: |
+          DAY="${{ inputs.day }}"
+          if [ -n "$DAY" ]; then
+            python -u prototype_scoreboard.py --day "$DAY"
+          else
+            python -u prototype_scoreboard.py
+          fi
+      - name: Send 新人予想家 ゆうき report
+        env:
+          TZ: Asia/Tokyo
+          PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL }}
+        run: |
+          test -n "$PT3_DISCORD_WEBHOOK_URL" || { echo "PT3_DISCORD_WEBHOOK_URL is not set"; exit 1; }
+          DAY="${{ inputs.day }}"
+          FORCE=""
+          if [ "${{ inputs.force }}" = "true" ]; then FORCE="--force"; fi
+          if [ -n "$DAY" ]; then
+            python -u yuuki_daily_report.py --day "$DAY" $FORCE
+          else
+            python -u yuuki_daily_report.py $FORCE
+          fi
+      - name: Persist report marker and scoreboard
+        if: always()
+        run: |
+          git config user.name 'boat-ai-report-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add data/yuuki_daily_report/ data/prototype_scoreboard/ 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Record 新人予想家 ゆうき daily report'
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+          done
+          exit 1
