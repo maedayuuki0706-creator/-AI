@@ -22,7 +22,7 @@ import hiyori_model
 import hiyori_source
 
 ROOT = Path("data/prototype3_delivery")
-WEBHOOK_ENV = "PROTO3_DISCORD_WEBHOOK_URL"
+WEBHOOK_ENV = "PT3_DISCORD_WEBHOOK_URL"\nLEGACY_WEBHOOK_ENV = "PROTO3_DISCORD_WEBHOOK_URL"
 
 
 def now_jst():
@@ -55,13 +55,13 @@ def message(record):
     main = " / ".join(model.get("main_picks") or [])
     cover = " / ".join(model.get("cover_picks") or [])
     return (
-        f"🧪 **プロトタイプ3｜日和本線＋中穴抑え**\n"
+        f"🏆 **新人予想家 ゆうき｜日和本線＋中穴抑え**\n"
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
         f"🎯 **本線・日和（{len(model.get('main_picks') or [])}点）**\n"
         f"`{main}`\n"
         f"🔥 **抑え・中穴くん＋日和（{len(model.get('cover_picks') or [])}点）**\n"
         f"`{cover or 'なし'}`\n"
-        f"📊 計{model['point_count']}点｜Grade {model['grade']}｜比較テスト配信"
+        f"📊 計{model['point_count']}点｜Grade {model['grade']}｜本番配信"
     )
 
 
@@ -129,7 +129,7 @@ def deliver(record):
         raise RuntimeError(f"{WEBHOOK_ENV} is not configured")
 
     try:
-        post_webhook(url, {"username": "プロトタイプ3", "content": message(record)})
+        post_webhook(url, {"username": "新人予想家 ゆうき", "content": message(record)})
         trial.write_json(receipt, {
             "key": key,
             "delivered_at": now_jst().isoformat(),
