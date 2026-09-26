@@ -294,9 +294,18 @@ async def answer_question(question: str, source: str, context_label: str) -> str
     if fallback:
         return fallback
     if source:
-        formation = explain_formation(source)
-        if formation:
-            return formation
+        q = question.lower()
+        if any(k in q for k in ["予想", "買い目", "内容", "見せて", "教えて"]):
+            preview = source.strip()
+            if len(preview) > 1400:
+                preview = preview[:1400] + "…"
+            return f"対象レースの予想メッセージを見つけたで。\n\n{preview}"
+        return (
+            "対象レースの予想メッセージは見つけたで👍 "
+            "ただ、聞きたいポイントがまだ広いです。"
+            "「この買い目の理由は？」「1頭の根拠は？」「相手艇はなぜ？」「何点？」"
+            "みたいに続けて聞いてください。"
+        )
     return (
         "その質問は答えられるけど、今のメッセージだけだと参照元が足りないです。"
         "予想文をそのまま貼るか、Discordの予想メッセージのリンクを一緒に送ってください。"
