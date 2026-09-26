@@ -36,13 +36,13 @@ def _prototype_message(record, stream):
         main = ' / '.join(model.get('main_picks') or [])
         cover = ' / '.join(model.get('cover_picks') or [])
         return (
-            f"🧪 **プロトタイプ3｜日和本線＋中穴抑え**\n"
+            f"🏆 **PT3予想家｜日和本線＋中穴抑え**\n"
             f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
             f"🎯 **本線・日和（{len(model.get('main_picks') or [])}点）**\n"
             f"`{main}`\n"
             f"🔥 **抑え・中穴くん＋日和（{len(model.get('cover_picks') or [])}点）**\n"
             f"`{cover or 'なし'}`\n"
-            f"📊 計{model['point_count']}点｜Grade {model['grade']}｜比較テスト配信"
+            f"📊 計{model['point_count']}点｜Grade {model['grade']}｜本番配信"
         )
     weight = model['weights']
     picks = ' / '.join(model['picks'])
@@ -82,13 +82,17 @@ def deliver_prototypes(record, now=None):
     mapping = {
         'prototype1': ('PROTO1_DISCORD_WEBHOOK_URL', 'プロトタイプ1'),
         'prototype2': ('PROTO2_DISCORD_WEBHOOK_URL', 'プロトタイプ2'),
-        'prototype3': ('PROTO3_DISCORD_WEBHOOK_URL', 'プロトタイプ3'),
+        'prototype3': ('PT3_DISCORD_WEBHOOK_URL', 'PT3予想家'),
     }
     for stream, (env_name, username) in mapping.items():
         receipt = _delivery_path(record, stream)
         if receipt.exists():
             continue
         url = os.getenv(env_name, '').strip()
+        if stream == 'prototype3' and not url:
+            # Promotion compatibility: keep delivery alive until the new
+            # production channel webhook is configured on Render.
+            url = os.getenv('PROTO3_DISCORD_WEBHOOK_URL', '').strip()
         if not url:
             raise RuntimeError(f'{env_name} is not configured')
         try:
