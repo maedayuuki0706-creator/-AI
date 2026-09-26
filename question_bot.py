@@ -92,6 +92,7 @@ GLOSSARY = {
 
 _last_reply_by_user: dict[int, float] = {}
 _race_context_by_user: dict[int, tuple[str, int, float]] = {}
+_venue_context_by_user: dict[int, tuple[str, float]] = {}
 _stats_cache: dict[str, tuple[float, object]] = {}
 _startup_test_sent = False
 
@@ -650,7 +651,7 @@ def live_venue_answer_sync(question: str) -> Optional[str]:
     venue = _venue_from_question(question)
     if not venue:
         return None
-    if not any(k in q for k in ["的中率", "回収率", "roi", "成績", "調子", "今どう", "現状"]):
+    if not any(k in q for k in ["的中率", "回収率", "roi", "成績", "調子", "今どう", "現状", "結果"]):
         return None
 
     data = fetch_json_sync(LIVE_STATUS_URL)
@@ -866,6 +867,16 @@ async def on_message(message: discord.Message):
     _last_reply_by_user[message.author.id] = now
 
     async with message.channel.typing():
+        effective_question = question
+        venue = _venue_from_question(question)
+        stats_words = ["的中率", "回収率", "roi", "成績", "調子", "今どう", "現状", "結果"]
+        if venue and any(k in question.lower() for k in stats_words):
+            _venue_context_by_user[message.author.id] = (venue, time.monotonic())
+        elif len(question) <= 16 and any(k in question.lower() for k in stats_words):
+            ctx = _venue_context_by_user.get(message.author.id)
+            if ctx and time.monotonic() - ctx[1] <= 900:
+                effective_question = f"{ctx[0]} {question}"
+
         source_message = await get_reference_message(message)
         context_label = "返信/リンク先メッセージ"
         if source_message is None:
@@ -873,10 +884,10 @@ async def on_message(message: discord.Message):
             context_label = "同一サーバー内の最近の予想メッセージ"
 
         source = message_text(source_message) if source_message else ""
-        resolve_race_context(message.author.id, question, source)
-        answer = await maybe_answer_course_stats(question, source, message.author.id)
+        resolve_race_context(message.author.id, effective_question, source)
+        answer = await maybe_answer_course_stats(effective_question, source, message.author.id)
         if answer is None:
-            answer = await answer_question(question, source, context_label)
+            answer = await answer_question(effective_question, source, context_label)
 
         if source_message and source_message.jump_url:
             answer = f"{answer}\n\n↪ 参照: {source_message.jump_url}"
