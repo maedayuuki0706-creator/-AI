@@ -2,10 +2,27 @@
 
 The existing A/B/C grade is intentionally unchanged. It describes the shape of
 the likely winner. This module separately scores how attractive the race is as
-a betting candidate, then uses 75+ for selected and 85+ for strong selected.
+a betting candidate. Selected delivery uses a conservative stability gate:
+82+ total score, exhibition/ST component 12+, and EV component 13+.
+85+ remains the strong-selected tier after the same stability gate.
 """
 
 import random
+
+
+SELECTED_THRESHOLD = 82
+STRONG_SELECTED_THRESHOLD = 85
+MIN_SELECTED_EXHIBITION_ST = 12.0
+MIN_SELECTED_EV = 13.0
+
+
+def passes_stability_gate(breakdown):
+    """Evidence-backed delivery gate calibrated on the latest five-day sample."""
+    breakdown = breakdown or {}
+    return (
+        float(breakdown.get("exhibition_st") or 0.0) >= MIN_SELECTED_EXHIBITION_ST
+        and float(breakdown.get("ev") or 0.0) >= MIN_SELECTED_EV
+    )
 
 
 GENSEN_KUN_LINES = (
@@ -154,11 +171,14 @@ def race_score(analysis, allocation):
     return max(0, min(100, total)), breakdown
 
 
-def badge(score):
-    if score >= 85:
+def badge(score, breakdown=None):
+    stable = passes_stability_gate(breakdown)
+    if score >= STRONG_SELECTED_THRESHOLD and stable:
         return "🔥🔥強厳選"
-    if score >= 75:
+    if score >= SELECTED_THRESHOLD and stable:
         return "🔥厳選"
+    if score >= 75:
+        return "候補｜精度ゲート見送り"
     return "通常"
 
 
@@ -176,7 +196,7 @@ def install(app):
         score_cache[key] = {"score": score, "breakdown": breakdown}
 
         if phase == "final" and int((analysis.get("preview") or {}).get("exhibition_count") or 0) >= 6:
-            score_line = f"**総合スコア {score}/100｜{badge(score)}**"
+            score_line = f"**総合スコア {score}/100｜{badge(score, breakdown)}**"
             marker = "\n\n**仮想投票"
             if marker in message:
                 candidate = message.replace(marker, "\n\n" + score_line + marker, 1)
@@ -190,13 +210,14 @@ def install(app):
         return (
             record.get("phase") == "final"
             and bool(record.get("exhibition"))
-            and int(record.get("selection_score") or 0) >= 75
+            and int(record.get("selection_score") or 0) >= SELECTED_THRESHOLD
             and record.get("virtual_status") == "bet"
+            and passes_stability_gate(record.get("selection_score_breakdown") or {})
         )
 
     def selected_message(record):
         score = int(record.get("selection_score") or 0)
-        strong = score >= 85
+        strong = score >= STRONG_SELECTED_THRESHOLD
         title = "🔥🔥 **厳選くんの勝負レース【強厳選】**" if strong else "🔥 **厳選くんの勝負レース**"
         intro = random.choice(GENSEN_KUN_LINES)
 
@@ -261,7 +282,10 @@ def install(app):
             thick_section = f"💥 **厚め（{len(thick)}点）**\n{thick_text}\n\n"
 
         point_heading = "💡 **強厳選になった理由**" if strong else "💡 **厳選ポイント**"
-        threshold_text = "・総合スコア85点以上" if strong else "・総合スコア75点以上"
+        threshold_text = (
+            f"・総合スコア{STRONG_SELECTED_THRESHOLD}点以上"
+            if strong else f"・総合スコア{SELECTED_THRESHOLD}点以上"
+        )
 
         return (
             f"{intro}\n\n"
@@ -276,8 +300,8 @@ def install(app):
             f"👀 **頭候補**\n{head_line}\n\n"
             f"{point_heading}\n"
             f"{threshold_text}\n"
-            f"・展示6艇確認済み\n"
-            f"・仮想投票条件クリア\n\n"
+            f"・展示6艇確認済み／展示・ST評価 {MIN_SELECTED_EXHIBITION_ST:.0f}/15以上\n"
+            f"・EV評価 {MIN_SELECTED_EV:.0f}/15以上＋仮想投票条件クリア\n\n"
             f"📈 **期待値候補**\n{ev_text}\n\n"
             f"📊 **評価メモ**\n{detail}"
         )
@@ -294,9 +318,11 @@ def install(app):
             record = dict(record)
             record["selection_score"] = info["score"]
             record["selection_score_breakdown"] = info["breakdown"]
-            record["selection_score_version"] = "selected-score-v1"
-            record["selection_threshold"] = 75
-            record["strong_selection_threshold"] = 85
+            record["selection_score_version"] = "selected-score-v2-stability"
+            record["selection_threshold"] = SELECTED_THRESHOLD
+            record["strong_selection_threshold"] = STRONG_SELECTED_THRESHOLD
+            record["selection_min_exhibition_st"] = MIN_SELECTED_EXHIBITION_ST
+            record["selection_min_ev"] = MIN_SELECTED_EV
         return original_log(record)
 
     app.analysis_message_with_virtual = scored_message
