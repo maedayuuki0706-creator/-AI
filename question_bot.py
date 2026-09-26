@@ -24,6 +24,9 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna").strip()
 PORT = int(os.getenv("PORT", "10000"))
 STARTUP_TEST_MESSAGE = os.getenv("STARTUP_TEST_MESSAGE", "").strip()
 RACER_PROFILE_PATH = os.getenv("RACER_PROFILE_PATH", "data/racer_profiles.json").strip()
+ENCYCLOPEDIA_PATH = os.getenv("ENCYCLOPEDIA_PATH", "data/boat_encyclopedia.json").strip()
+VENUE_TIDE_PATH = os.getenv("VENUE_TIDE_PATH", "data/venue_tide_profiles.json").strip()
+VENUE_TACTICAL_PATH = os.getenv("VENUE_TACTICAL_PATH", "data/venue_tactical_priors.json").strip()
 LIVE_STATUS_URL = os.getenv(
     "LIVE_STATUS_URL",
     "https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/main/data/live_status/latest.json",
@@ -95,6 +98,7 @@ GLOSSARY = {
 _last_reply_by_user: dict[int, float] = {}
 _race_context_by_user: dict[int, tuple[str, int, float]] = {}
 _venue_context_by_user: dict[int, tuple[str, float]] = {}
+_encyclopedia_context_by_user: dict[int, tuple[str, float]] = {}
 _stats_cache: dict[str, tuple[float, object]] = {}
 _startup_test_sent = False
 
@@ -1088,6 +1092,135 @@ async def live_venue_answer(question: str) -> Optional[str]:
         print(f"[live-status] {type(e).__name__}: {e}", flush=True)
         return None
 
+
+def _load_json_file_cached(path: str, cache_key: str, ttl: float = 300.0) -> dict:
+    cached = _cache_get(cache_key, ttl)
+    if cached is not None:
+        return cached
+    try:
+        with open(path, "r", encoding="utf-8") as fp:
+            value = json.load(fp)
+        if not isinstance(value, dict):
+            value = {}
+    except Exception:
+        value = {}
+    return _cache_set(cache_key, value)
+
+
+def _norm_knowledge_text(text: str) -> str:
+    return (
+        unicodedata.normalize("NFKC", str(text or ""))
+        .lower()
+        .replace(" ", "")
+        .replace("　", "")
+    )
+
+
+def venue_knowledge_answer_sync(question: str) -> Optional[str]:
+    venue = _venue_from_question(question)
+    if not venue:
+        return None
+    q = _norm_knowledge_text(question)
+    if not any(word in q for word in [
+        "特徴", "水面", "水質", "潮", "干満", "満潮", "干潮",
+        "海水", "汽水", "淡水", "どんな場", "どんな水面"
+    ]):
+        return None
+
+    jcd = VENUE_TO_JCD.get(venue)
+    tide_data = _load_json_file_cached(VENUE_TIDE_PATH, "venue_tide_profiles", 300)
+    tactical_data = _load_json_file_cached(VENUE_TACTICAL_PATH, "venue_tactical_priors", 300)
+    row = ((tide_data.get("venues") or {}).get(str(jcd)) or {}) if jcd else {}
+    tactical = ((tactical_data.get("venues") or {}).get(str(jcd)) or {}) if jcd else {}
+
+    if not row and not tactical:
+        return None
+
+    lines = [f"🌊 **{venue}の水面メモ**"]
+    water = row.get("water_type")
+    if water:
+        lines.append(f"水質: **{water}**")
+    if row:
+        if row.get("tidal_difference"):
+            lines.append("干満差: **あり**。潮位は予想材料に入れる水面。")
+            if row.get("weight"):
+                lines.append(f"潮位の扱い: {row.get('weight')}")
+        else:
+            reason = row.get("exclusion_reason")
+            lines.append("干満差: **予想では基本的に除外**。")
+            if reason:
+                lines.append(f"理由: {reason}")
+    if tactical.get("course1_win_pct") is not None:
+        period = tactical.get("period") or "掲載期間"
+        lines.append(
+            f"参考データ: {period}の1コース1着率 **{float(tactical['course1_win_pct']):.1f}%**"
+        )
+    lines.append("※場データは固定観念にせず、当日の風・展示・進入と合わせて見る。")
+    return "\n".join(lines)
+
+
+def encyclopedia_answer_sync(question: str, user_id: int) -> Optional[str]:
+    venue_answer = venue_knowledge_answer_sync(question)
+    if venue_answer:
+        return venue_answer
+
+    data = _load_json_file_cached(ENCYCLOPEDIA_PATH, "boat_encyclopedia", 300)
+    entries = data.get("entries") or []
+    if not entries:
+        return None
+
+    q = _norm_knowledge_text(question)
+    if any(word in q for word in ["何が聞ける", "なにが聞ける", "質問例", "競艇事典", "使い方"]):
+        return (
+            "📚 **質問くん・競艇事典**\n"
+            "用語・決まり手・展示・進入・風/潮・モーター・選手成績・コース別成績・"
+            "当日結果・場別的中率まで聞けるで。\n"
+            "例: 「まくり差しって何？」「若松8Rの1号艇データ」"
+            "「常滑は潮見る？」「桐生1Rの結果」「今の常滑の的中率」"
+        )
+
+    candidates = []
+    for entry in entries:
+        aliases = [entry.get("key")] + list(entry.get("aliases") or [])
+        for alias in aliases:
+            norm = _norm_knowledge_text(alias)
+            if norm and norm in q:
+                candidates.append((len(norm), entry))
+                break
+
+    if candidates:
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        entry = candidates[0][1]
+        key = str(entry.get("key") or entry.get("title") or "")
+        if key:
+            _encyclopedia_context_by_user[user_id] = (key, time.monotonic())
+        title = entry.get("title") or key
+        answer = entry.get("answer") or ""
+        return f"📘 **{title}**\n{answer}"
+
+    # Lightweight conversational follow-up: "それもう少し詳しく" etc.
+    if len(q) <= 18 and any(word in q for word in ["それ", "もっと詳しく", "詳しく", "例えば", "どういう時"]):
+        ctx = _encyclopedia_context_by_user.get(user_id)
+        if ctx and time.monotonic() - ctx[1] <= 900:
+            key = ctx[0]
+            for entry in entries:
+                if str(entry.get("key") or "") == key:
+                    return (
+                        f"📘 **{entry.get('title') or key}**\n"
+                        f"{entry.get('answer') or ''}\n"
+                        "気になる条件があれば、場名・レース番号・艇番まで付けて聞けば実データ側も見にいけるで。"
+                    )
+    return None
+
+
+async def maybe_answer_encyclopedia(question: str, user_id: int) -> Optional[str]:
+    try:
+        return await asyncio.to_thread(encyclopedia_answer_sync, question, user_id)
+    except Exception as e:
+        print(f"[encyclopedia] {type(e).__name__}: {e}", flush=True)
+        return None
+
+
 def build_instructions() -> str:
     return """あなたは競艇AIナビのDiscord質問係です。
 ユーザーの質問に、日本語で短く分かりやすく答えてください。
@@ -1271,6 +1404,8 @@ async def on_message(message: discord.Message):
             if quick is None:
                 quick = await maybe_answer_racer_data(effective_question, "", message.author.id)
             if quick is None:
+                quick = await maybe_answer_encyclopedia(effective_question, message.author.id)
+            if quick is None:
                 quick = glossary_answer(effective_question, "")
             if quick is not None:
                 await message.reply(
@@ -1293,6 +1428,8 @@ async def on_message(message: discord.Message):
                 answer = await maybe_answer_course_stats(effective_question, source, message.author.id)
             if answer is None:
                 answer = await maybe_answer_racer_data(effective_question, source, message.author.id)
+            if answer is None:
+                answer = await maybe_answer_encyclopedia(effective_question, message.author.id)
             if answer is None:
                 answer = await answer_question(effective_question, source, context_label)
 
