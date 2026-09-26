@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - 'prototype3_delivery.py'
+      - 'yuuki_hit_alerts.py'
+      - 'test_yuuki_hit_alerts.py'
       - 'four_way_prototype.py'
       - 'prototype_scoreboard.py'
       - 'tests/test_prototype_scoreboard.py'
@@ -38,6 +40,7 @@ jobs:
         run: |
           python -m py_compile prototype3_delivery.py four_way_prototype.py prototype_scoreboard.py daily_report.py
           python -m unittest discover -s tests -p 'test_prototype_scoreboard.py' -v
+          python -m unittest test_yuuki_hit_alerts.py -v
           test -n "$PT3_DISCORD_WEBHOOK_URL$PROTO3_DISCORD_WEBHOOK_URL"
       - name: Deliver 新人予想家 ゆうき
         env:
@@ -52,6 +55,12 @@ jobs:
         env:
           TZ: Asia/Tokyo
         run: python -u prototype_scoreboard.py
+      - name: Notify 速報くん of confirmed ゆうき hits
+        if: always()
+        env:
+          TZ: Asia/Tokyo
+          DISCORD_HIT_WEBHOOK_URL: ${{ secrets.DISCORD_HIT_WEBHOOK_URL }}
+        run: python -u yuuki_hit_alerts.py
       - name: Persist 新人予想家 ゆうき delivery receipts and PT scoreboard
         if: always()
         run: |
