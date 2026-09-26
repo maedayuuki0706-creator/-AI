@@ -7,6 +7,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import unicodedata
 from datetime import datetime
 from html.parser import HTMLParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -22,6 +23,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna").strip()
 PORT = int(os.getenv("PORT", "10000"))
 STARTUP_TEST_MESSAGE = os.getenv("STARTUP_TEST_MESSAGE", "").strip()
+RACER_PROFILE_PATH = os.getenv("RACER_PROFILE_PATH", "data/racer_profiles.json").strip()
 LIVE_STATUS_URL = os.getenv(
     "LIVE_STATUS_URL",
     "https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/main/data/live_status/latest.json",
@@ -310,6 +312,284 @@ def fetch_race_entries_sync(day: str, venue: str, rno: int):
     if len(racers) != 6:
         raise RuntimeError(f"出走表の選手情報を6艇分取得できませんでした（{len(racers)}艇）")
     return _cache_set(cache_key, racers)
+
+
+def _textify_fragment(raw: str) -> str:
+    raw = re.sub(r"<script\b[^>]*>.*?</script>", " ", raw, flags=re.I | re.S)
+    raw = re.sub(r"<style\b[^>]*>.*?</style>", " ", raw, flags=re.I | re.S)
+    raw = re.sub(r"<br\s*/?>", "\n", raw, flags=re.I)
+    raw = re.sub(r"</(?:td|th|tr|li|p|div|h[1-6])>", "\n", raw, flags=re.I)
+    raw = re.sub(r"<[^>]+>", " ", raw)
+    raw = html.unescape(raw).replace("\u3000", " ")
+    raw = unicodedata.normalize("NFKC", raw)
+    raw = re.sub(r"[ \t\r\f\v]+", " ", raw)
+    raw = re.sub(r"\n+", "\n", raw)
+    return "\n".join(line.strip() for line in raw.splitlines() if line.strip())
+
+
+def fetch_race_boats_sync(day: str, venue: str, rno: int) -> list[dict]:
+    jcd = VENUE_TO_JCD.get(venue)
+    if not jcd:
+        return []
+    cache_key = f"raceboats:{day}:{jcd}:{rno}"
+    cached = _cache_get(cache_key, 300)
+    if cached is not None:
+        return cached
+
+    url = (
+        "https://www.boatrace.jp/owpc/pc/race/racelist"
+        f"?rno={rno}&jcd={jcd}&hd={day}"
+    )
+    raw = _fetch_html_sync(url, timeout=10)
+    boats = []
+    for body in re.findall(r"<tbody\b[^>]*>(.*?)</tbody>", raw, re.I | re.S):
+        lane_match = re.search(r"is-boatColor([1-6])", body)
+        text = _textify_fragment(body)
+        registration = re.search(r"(\d{4})\s*/\s*(A1|A2|B1|B2)\b", text)
+        if not lane_match or not registration:
+            continue
+        cells = re.findall(r"<td\b[^>]*>(.*?)</td>", body, re.I | re.S)
+        if len(cells) < 8:
+            continue
+
+        start_text = _textify_fragment(cells[3])
+        fl = re.search(r"F\s*(\d+)\s*\nL\s*(\d+)\s*\n", start_text)
+        if not fl:
+            continue
+
+        vals = [start_text[fl.end():].strip()]
+        ok = True
+        for cell in cells[4:8]:
+            values = _textify_fragment(cell).splitlines()
+            if len(values) != 3:
+                ok = False
+                break
+            vals.extend(values)
+        if not ok or len(vals) != 13:
+            continue
+        if any(not re.fullmatch(r"(?:\d+(?:\.\d+)?|[-－―—])", value) for value in vals):
+            continue
+        nums = [float(value) if re.fullmatch(r"\d+(?:\.\d+)?", value) else None for value in vals]
+
+        lane = int(lane_match.group(1))
+        name = re.sub(r"\s+", "", text[registration.end():].strip().split("\n")[0])
+        boats.append({
+            "boat": lane,
+            "toban": registration.group(1),
+            "class": registration.group(2),
+            "name": name,
+            "avg_st": nums[0],
+            "f_count": int(fl.group(1)),
+            "l_count": int(fl.group(2)),
+            "win_rate": nums[1],
+            "top2_rate": nums[2],
+            "top3_rate": nums[3],
+            "local_win_rate": nums[4] if any(x is not None for x in nums[4:7]) else None,
+            "local_top2_rate": nums[5] if any(x is not None for x in nums[4:7]) else None,
+            "local_top3_rate": nums[6] if any(x is not None for x in nums[4:7]) else None,
+            "motor_number": int(nums[7]) if nums[7] is not None else None,
+            "motor_top2_rate": nums[8],
+            "motor_top3_rate": nums[9],
+            "boat_number": int(nums[10]) if nums[10] is not None else None,
+            "boat_top2_rate": nums[11],
+            "boat_top3_rate": nums[12],
+        })
+
+    boats = sorted(boats, key=lambda row: row["boat"])
+    if len(boats) != 6 or {row["boat"] for row in boats} != set(range(1, 7)):
+        raise RuntimeError("公式出走表の選手データを6艇分取得できませんでした")
+    return _cache_set(cache_key, boats)
+
+
+def load_racer_profiles_sync() -> dict:
+    cached = _cache_get("racer_profiles", 300)
+    if cached is not None:
+        return cached
+    with open(RACER_PROFILE_PATH, "r", encoding="utf-8") as fp:
+        data = json.load(fp)
+    if not isinstance(data, dict):
+        data = {"racers": {}}
+    return _cache_set("racer_profiles", data)
+
+
+def _norm_name(text: str) -> str:
+    return re.sub(r"[\s\u3000・･]", "", str(text or "")).replace("選手", "")
+
+
+def _find_profile_by_question(question: str, data: dict):
+    q = _norm_name(question)
+    matches = []
+    for rid, profile in (data.get("racers") or {}).items():
+        name = _norm_name(profile.get("name"))
+        if len(name) >= 2 and name in q:
+            matches.append((len(name), str(rid), profile))
+    if not matches:
+        return None
+    matches.sort(reverse=True, key=lambda row: row[0])
+    return matches[0][1], matches[0][2]
+
+
+def _pct(num, den) -> Optional[float]:
+    try:
+        den = float(den)
+        if den <= 0:
+            return None
+        return 100.0 * float(num or 0) / den
+    except (TypeError, ValueError):
+        return None
+
+
+def _st_text(value) -> str:
+    if value is None:
+        return "—"
+    return f"{float(value):.3f}".lstrip("0")
+
+
+def _row_summary(row: dict) -> str:
+    starts = int(row.get("starts") or 0)
+    if starts <= 0:
+        return "データなし"
+    win = _pct(row.get("wins"), starts)
+    top2 = _pct(row.get("top2"), starts)
+    top3 = _pct(row.get("top3"), starts)
+    return (
+        f"{starts}走｜1着 {win:.1f}%｜2連 {top2:.1f}%｜3連 {top3:.1f}%"
+        f"｜平均ST {_st_text(row.get('avg_st'))}"
+    )
+
+
+def racer_data_answer_sync(question: str, race_context):
+    q = question.lower()
+    triggers = [
+        "選手データ", "選手情報", "選手成績", "どんな選手", "選手どう",
+        "平均st", "得意コース", "決まり手", "選手のデータ", "選手について",
+    ]
+    data = load_racer_profiles_sync()
+    named = _find_profile_by_question(question, data)
+
+    boat_m = BOAT_RE.search(question)
+    boat_no = int(boat_m.group(1)) if boat_m else None
+    toban_m = TOBAN_RE.search(question)
+    direct_toban = toban_m.group(1) if toban_m else None
+
+    # If there is no clear racer-related intent, leave the question to other handlers.
+    if not any(t in q for t in triggers) and named is None and direct_toban is None:
+        return None
+
+    venue = ""
+    rno = 0
+    official_boats = []
+    if race_context:
+        venue, rno = race_context
+        day = datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y%m%d")
+        try:
+            official_boats = fetch_race_boats_sync(day, venue, rno)
+        except Exception:
+            official_boats = []
+
+    # "若松8Rの選手データ" -> summarize all six.
+    if race_context and boat_no is None and named is None and direct_toban is None:
+        if not any(t in q for t in ["選手データ", "選手情報", "選手成績"]):
+            return None
+        if not official_boats:
+            return f"{venue}{rno}Rまでは分かったけど、公式出走表の選手データ取得に失敗しました。"
+        lines = [f"👥 **{venue}{rno}R 選手データ**"]
+        racers = data.get("racers") or {}
+        for boat in official_boats:
+            p = racers.get(str(boat["toban"])) or {}
+            course = (p.get("courses") or {}).get(str(boat["boat"]), {})
+            course_win = _pct(course.get("wins"), course.get("starts"))
+            course_piece = f"｜{boat['boat']}C1着 {course_win:.1f}%" if course_win is not None and int(course.get("starts") or 0) >= 3 else ""
+            lines.append(
+                f"{boat['boat']}号艇 {boat['name']} {boat['class']}｜勝率 {boat['win_rate'] if boat['win_rate'] is not None else '—'}"
+                f"｜ST {_st_text(boat['avg_st'])}{course_piece}"
+            )
+        lines.append("※勝率/STは公式出走表、コース1着率はAI学習DB。")
+        return "\n".join(lines)
+
+    profile = None
+    toban = None
+    official = None
+
+    if race_context and boat_no is not None and official_boats:
+        official = official_boats[boat_no - 1]
+        toban = str(official["toban"])
+        profile = (data.get("racers") or {}).get(toban)
+    elif direct_toban:
+        toban = direct_toban
+        profile = (data.get("racers") or {}).get(toban)
+    elif named:
+        toban, profile = named
+
+    if not profile and not official:
+        if any(t in q for t in triggers):
+            return "選手名か「若松8Rの1号艇」みたいに、場・レース・艇番を入れて聞いてください。"
+        return None
+
+    name = (official or {}).get("name") or (profile or {}).get("name") or ""
+    lines = [f"👤 **{name}（{toban}）**"]
+
+    if official:
+        f_mark = f"F{official['f_count']}" if official.get("f_count") is not None else ""
+        lines.append(
+            f"公式: **{official['class']}｜勝率 {official['win_rate'] if official['win_rate'] is not None else '—'}"
+            f"｜2連 {official['top2_rate'] if official['top2_rate'] is not None else '—'}%"
+            f"｜3連 {official['top3_rate'] if official['top3_rate'] is not None else '—'}%"
+            f"｜平均ST {_st_text(official['avg_st'])}｜{f_mark}**"
+        )
+        if official.get("local_win_rate") is not None:
+            lines.append(
+                f"{venue}: 勝率 {official['local_win_rate']:.2f}｜2連 {official['local_top2_rate']:.1f}%"
+                + (f"｜3連 {official['local_top3_rate']:.1f}%" if official.get("local_top3_rate") is not None else "")
+            )
+        if official.get("motor_number") is not None:
+            lines.append(
+                f"モーター{official['motor_number']}号機｜2連 {official['motor_top2_rate']:.1f}%"
+                + (f"｜3連 {official['motor_top3_rate']:.1f}%" if official.get("motor_top3_rate") is not None else "")
+            )
+
+    if profile:
+        starts = int(profile.get("starts") or 0)
+        if starts > 0:
+            lines.append(f"AI履歴: {_row_summary(profile)}")
+        methods = profile.get("win_methods") or {}
+        if methods:
+            ordered = ["逃げ", "差し", "まくり", "まくり差し", "抜き", "恵まれ"]
+            parts = [f"{m}{int(methods.get(m) or 0)}" for m in ordered if int(methods.get(m) or 0) > 0]
+            if parts:
+                lines.append("決まり手: " + " / ".join(parts))
+
+        if race_context and boat_no is not None:
+            course_row = (profile.get("courses") or {}).get(str(boat_no), {})
+            if int(course_row.get("starts") or 0) > 0:
+                lines.append(f"{boat_no}コース履歴: {_row_summary(course_row)}")
+            jcd = VENUE_TO_JCD.get(venue)
+            venue_row = (profile.get("venues") or {}).get(str(jcd), {}) if jcd else {}
+            if int(venue_row.get("starts") or 0) > 0:
+                lines.append(f"{venue}履歴: {_row_summary(venue_row)}")
+
+        first_seen = str(profile.get("first_seen") or "")
+        last_seen = str(profile.get("last_seen") or "")
+        if len(first_seen) == 8 and len(last_seen) == 8:
+            lines.append(
+                f"※AI履歴の集計範囲: {first_seen[:4]}/{first_seen[4:6]}/{first_seen[6:]}〜"
+                f"{last_seen[:4]}/{last_seen[4:6]}/{last_seen[6:]}"
+            )
+    return "\n".join(lines)
+
+
+async def maybe_answer_racer_data(question: str, source: str, user_id: int):
+    context = resolve_race_context(user_id, question, source)
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(racer_data_answer_sync, question, context),
+            timeout=12,
+        )
+    except asyncio.TimeoutError:
+        return "選手データの取得に時間がかかったので一度止めました。少し時間を置いてもう一度聞いてください。"
+    except Exception as e:
+        print(f"[racer-data] {type(e).__name__}: {e}", flush=True)
+        return None
 
 
 def fetch_racer_course_stats_sync(toban: str, course: int):
@@ -883,6 +1163,8 @@ async def on_message(message: discord.Message):
             if quick is None:
                 quick = await maybe_answer_course_stats(effective_question, "", message.author.id)
             if quick is None:
+                quick = await maybe_answer_racer_data(effective_question, "", message.author.id)
+            if quick is None:
                 quick = glossary_answer(effective_question, "")
             if quick is not None:
                 await message.reply(
@@ -901,6 +1183,8 @@ async def on_message(message: discord.Message):
             source = message_text(source_message) if source_message else ""
             resolve_race_context(message.author.id, effective_question, source)
             answer = await maybe_answer_course_stats(effective_question, source, message.author.id)
+            if answer is None:
+                answer = await maybe_answer_racer_data(effective_question, source, message.author.id)
             if answer is None:
                 answer = await answer_question(effective_question, source, context_label)
 
