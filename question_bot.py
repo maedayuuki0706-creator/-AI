@@ -867,36 +867,64 @@ async def on_message(message: discord.Message):
     _last_reply_by_user[message.author.id] = now
 
     async with message.channel.typing():
-        effective_question = question
-        venue = _venue_from_question(question)
-        stats_words = ["的中率", "回収率", "roi", "成績", "調子", "今どう", "現状", "結果"]
-        if venue and any(k in question.lower() for k in stats_words):
-            _venue_context_by_user[message.author.id] = (venue, time.monotonic())
-        elif len(question) <= 16 and any(k in question.lower() for k in stats_words):
-            ctx = _venue_context_by_user.get(message.author.id)
-            if ctx and time.monotonic() - ctx[1] <= 900:
-                effective_question = f"{ctx[0]} {question}"
+        try:
+            effective_question = question
+            venue = _venue_from_question(question)
+            stats_words = ["的中率", "回収率", "roi", "成績", "調子", "今どう", "現状", "結果"]
+            if venue and any(k in question.lower() for k in stats_words):
+                _venue_context_by_user[message.author.id] = (venue, time.monotonic())
+            elif len(question) <= 16 and any(k in question.lower() for k in stats_words):
+                ctx = _venue_context_by_user.get(message.author.id)
+                if ctx and time.monotonic() - ctx[1] <= 900:
+                    effective_question = f"{ctx[0]} {question}"
 
-        source_message = await get_reference_message(message)
-        context_label = "返信/リンク先メッセージ"
-        if source_message is None:
-            source_message = await find_recent_prediction(message)
-            context_label = "同一サーバー内の最近の予想メッセージ"
+            # Fast-path answers that do not need a Discord history scan.
+            quick = await live_venue_answer(effective_question)
+            if quick is None:
+                quick = await maybe_answer_course_stats(effective_question, "", message.author.id)
+            if quick is None:
+                quick = glossary_answer(effective_question, "")
+            if quick is not None:
+                await message.reply(
+                    quick[:1900],
+                    mention_author=False,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                return
 
-        source = message_text(source_message) if source_message else ""
-        resolve_race_context(message.author.id, effective_question, source)
-        answer = await maybe_answer_course_stats(effective_question, source, message.author.id)
-        if answer is None:
-            answer = await answer_question(effective_question, source, context_label)
+            source_message = await get_reference_message(message)
+            context_label = "返信/リンク先メッセージ"
+            if source_message is None:
+                source_message = await asyncio.wait_for(find_recent_prediction(message), timeout=15)
+                context_label = "同一サーバー内の最近の予想メッセージ"
 
-        if source_message and source_message.jump_url:
-            answer = f"{answer}\n\n↪ 参照: {source_message.jump_url}"
+            source = message_text(source_message) if source_message else ""
+            resolve_race_context(message.author.id, effective_question, source)
+            answer = await maybe_answer_course_stats(effective_question, source, message.author.id)
+            if answer is None:
+                answer = await answer_question(effective_question, source, context_label)
 
-        await message.reply(
-            answer[:1900],
-            mention_author=False,
-            allowed_mentions=discord.AllowedMentions.none(),
-        )
+            if source_message and source_message.jump_url:
+                answer = f"{answer}\n\n↪ 参照: {source_message.jump_url}"
+
+            await message.reply(
+                answer[:1900],
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+        except asyncio.TimeoutError:
+            await message.reply(
+                "参照先の検索に時間がかかったので一度止めました。場名＋レース番号を入れて、もう一度聞いてみてください。",
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+        except Exception as e:
+            print(f"[question] {type(e).__name__}: {e}", flush=True)
+            await message.reply(
+                "質問の処理中にエラーが出ました。少し時間を置いてもう一度送ってください。",
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
 
 
 def main():
