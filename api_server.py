@@ -190,6 +190,13 @@ def maybe_send_pt3_startup_test() -> None:
         )
         with urllib.request.urlopen(req, timeout=20) as response:
             print(f"PT3 startup test sent status={response.status}", flush=True)
+        try:
+            import yuuki_daily_report
+            day = yuuki_daily_report.default_day()
+            result = yuuki_daily_report.send(day, force=True)
+            print(f"PT3 startup daily report sent: {result}", flush=True)
+        except Exception as report_exc:
+            print(f"PT3 startup daily report failed: {type(report_exc).__name__}: {report_exc}", flush=True)
     except Exception as exc:
         print(f"PT3 startup test failed: {type(exc).__name__}: {exc}", flush=True)
 
