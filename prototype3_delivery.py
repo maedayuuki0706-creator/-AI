@@ -168,9 +168,9 @@ def selected_message(record):
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
         f"✅ 厳選スコア **{selected.get('score', 0)}**｜{reason}\n"
         f"🎯 **本線（{len(model.get('main_picks') or [])}点）**\n"
-        f"\`{main}\`\n"
+        f"`{main}`\n"
         f"🔥 **抑え（{len(model.get('cover_picks') or [])}点）**\n"
-        f"\`{cover or 'なし'}\`\n"
+        f"`{cover or 'なし'}`\n"
         f"📊 計{model['point_count']}点｜通常配信より厳しい条件を通過"
     )
 
