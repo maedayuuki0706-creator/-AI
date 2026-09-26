@@ -17,6 +17,7 @@ QUESTION_CHANNEL_ID = os.getenv("DISCORD_QUESTION_CHANNEL_ID", "").strip()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna").strip()
 PORT = int(os.getenv("PORT", "10000"))
+STARTUP_TEST_MESSAGE = os.getenv("STARTUP_TEST_MESSAGE", "").strip()
 PREDICTION_CHANNEL_NAMES = {
     x.strip().lower()
     for x in os.getenv(
@@ -64,6 +65,7 @@ GLOSSARY = {
 }
 
 _last_reply_by_user: dict[int, float] = {}
+_startup_test_sent = False
 
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -307,12 +309,42 @@ client = discord.Client(intents=intents)
 
 @client.event
 async def on_ready():
+    global _startup_test_sent
     print(
         f"[discord] logged in as {client.user} | "
         f"question_channel={QUESTION_CHANNEL_ID or QUESTION_CHANNEL_NAME} | "
         f"model={OPENAI_MODEL} | ai={'on' if OPENAI_API_KEY else 'fallback'}",
         flush=True,
     )
+
+    if STARTUP_TEST_MESSAGE and not _startup_test_sent:
+        target = None
+        for guild in client.guilds:
+            if QUESTION_CHANNEL_ID:
+                candidate = guild.get_channel(int(QUESTION_CHANNEL_ID))
+                if isinstance(candidate, discord.TextChannel):
+                    target = candidate
+                    break
+            else:
+                for candidate in guild.text_channels:
+                    if candidate.name == QUESTION_CHANNEL_NAME:
+                        target = candidate
+                        break
+                if target:
+                    break
+
+        if target:
+            try:
+                await target.send(
+                    STARTUP_TEST_MESSAGE,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                _startup_test_sent = True
+                print(f"[discord] startup test sent to #{target.name}", flush=True)
+            except (discord.Forbidden, discord.HTTPException) as e:
+                print(f"[discord] startup test failed: {type(e).__name__}: {e}", flush=True)
+        else:
+            print("[discord] startup test skipped: question channel not found", flush=True)
 
 
 @client.event
