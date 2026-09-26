@@ -33,14 +33,16 @@ jobs:
           python-version: '3.12'
       - name: Verify Prototype 3 delivery configuration
         env:
+          PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL }}
           PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
         run: |
           python -m py_compile prototype3_delivery.py four_way_prototype.py prototype_scoreboard.py daily_report.py
           python -m unittest discover -s tests -p 'test_prototype_scoreboard.py' -v
-          test -n "$PROTO3_DISCORD_WEBHOOK_URL"
+          test -n "$PT3_DISCORD_WEBHOOK_URL$PROTO3_DISCORD_WEBHOOK_URL"
       - name: Deliver Prototype 3
         env:
           TZ: Asia/Tokyo
+          PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL }}
           PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
           PROTOTYPE3_WATCH_SECONDS: '210'
         run: python -u prototype3_delivery.py
