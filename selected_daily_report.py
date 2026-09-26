@@ -137,7 +137,7 @@ def main_selected_payload(day):
     date = f"{day[:4]}/{day[4:6]}/{day[6:8]}"
     return {"embeds": [{
         "title": f"🔵 厳選くん（メイン）｜{date} 日報",
-        "description": "通常メイン予想の中から selection_score 82以上＋展示/ST評価12/15以上＋EV評価13/15以上＋BET判定を通過した厳選レースを集計。",
+        "description": "配信時点の厳選ルールで実際に対象となったレースを集計。現行基準は score82以上＋展示/ST評価12/15以上＋EV評価13/15以上＋BET判定。",
         "color": 0x3498DB,
         "fields": [
             {"name": "📊 今日の成績", "value":
