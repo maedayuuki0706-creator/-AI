@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import re
 from urllib.parse import parse_qs, urlparse
+import urllib.request
 
 import daily_report as daily
 import direct_discord_notify as boat_source
@@ -167,6 +168,32 @@ def build_opportunity_report(day: str) -> dict:
     }
 
 
+def maybe_send_pt3_startup_test() -> None:
+    """Send a one-shot promoted PT3 webhook test when explicitly enabled."""
+    if os.getenv("PT3_TEST_ON_START", "").strip() != "1":
+        return
+    url = os.getenv("PT3_DISCORD_WEBHOOK_URL", "").strip()
+    if not url:
+        print("PT3 startup test skipped: PT3_DISCORD_WEBHOOK_URL missing", flush=True)
+        return
+    payload = json.dumps({
+        "username": "新人予想家 ゆうき",
+        "content": "🏆 **新人予想家 ゆうき｜配信テスト**\nRender本番環境から新チャンネルへの接続テスト成功！\n本番予想＋Discord日報をこのチャンネルへ配信します🔥",
+        "allowed_mentions": {"parse": []},
+    }, ensure_ascii=False).encode("utf-8")
+    try:
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json", "User-Agent": "boat-ai-yuuki-startup-test/1.0"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=20) as response:
+            print(f"PT3 startup test sent status={response.status}", flush=True)
+    except Exception as exc:
+        print(f"PT3 startup test failed: {type(exc).__name__}: {exc}", flush=True)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "BoatAINavi/2.0"
 
@@ -280,6 +307,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    maybe_send_pt3_startup_test()
     port = int(os.getenv("PORT", "10000"))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Boat AI Navi listening on {port}", flush=True)
