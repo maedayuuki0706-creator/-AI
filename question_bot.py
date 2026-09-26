@@ -22,6 +22,10 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna").strip()
 PORT = int(os.getenv("PORT", "10000"))
 STARTUP_TEST_MESSAGE = os.getenv("STARTUP_TEST_MESSAGE", "").strip()
+LIVE_STATUS_URL = os.getenv(
+    "LIVE_STATUS_URL",
+    "https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/main/data/live_status/latest.json",
+).strip()
 PREDICTION_CHANNEL_NAMES = {
     x.strip().lower()
     for x in os.getenv(
@@ -588,6 +592,117 @@ async def find_recent_prediction(message: discord.Message) -> Optional[discord.M
     return best
 
 
+
+LIVE_STATUS_STREAMS = ["main", "mid_odds", "selected", "hiyori", "prototype3", "longshot"]
+STREAM_ALIASES = {
+    "メイン": "main",
+    "本線": "main",
+    "中穴": "mid_odds",
+    "中穴くん": "mid_odds",
+    "厳選": "selected",
+    "厳選くん": "selected",
+    "日和": "hiyori",
+    "pt3": "prototype3",
+    "PT3": "prototype3",
+    "穴": "longshot",
+    "穴くん": "longshot",
+    "pt1": "prototype1",
+    "PT1": "prototype1",
+    "pt2": "prototype2",
+    "PT2": "prototype2",
+}
+
+
+def fetch_json_sync(url: str) -> dict:
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "boat-ai-question-bot/1.0"},
+        method="GET",
+    )
+    with urllib.request.urlopen(req, timeout=12) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _fmt_pct(value) -> str:
+    if value is None:
+        return "—"
+    return f"{float(value):.1f}%"
+
+
+def _venue_from_question(question: str) -> Optional[str]:
+    for venue in VENUES:
+        if venue in question:
+            return venue
+    return None
+
+
+def _requested_stream(question: str) -> Optional[str]:
+    q = question.lower()
+    # Longer aliases first so "中穴くん" wins over "中穴".
+    for alias, key in sorted(STREAM_ALIASES.items(), key=lambda x: len(x[0]), reverse=True):
+        if alias.lower() in q:
+            return key
+    return None
+
+
+def live_venue_answer_sync(question: str) -> Optional[str]:
+    q = question.lower()
+    venue = _venue_from_question(question)
+    if not venue:
+        return None
+    if not any(k in q for k in ["的中率", "回収率", "roi", "成績", "調子", "今どう", "現状"]):
+        return None
+
+    data = fetch_json_sync(LIVE_STATUS_URL)
+    venue_data = (data.get("venues") or {}).get(venue)
+    if not venue_data:
+        return f"{venue}は、いまの集計データではまだ成績を確認できません。"
+
+    generated_at = str(data.get("generated_at") or "")
+    time_label = ""
+    m = re.search(r"T(\d{2}:\d{2})", generated_at)
+    if m:
+        time_label = f"（{m.group(1)}更新）"
+
+    requested = _requested_stream(question)
+    if requested:
+        stat = venue_data.get(requested)
+        if not stat or not stat.get("judged"):
+            label = (stat or {}).get("label") or requested
+            return f"{venue}の{label}は、{time_label or '現在'} 判定済みデータがまだありません。"
+        return (
+            f"📍{venue} {stat.get('label', requested)} {time_label}\n"
+            f"的中 **{stat.get('hits', 0)}/{stat.get('judged', 0)} = {_fmt_pct(stat.get('hit_rate'))}**\n"
+            f"回収率 **{_fmt_pct(stat.get('roi'))}**"
+            + (f"｜万舟 {stat.get('manshu', 0)}本" if stat.get("manshu") is not None else "")
+        )
+
+    lines = [f"📍{venue} 現在の成績 {time_label}".rstrip()]
+    for key in LIVE_STATUS_STREAMS:
+        stat = venue_data.get(key)
+        if not stat:
+            continue
+        label = stat.get("label", key)
+        judged = int(stat.get("judged") or 0)
+        if judged <= 0:
+            if key == "longshot":
+                lines.append(f"・{label}: 配信/判定なし")
+            continue
+        lines.append(
+            f"・{label}: **{stat.get('hits', 0)}/{judged} "
+            f"({_fmt_pct(stat.get('hit_rate'))})**｜回収 {_fmt_pct(stat.get('roi'))}"
+        )
+    lines.append("※判定済みレースだけで集計。結果待ちは分母に入れていません。")
+    return "\n".join(lines)
+
+
+async def live_venue_answer(question: str) -> Optional[str]:
+    try:
+        return await asyncio.to_thread(live_venue_answer_sync, question)
+    except Exception as e:
+        print(f"[live-status] {type(e).__name__}: {e}", flush=True)
+        return None
+
 def build_instructions() -> str:
     return """あなたは競艇AIナビのDiscord質問係です。
 ユーザーの質問に、日本語で短く分かりやすく答えてください。
@@ -654,6 +769,10 @@ def call_openai_sync(question: str, source: str, context_label: str) -> str:
 
 
 async def answer_question(question: str, source: str, context_label: str) -> str:
+    live = await live_venue_answer(question)
+    if live:
+        return live
+
     fallback = glossary_answer(question, source)
     if OPENAI_API_KEY:
         try:
