@@ -80,6 +80,91 @@ def selected_record(
     )
 
 
+def delivered_selected_record(row: dict) -> bool:
+    """Reconstruct the rule that was active when this prediction was logged.
+
+    This prevents a new threshold from rewriting historical delivered counts.
+    v1 records used score>=75. v2-stability records use the current stability gate.
+    """
+    version = str(row.get("selection_score_version") or "")
+    recorded_threshold = int(row.get("selection_threshold") or 75)
+    if version == "selected-score-v2-stability" or recorded_threshold >= SELECTED_THRESHOLD:
+        return selected_record(
+            row,
+            threshold=max(recorded_threshold, SELECTED_THRESHOLD),
+            require_stability=True,
+        )
+    return selected_record(row, threshold=recorded_threshold, require_stability=False)
+
+
+def subset_summary_predicate(
+    records: dict[str, dict],
+    settled_by_key: dict[str, dict],
+    predicate,
+    *,
+    threshold_label=None,
+    stability_gate_label=None,
+) -> dict:
+    selected = {key: row for key, row in records.items() if predicate(row)}
+    settled = [settled_by_key[key] for key in selected if key in settled_by_key]
+    base = totals(settled)
+    prediction_samples = int(base.get("prediction_samples") or 0)
+    prediction_hits = int(base.get("prediction_hits") or 0)
+    flat_stake = sum(int((row.get("uniform") or {}).get("stake_yen") or 0) for row in settled)
+    flat_return = sum(int((row.get("uniform") or {}).get("return_yen") or 0) for row in settled)
+    budget_3000_rows = {
+        key: settle_equal_3000(selected[key], settled_by_key[key])
+        for key in selected if key in settled_by_key
+    }
+    budget_3000_stake = sum(row["stake_yen"] for row in budget_3000_rows.values())
+    budget_3000_return = sum(row["return_yen"] for row in budget_3000_rows.values())
+    return {
+        "threshold": threshold_label,
+        "stability_gate": stability_gate_label,
+        "selected_races": len(selected),
+        "settled_races": len(settled),
+        "prediction_hits": prediction_hits,
+        "prediction_samples": prediction_samples,
+        "prediction_hit_rate": (prediction_hits / prediction_samples * 100) if prediction_samples else None,
+        "flat_100_per_pick_stake_yen": flat_stake,
+        "flat_100_per_pick_return_yen": flat_return,
+        "flat_100_per_pick_profit_yen": flat_return - flat_stake,
+        "flat_100_per_pick_roi": (flat_return / flat_stake * 100) if flat_stake else None,
+        "budget_3000_per_race_yen": BUDGET_3000_YEN,
+        "budget_3000_allocation_rule": "all disclosed picks; as-even-as-possible 100-yen units; remainder follows disclosed pick order",
+        "budget_3000_races": len(budget_3000_rows),
+        "budget_3000_stake_yen": budget_3000_stake,
+        "budget_3000_return_yen": budget_3000_return,
+        "budget_3000_profit_yen": budget_3000_return - budget_3000_stake,
+        "budget_3000_roi": (budget_3000_return / budget_3000_stake * 100) if budget_3000_stake else None,
+        "virtual_hits": base.get("virtual_hits"),
+        "virtual_hit_samples": base.get("virtual_hit_samples"),
+        "virtual_hit_rate": base.get("hit_rate"),
+        "stake_yen": base.get("settled_stake_yen"),
+        "return_yen": base.get("return_yen"),
+        "profit_yen": base.get("profit_yen"),
+        "roi": base.get("roi"),
+        "races": [
+            {
+                "jcd": str(row.get("jcd")).zfill(2),
+                "venue": row.get("venue"),
+                "rno": int(row.get("rno", 0)),
+                "selection_score": int(row.get("selection_score") or 0),
+                "grade": row.get("grade"),
+                "selection_score_version": row.get("selection_score_version"),
+                "prediction_hit": settled_by_key.get(key, {}).get("prediction_hit"),
+                "virtual_hit": settled_by_key.get(key, {}).get("virtual_hit"),
+                "stake_yen": settled_by_key.get(key, {}).get("stake_yen"),
+                "return_yen": settled_by_key.get(key, {}).get("return_yen"),
+                "flat_stake_yen": (settled_by_key.get(key, {}).get("uniform") or {}).get("stake_yen"),
+                "flat_return_yen": (settled_by_key.get(key, {}).get("uniform") or {}).get("return_yen"),
+                "budget_3000": budget_3000_rows.get(key),
+            }
+            for key, row in sorted(selected.items())
+        ],
+    }
+
+
 def subset_summary(
     records: dict[str, dict],
     settled_by_key: dict[str, dict],
@@ -167,7 +252,14 @@ def build(day: str) -> dict:
         "candidate_selected_75": subset_summary(
             latest, settled_by_key, 75, require_stability=False
         ),
-        "selected": subset_summary(
+        "selected": subset_summary_predicate(
+            latest,
+            settled_by_key,
+            delivered_selected_record,
+            threshold_label="delivery-time rule",
+            stability_gate_label="version-aware",
+        ),
+        "stability_selected": subset_summary(
             latest, settled_by_key, SELECTED_THRESHOLD, require_stability=True
         ),
         "strong_selected": subset_summary(
