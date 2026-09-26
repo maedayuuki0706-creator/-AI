@@ -17,7 +17,7 @@ import re
 import daily_report
 import direct_discord_notify as base
 import prototype_scoreboard
-from selected_metrics import selected_record
+from selected_metrics import delivered_selected_record
 
 ROOT = Path("data/live_status")
 OFFICIAL_DIR = ROOT / "official"
@@ -115,7 +115,7 @@ def base_streams(day: str):
             "picks": picks,
         }
         main[key] = item
-        if selected_record(row):
+        if delivered_selected_record(row):
             selected[key] = {**item, "selection_score": int(row.get("selection_score") or 0)}
     return main, selected
 
