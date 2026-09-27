@@ -3,6 +3,7 @@ import unittest
 
 import four_way_prototype as trial
 import hiyori_model
+import prototype12_delivery as delivery
 from test_hiyori_parallel import fixtures
 
 
@@ -25,9 +26,20 @@ class NewPrototypeFusionTests(unittest.TestCase):
 
         self.assertEqual(p3['selection_policy'], 'hiyori-native-main-plus-mid-on-hiyori-cover-cap16')
         self.assertEqual(p3['main_picks'], record['native_candidate_picks']['hiyori'][:16])
-        self.assertEqual(p1['selection_policy'], 'pt3-core-10-plus-longshot-sniper-max3')
-        self.assertGreaterEqual(p1['point_count'], 1)
+        self.assertEqual(p1['selection_policy'], 'scent-box-exhibition-fusion-v1')
+        self.assertEqual(len(p1['box_lanes']), 3)
+        self.assertEqual(len(p1['box_picks']), 6)
+        self.assertEqual(len(p1['cover_picks']), 2 if not p1['cover_formation'] else 4)
+        self.assertLessEqual(len(p1['longshot_picks']), 3)
+        self.assertEqual(len(set(p1['picks'])), p1['point_count'])
+        self.assertGreaterEqual(p1['point_count'], 8)
         self.assertLessEqual(p1['point_count'], 13)
+        message = delivery.model_message(record, 'prototype1')
+        self.assertIn('ここが匂う！', message)
+        self.assertIn('📦 **BOX', message)
+        self.assertIn('🛟 **抜け目', message)
+        self.assertIn('💣 **穴目', message)
+        self.assertIn('試験配信', message)
         self.assertEqual(p2['selection_policy'], 'pt3-existing-consensus-compress-grade-7-8-10')
         self.assertGreaterEqual(p2['point_count'], 1)
         self.assertLessEqual(p2['point_count'], 10)
@@ -39,6 +51,17 @@ class NewPrototypeFusionTests(unittest.TestCase):
         p2 = record['models']['prototype2']
         expected = {'A': 7, 'B': 8, 'C': 10}[p2['grade']]
         self.assertEqual(p2['point_count'], min(expected, record['models']['prototype3']['point_count']))
+
+    def test_box_hit_is_measured_separately_from_cover_hit(self):
+        req, hy, src, now = self.prepared()
+        record = trial.build_bundle(req, hy, src, now)
+        box = record['models']['prototype1']['box_picks'][0]
+        cover = record['models']['prototype1']['cover_picks'][0]
+        hit = trial.evaluate(record, {'status': 'settled', 'payouts': {box: 1000}})
+        self.assertTrue(hit['models']['prototype1']['box_hit'])
+        cover_hit = trial.evaluate(record, {'status': 'settled', 'payouts': {cover: 1000}})
+        self.assertTrue(cover_hit['models']['prototype1']['hit'])
+        self.assertFalse(cover_hit['models']['prototype1']['box_hit'])
 
 
 if __name__ == '__main__':
