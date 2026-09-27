@@ -23,6 +23,7 @@ QUESTION_CHANNEL_ID = os.getenv("DISCORD_QUESTION_CHANNEL_ID", "").strip()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna").strip()
 PORT = int(os.getenv("PORT", "10000"))
+DISCORD_STARTUP_GRACE_SECONDS = float(os.getenv("DISCORD_STARTUP_GRACE_SECONDS", "20"))
 STARTUP_TEST_MESSAGE = os.getenv("STARTUP_TEST_MESSAGE", "").strip()
 RACER_PROFILE_PATH = os.getenv("RACER_PROFILE_PATH", "data/racer_profiles.json").strip()
 ENCYCLOPEDIA_PATH = os.getenv("ENCYCLOPEDIA_PATH", "data/boat_encyclopedia.json").strip()
@@ -1759,6 +1760,18 @@ def main():
         print("[waiting] DISCORD_BOT_TOKEN is not configured; health server remains online", flush=True)
         while True:
             time.sleep(3600)
+
+    # Render uses rolling deploys: the old and new instances can overlap briefly.
+    # Keep the HTTP health server available immediately, but delay Discord login
+    # so two instances do not authenticate with the same bot token at once.
+    if DISCORD_STARTUP_GRACE_SECONDS > 0:
+        print(
+            f"[discord] startup grace {DISCORD_STARTUP_GRACE_SECONDS:.0f}s "
+            "to avoid overlapping bot logins during rolling deploy",
+            flush=True,
+        )
+        time.sleep(DISCORD_STARTUP_GRACE_SECONDS)
+
     wait_for_discord_api()
     client.run(BOT_TOKEN, log_handler=None)
 
