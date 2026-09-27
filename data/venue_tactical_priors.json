@@ -1,6 +1,6 @@
 {
   "version": "venue-tactical-priors-v1",
-  "snapshot_date": "2026-09-24",
+  "snapshot_date": "2026-09-28",
   "policy": {
     "production_use": "context_only_until_out_of_time_validation",
     "note": "These venue priors describe recent official course/winning-method tendencies. They must not override live model probabilities by themselves."
@@ -8,9 +8,55 @@
   "sources": {
     "kiryu": "https://www.boatrace.jp/owpc/pc/data/stadium?jcd=01",
     "miyajima": "https://www.boatrace.jp/owpc/pc/data/stadium?jcd=17",
-    "miyajima_water": "https://www.boatrace.jp/owpc/pc/site/place/stadium/br17/"
+    "miyajima_water": "https://www.boatrace.jp/owpc/pc/site/place/stadium/br17/",
+    "kojima": "https://www.boatrace.jp/owpc/pc/data/stadium?jcd=16",
+    "kojima_water": "https://www.boatrace.jp/owpc/pc/site/place/stadium/br16/"
   },
   "venues": {
+    "16": {
+      "venue": "児島",
+      "period": "2026-06-01/2026-08-31",
+      "course1_win_pct": 54.7,
+      "water_context": {
+        "tidal": true,
+        "water_type": "海水",
+        "tide_note": "瀬戸内に面し潮位差が大きい。公式は満潮時と干潮時でレースの流れが変わるとしている。",
+        "high_tide": "追い風と満潮が重なると差しが決まりやすく高配当化しやすい",
+        "low_tide": "比較的乗りやすく、インを含めスピード戦になりやすい",
+        "wind_note": "通常は風の影響が比較的小さいが、潮位との組み合わせを優先して評価"
+      },
+      "attack_priors": {
+        "2": {
+          "win_pct": 10.9,
+          "makuri_pct": 23,
+          "sashi_pct": 70.7
+        },
+        "3": {
+          "win_pct": 14.4,
+          "makuri_pct": 24.7,
+          "sashi_pct": 12.9,
+          "makurizashi_pct": 48.2
+        },
+        "4": {
+          "win_pct": 11.2,
+          "makuri_pct": 50.7,
+          "sashi_pct": 14.9,
+          "makurizashi_pct": 22.3
+        },
+        "5": {
+          "win_pct": 8.6,
+          "makuri_pct": 15.6,
+          "sashi_pct": 1.9,
+          "makurizashi_pct": 74.5
+        },
+        "6": {
+          "win_pct": 1.1,
+          "makuri_pct": 42.8,
+          "sashi_pct": 0,
+          "makurizashi_pct": 28.5
+        }
+      }
+    },
     "17": {
       "venue": "宮島",
       "period": "2026-06-01/2026-08-31",
