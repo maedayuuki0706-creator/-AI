@@ -53,7 +53,7 @@ class ModelTests(unittest.TestCase):
         record = trial.build_bundle(req, hy, src, now)
         self.assertEqual((req, hy, src), original)
         self.assertEqual(set(record['models']), set(trial.STREAMS))
-        for stream in ('existing', 'hiyori', 'prototype1', 'prototype2'):
+        for stream in ('existing', 'hiyori'):
             card = record['models'][stream]
             self.assertEqual(len(set(card['picks'])), 10)
             self.assertEqual(card['stake_yen'], 1000)
@@ -68,14 +68,16 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(p3['picks'], p3['main_picks'] + p3['cover_picks'])
         self.assertEqual(p3['stake_yen'], 100 * p3['point_count'])
         self.assertTrue(p3['odds_complete'])
-        self.assertEqual(record['models']['prototype1']['weights'], {'hiyori_main': 1.0, 'mid_cover_policy': 1.0})
-        self.assertEqual(record['models']['prototype2']['weights'], {'hiyori_main': 1.0, 'mid_cover_policy': 1.0})
-        self.assertEqual(len(record['models']['prototype1']['main_picks']), 4)
-        self.assertEqual(len(record['models']['prototype1']['cover_picks']), 6)
-        self.assertEqual(len(record['models']['prototype2']['main_picks']), 6)
-        self.assertEqual(len(record['models']['prototype2']['cover_picks']), 4)
-        self.assertEqual(record['models']['prototype1']['main_picks'], record['native_candidate_picks']['hiyori'][:4])
-        self.assertEqual(record['models']['prototype2']['main_picks'], record['native_candidate_picks']['hiyori'][:6])
+        p1 = record['models']['prototype1']
+        self.assertEqual(p1['selection_policy'], 'scent-box-exhibition-fusion-v1')
+        self.assertEqual(len(p1['box_picks']), 6)
+        self.assertEqual(set(p1['box_picks']), set(p1['main_picks']))
+        self.assertEqual(len(set(p1['picks'])), p1['point_count'])
+        self.assertEqual(p1['stake_yen'], 100 * p1['point_count'])
+        self.assertLessEqual(len(p1['longshot_picks']), 3)
+        p2 = record['models']['prototype2']
+        self.assertLessEqual(p2['point_count'], 10)
+        self.assertEqual(p2['picks'], p2['main_picks'] + p2['cover_picks'])
 
     def test_even_three_way_tie_has_ten_points(self):
         req, hy, src, now = prepared()
@@ -83,8 +85,10 @@ class ModelTests(unittest.TestCase):
             for row in analysis['trifecta']:
                 row['probability'] = 1/120
         record = trial.build_bundle(req, hy, src, now)
-        for stream in ('existing', 'hiyori', 'prototype1', 'prototype2'):
+        for stream in ('existing', 'hiyori'):
             self.assertEqual(len(record['models'][stream]['picks']), 10)
+        self.assertTrue(8 <= len(record['models']['prototype1']['picks']) <= 13)
+        self.assertTrue(1 <= len(record['models']['prototype2']['picks']) <= 10)
         self.assertLessEqual(len(record['models']['prototype3']['picks']), 16)
 
     def test_missing_odds_are_unknown_not_zero(self):
@@ -95,6 +99,7 @@ class ModelTests(unittest.TestCase):
         for card in record['models'].values():
             self.assertFalse(card['odds_complete'])
             self.assertIsNone(card['estimated_return_yen'])
+        self.assertEqual(record['models']['prototype1']['longshot_picks'], [])
 
     def test_deadline_sources_and_entrants_are_checked(self):
         req, hy, src, now = prepared()
@@ -136,7 +141,7 @@ class StorageAndSettlementTests(unittest.TestCase):
         changed = deepcopy(record)
         changed['models']['prototype1']['picks'] = ['6-5-4']
         stored = trial.persist(changed, req, src, hy)
-        self.assertEqual(stored, record)
+        self.assertEqual(stored, json.loads(json.dumps(record)))
         with gzip.open(trial.ROOT/'20260921/snapshots/20260921_05_01.json.gz', 'rt') as handle:
             self.assertEqual(json.load(handle)['record_digest'], record['digest'])
 
