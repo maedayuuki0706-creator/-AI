@@ -145,7 +145,7 @@ def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
             return []
         boats.append({
             "lane": lane, "course": lane, "predicted_course": lane,
-            "racer_id": registration[1], "name": re.sub(r"\s+", "", text[registration.end():].strip().split("\n")[0]),
+            "racer_id": registration[1], "current_class": registration[2], "name": re.sub(r"\s+", "", text[registration.end():].strip().split("\n")[0]),
             "avg_st": nums[0], "flying": int(fl[1]) > 0,
             "win_rate": nums[1], "top2_rate": nums[2], "top3_rate": nums[3],
             "local_win_rate": nums[4] if any(nums[4:7]) else None,

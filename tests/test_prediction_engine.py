@@ -1,6 +1,6 @@
 import unittest
 
-from prediction_engine import analyze_race, score_boat
+from prediction_engine import _exhibition_line_signals, analyze_race, score_boat
 
 
 class PredictionEngineTests(unittest.TestCase):
@@ -131,6 +131,31 @@ class PredictionEngineTests(unittest.TestCase):
         detail = next(x for x in out["race_shape"]["attack_details"] if x["lane"] == 4)
         self.assertLess(detail["projected_st"], .21)
         self.assertEqual(detail["likely_method"], "まくり")
+
+    def test_adjacent_fast_exhibition_line_is_detected_but_bounded(self):
+        boats = self._boats()
+        for lane, st in {1: .16, 2: .15, 3: .07, 4: .06, 5: .08, 6: .17}.items():
+            boats[lane - 1]["exhibition_st"] = st
+        signals = _exhibition_line_signals(boats)
+        self.assertEqual(set(signals), {3, 4, 5})
+
+        base = dict(boats[3])
+        base.pop("exhibition_line_signal", None)
+        boosted = dict(base)
+        boosted["exhibition_line_signal"] = 1.0
+        base_score = score_boat(base, {"venue": "多摩川"})
+        boosted_score = score_boat(boosted, {"venue": "多摩川"})
+        self.assertGreater(boosted_score["score"], base_score["score"])
+        self.assertLessEqual(boosted_score["score"] - base_score["score"], .0041)
+
+    def test_former_a_class_context_is_only_a_small_bonus(self):
+        boat = self._boats()[4]
+        base = score_boat(dict(boat), {"venue": "多摩川"})
+        former_a = dict(boat)
+        former_a["historical_class_signal"] = 1.0
+        boosted = score_boat(former_a, {"venue": "多摩川"})
+        self.assertGreater(boosted["score"], base["score"])
+        self.assertLessEqual(boosted["score"] - base["score"], .0041)
 
     def test_expected_value_is_calculated(self):
         boats = self._boats()
