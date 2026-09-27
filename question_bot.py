@@ -1739,17 +1739,33 @@ def wait_for_discord_api():
                 print(f"[discord] preflight HTTP {e.code}; discord.py will handle login", flush=True)
                 return
 
-            retry_after = backoff
+            raw = ""
+            payload = {}
             try:
-                payload = json.loads(e.read().decode("utf-8", errors="replace") or "{}")
-                retry_after = max(retry_after, float(payload.get("retry_after") or 0))
+                raw = e.read().decode("utf-8", errors="replace")
+                payload = json.loads(raw or "{}") if raw else {}
             except Exception:
-                pass
+                payload = {}
 
-            retry_after = max(30.0, min(600.0, retry_after))
-            print(f"[discord] global 429 during startup; retry in {retry_after:.0f}s", flush=True)
-            time.sleep(retry_after)
-            backoff = min(600.0, max(backoff * 2.0, retry_after * 1.5))
+            headers = e.headers or {}
+            scope = headers.get("X-RateLimit-Scope")
+            global_header = headers.get("X-RateLimit-Global")
+            retry_header = headers.get("Retry-After")
+            cf_ray = headers.get("CF-Ray")
+            retry_body = payload.get("retry_after") if isinstance(payload, dict) else None
+            global_body = payload.get("global") if isinstance(payload, dict) else None
+            message = payload.get("message") if isinstance(payload, dict) else None
+            code = payload.get("code") if isinstance(payload, dict) else None
+            print(
+                "[discord] 429 diagnostic | "
+                f"scope={scope!r} global_header={global_header!r} global_body={global_body!r} "
+                f"retry_header={retry_header!r} retry_body={retry_body!r} "
+                f"cf_ray={cf_ray!r} code={code!r} message={message!r}",
+                flush=True,
+            )
+            print("[discord] diagnostic stop after one 429; no automatic retry", flush=True)
+            while True:
+                time.sleep(3600)
         except Exception as e:
             print(f"[discord] preflight skipped: {type(e).__name__}: {e}", flush=True)
             return
