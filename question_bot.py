@@ -24,6 +24,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna").strip()
 PORT = int(os.getenv("PORT", "10000"))
 DISCORD_STARTUP_GRACE_SECONDS = float(os.getenv("DISCORD_STARTUP_GRACE_SECONDS", "20"))
+DISCORD_CONNECT_ENABLED = os.getenv("DISCORD_CONNECT_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
 STARTUP_TEST_MESSAGE = os.getenv("STARTUP_TEST_MESSAGE", "").strip()
 RACER_PROFILE_PATH = os.getenv("RACER_PROFILE_PATH", "data/racer_profiles.json").strip()
 ENCYCLOPEDIA_PATH = os.getenv("ENCYCLOPEDIA_PATH", "data/boat_encyclopedia.json").strip()
@@ -1756,6 +1757,11 @@ def wait_for_discord_api():
 
 def main():
     start_health_server()
+    if not DISCORD_CONNECT_ENABLED:
+        print("[discord] connection disabled; health server remains online", flush=True)
+        while True:
+            time.sleep(3600)
+
     if not BOT_TOKEN:
         print("[waiting] DISCORD_BOT_TOKEN is not configured; health server remains online", flush=True)
         while True:
