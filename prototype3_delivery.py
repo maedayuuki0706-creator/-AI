@@ -167,6 +167,47 @@ def _pick_lines(picks, per_line=4):
     )
 
 
+def _reason_lines(model):
+    """Describe only signals and picks actually stored with this prediction."""
+    heads = []
+    for lane, value in (model.get("heads") or {}).items():
+        try:
+            lane_no, score = int(lane), float(value)
+            if 1 <= lane_no <= 6 and 0 <= score <= 1:
+                heads.append((lane_no, score))
+        except (TypeError, ValueError):
+            pass
+    heads.sort(key=lambda item: item[1], reverse=True)
+
+    lines = []
+    if len(heads) >= 2:
+        first, second = heads[:2]
+        lines.append(
+            f"・1着評価は**{first[0]}号艇 {first[1]:.1%}**が最上位"
+            f"（次点{second[0]}号艇 {second[1]:.1%}）"
+        )
+
+    main = set(model.get("main_picks") or [])
+    ranked_main = []
+    for row in model.get("trifecta") or []:
+        if row.get("combination") not in main:
+            continue
+        try:
+            probability = float(row.get("probability"))
+            if 0 <= probability <= 1:
+                ranked_main.append((probability, row["combination"]))
+        except (TypeError, ValueError):
+            pass
+    if ranked_main:
+        probability, combo = max(ranked_main)
+        lines.append(f"・本線の最高評価は**{combo}**（組み合わせ評価 {probability:.1%}）")
+
+    cover = model.get("cover_picks") or []
+    if cover:
+        lines.append(f"・抑えは配当も見て選んだ中穴候補を**{len(cover)}点**追加")
+    return lines
+
+
 def _prediction_message(record, *, selected=False):
     model = record["model"]
     main = model.get("main_picks") or []
@@ -183,6 +224,9 @@ def _prediction_message(record, *, selected=False):
         _pick_lines(cover),
         "",
         f"📌 **合計 {model['point_count']}点**",
+        "",
+        "📝 **ゆうきの予想根拠（モデル内評価）**",
+        *_reason_lines(model),
     ]
     if selected:
         selection = record.get("selection") or {}
