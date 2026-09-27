@@ -23,7 +23,7 @@ import hiyori_source
 ROOT = Path("data/prototype12_delivery")
 STREAMS = ("prototype1", "prototype2")
 WEBHOOKS = {
-    "prototype1": ("PROTO1_DISCORD_WEBHOOK_URL", "鼻利きBOX予想家"),
+    "prototype1": ("PROTO1_DISCORD_WEBHOOK_URL", "嗅覚型予想家"),
     "prototype2": ("PROTO2_DISCORD_WEBHOOK_URL", "プロトタイプ2"),
 }
 
@@ -82,7 +82,7 @@ def model_message(record, stream):
         scenario = (f"{attacker}号艇の{method}を想定" if attacker
                     else "1マークの隊形は混戦を想定")
         return (
-            f"👃 **鼻利きBOX予想家（PT1）｜{record['venue']} {record['rno']}R**\n"
+            f"🐕 **嗅覚型予想家（PT1）｜{record['venue']} {record['rno']}R**\n"
             f"締切 {record['deadline']}｜展示6艇確認済み\n"
             f"**ここが匂う！ {scent}号艇**\n"
             f"展示＋既存/日和＋展開：{scenario}\n"
