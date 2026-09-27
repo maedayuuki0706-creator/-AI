@@ -6,8 +6,10 @@ on:
     branches: [main]
     paths:
       - 'four_way_prototype.py'
+      - 'scent_box.py'
       - 'prototype_runner.py'
       - 'tests/test_four_way_prototype.py'
+      - 'tests/test_scent_box.py'
       - '.github/workflows/fusion-prototype.yml'
   schedule:
     - cron: '*/5 * * * *'
@@ -33,7 +35,8 @@ jobs:
       - name: Verify five-way comparison invariants
         run: |
           python -m unittest discover -s tests -p 'test_four_way_prototype.py' -v
-          python -m py_compile prototype_runner.py four_way_prototype.py
+          python -m unittest discover -s tests -p 'test_scent_box.py' -v
+          python -m py_compile prototype_runner.py four_way_prototype.py scent_box.py
       - name: Capture first five-way checkpoint
         env:
           TZ: Asia/Tokyo
