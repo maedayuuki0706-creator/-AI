@@ -1545,9 +1545,17 @@ async def answer_question(question: str, source: str, context_label: str, conver
 
 
 def question_channel(message: discord.Message) -> bool:
+    channel = message.channel
     if QUESTION_CHANNEL_ID:
-        return str(message.channel.id) == QUESTION_CHANNEL_ID
-    return getattr(message.channel, "name", "") == QUESTION_CHANNEL_NAME
+        if str(getattr(channel, "id", "")) == QUESTION_CHANNEL_ID:
+            return True
+        parent = getattr(channel, "parent", None)
+        return str(getattr(parent, "id", "")) == QUESTION_CHANNEL_ID
+
+    if getattr(channel, "name", "") == QUESTION_CHANNEL_NAME:
+        return True
+    parent = getattr(channel, "parent", None)
+    return getattr(parent, "name", "") == QUESTION_CHANNEL_NAME
 
 
 intents = discord.Intents.default()
@@ -1599,8 +1607,22 @@ async def on_ready():
 async def on_message(message: discord.Message):
     if message.author.bot or not question_channel(message):
         return
+
     question = (message.content or "").strip()
+    print(
+        f"[question] received | channel={getattr(message.channel, 'name', '?')} "
+        f"| user={message.author.id} | chars={len(question)}",
+        flush=True,
+    )
     if not question:
+        try:
+            await message.reply(
+                "質問文を読み取れなかったで。Discord側のMessage Content Intentを確認する必要がありそうです。",
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+        except (discord.Forbidden, discord.HTTPException) as e:
+            print(f"[question] empty-content reply failed: {type(e).__name__}: {e}", flush=True)
         return
 
     now = time.monotonic()
