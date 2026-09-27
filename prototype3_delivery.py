@@ -157,37 +157,47 @@ def selection_info(official, model, native_existing):
     }
 
 
-def selected_message(record):
-    model = record["model"]
-    selected = record.get("selection") or {}
-    main = " / ".join(model.get("main_picks") or [])
-    cover = " / ".join(model.get("cover_picks") or [])
-    reason = "・".join(selected.get("reasons") or []) or "複合条件クリア"
-    return (
-        f"🏅 **新人予想家 ゆうき｜厳選**\n"
-        f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
-        f"✅ 厳選スコア **{selected.get('score', 0)}**｜{reason}\n"
-        f"🎯 **本線（{len(model.get('main_picks') or [])}点）**\n"
-        f"`{main}`\n"
-        f"🔥 **抑え（{len(model.get('cover_picks') or [])}点）**\n"
-        f"`{cover or 'なし'}`\n"
-        f"📊 計{model['point_count']}点｜通常配信より厳しい条件を通過"
+def _pick_lines(picks, per_line=4):
+    """Keep long prediction cards legible on narrow Discord screens."""
+    if not picks:
+        return "なし"
+    return "\n".join(
+        "  ".join(f"`{pick}`" for pick in picks[index:index + per_line])
+        for index in range(0, len(picks), per_line)
     )
+
+
+def _prediction_message(record, *, selected=False):
+    model = record["model"]
+    main = model.get("main_picks") or []
+    cover = model.get("cover_picks") or []
+    heading = "🏅 **新人予想家 ゆうき｜厳選予想**" if selected else "🎩 **新人予想家 ゆうき｜勝負予想**"
+    lines = [
+        heading,
+        f"🏁 **{record['venue']} {record['rno']}R**｜締切 **{record['deadline']}**",
+        "",
+        f"🎯 **ゆうきの本線｜{len(main)}点**",
+        _pick_lines(main),
+        "",
+        f"🛟 **展開の抑え｜{len(cover)}点**",
+        _pick_lines(cover),
+        "",
+        f"📌 **合計 {model['point_count']}点**",
+    ]
+    if selected:
+        selection = record.get("selection") or {}
+        reasons = "・".join(selection.get("reasons") or [])
+        if reasons:
+            lines.append(f"💡 **厳選ポイント**：{reasons}")
+    return "\n".join(lines)
+
+
+def selected_message(record):
+    return _prediction_message(record, selected=True)
 
 
 def message(record):
-    model = record["model"]
-    main = " / ".join(model.get("main_picks") or [])
-    cover = " / ".join(model.get("cover_picks") or [])
-    return (
-        f"🏆 **新人予想家 ゆうき｜日和本線＋中穴抑え**\n"
-        f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
-        f"🎯 **本線・日和（{len(model.get('main_picks') or [])}点）**\n"
-        f"`{main}`\n"
-        f"🔥 **抑え・中穴くん＋日和（{len(model.get('cover_picks') or [])}点）**\n"
-        f"`{cover or 'なし'}`\n"
-        f"📊 計{model['point_count']}点｜Grade {model['grade']}｜本番配信"
-    )
+    return _prediction_message(record)
 
 
 def build_record(day, jcd, rno, deadline):
