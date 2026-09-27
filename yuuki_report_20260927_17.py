@@ -8,10 +8,14 @@ from interim_report import require_report_channel
 from prediction_recap import post_confirmed
 from discord_notification_policy import SUPPRESS_NOTIFICATIONS
 
-cutoff = datetime.fromisoformat("2026-09-27T17:00:00+09:00")
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--hour", type=int, choices=(13, 15, 17), default=17)
+hour = parser.parse_args().hour
+cutoff = datetime.fromisoformat(f"2026-09-27T{hour:02d}:00:00+09:00")
 day = "20260927"
 root = Path("data/yuuki_interim_reports")
-marker = root / "20260927_17_receipt.json"
+marker = root / f"20260927_{hour:02d}_receipt.json"
 
 def read(path):
     return json.loads(path.read_text(encoding="utf-8"))
@@ -61,21 +65,21 @@ def main():
     totals = {k: sum(s[k] for s in counts.values()) for k in ("hits", "judged", "delivered")}
     if not totals["delivered"]:
         raise RuntimeError("No delivered forecasts available")
-    lines = ["🏆 **新人予想家 ゆうき｜09/27 17:00時点**", "",
+    lines = [f"🏆 **新人予想家 ゆうき｜09/27 {hour:02d}:00時点**", "",
              "**全場合計** " + text(totals),
              f'配信 {totals["delivered"]}R／判定済み {totals["judged"]}R',
              "", "**各場の的中率**"]
     lines += [f'・{v}：{text(s)}' for v, s in sorted(counts.items())]
-    lines += ["", "17:00 JSTまでの予想配信記録と公式結果確認記録で集計。結果待ち・未集計は分母外。判定0件の的中率は—。"]
+    lines += ["", f"{hour:02d}:00 JSTまでの予想配信記録と公式結果確認記録で集計。結果待ち・未集計は分母外。判定0件の的中率は—。"]
     payload = {"content": "\n".join(lines), "allowed_mentions": {"parse": []}, "flags": SUPPRESS_NOTIFICATIONS}
     root.mkdir(parents=True, exist_ok=True)
     snapshot = {"as_of": cutoff.isoformat(), "totals": totals, "venues": dict(counts), "races": races, "payload": payload}
-    (root / "20260927_17.json").write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (root / f"20260927_{hour:02d}.json").write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     result = post_confirmed(payload)
     if not str(result.get("id", "")).isdigit():
         raise RuntimeError("No Discord acknowledgement")
     with marker.open("w", encoding="utf-8") as handle:
-        json.dump({"request_id": "yuuki:20260927:17", "message_id": result["id"], "sent_at": datetime.now(cutoff.tzinfo).isoformat()}, handle)
+        json.dump({"request_id": f"yuuki:20260927:{hour:02d}", "message_id": result["id"], "sent_at": datetime.now(cutoff.tzinfo).isoformat()}, handle)
         handle.flush()
         os.fsync(handle.fileno())
     print("Yuuki report acknowledged", totals)
