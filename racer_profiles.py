@@ -114,6 +114,23 @@ def apply_profile(boat: dict, jcd: str | None = None) -> dict:
     boat["racer_profile_best_courses"] = best_courses[:3]
     boat["racer_profile_years"] = dict(profile.get("years") or {})
 
+    # Current class alone can understate a proven racer during a temporary B-class term.
+    # Historical class is only a small supplemental signal; live form/official rates stay dominant.
+    class_counts = dict(profile.get("class_counts") or {})
+    highest_class = profile.get("highest_class_seen")
+    current_class = str(boat.get("current_class") or "").upper()
+    class_signal = 0.0
+    if current_class in {"B1", "B2"}:
+        if highest_class == "A1":
+            class_signal = 1.0
+        elif highest_class == "A2":
+            class_signal = 0.65
+    boat["racer_profile_class_counts"] = class_counts
+    boat["racer_profile_highest_class"] = highest_class
+    boat["racer_profile_latest_class"] = profile.get("latest_class")
+    boat["racer_profile_class_last_seen"] = dict(profile.get("class_last_seen") or {})
+    boat["historical_class_signal"] = class_signal
+
     # Exhibition -> actual-race start correction profile. Prefer the same
     # course; fall back to the racer's overall behavior only when course
     # history is still sparse.
