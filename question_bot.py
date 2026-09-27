@@ -843,6 +843,35 @@ def course_stats_answer_sync(question: str, race_context):
         return None
 
     if toban is None:
+        venue_only = _venue_from_question(question)
+        if venue_only:
+            profile = _official_venue_features_sync(venue_only)
+            course_row = ((profile.get("courses") or {}).get(str(stat_course)) or {})
+            period = profile.get("period") or "直近3か月"
+            if course_row:
+                if metric == "1着率" and course_row.get("win_pct") is not None:
+                    return (
+                        f"{venue_only}の**{stat_course}コース1着率は{float(course_row['win_pct']):.1f}%**です。"
+                        f" 集計は{period}。"
+                    )
+                if metric == "2連対率" and course_row.get("top2_pct") is not None:
+                    return (
+                        f"{venue_only}の**{stat_course}コース2連対率は{float(course_row['top2_pct']):.1f}%**です。"
+                        f" 集計は{period}。"
+                    )
+                if metric == "3連対率" and course_row.get("top3_pct") is not None:
+                    return (
+                        f"{venue_only}の**{stat_course}コース3連対率は{float(course_row['top3_pct']):.1f}%**です。"
+                        f" 集計は{period}。"
+                    )
+                if metric in ("逃げ率", "差し率", "まくり率", "まくり差し率"):
+                    method = metric[:-1]
+                    value = (course_row.get("methods") or {}).get(method)
+                    if value is not None:
+                        return (
+                            f"{venue_only}の直近データでは、**{stat_course}コースの{method}構成比は"
+                            f"{float(value):.1f}%**です。集計は{period}。"
+                        )
         if metric == "1着率":
             rate = fetch_national_course_first_rate_sync(stat_course)
             if rate is not None:
@@ -1117,6 +1146,115 @@ def _norm_knowledge_text(text: str) -> str:
     )
 
 
+def _official_venue_features_sync(venue: str) -> dict:
+    """Fetch current BOAT RACE official venue notes and recent course stats."""
+    jcd = VENUE_TO_JCD.get(venue)
+    if not jcd:
+        return {}
+    cache_key = f"official_venue:{jcd}"
+    cached = _cache_get(cache_key, 3600)
+    if cached is not None:
+        return cached
+
+    result = {
+        "venue": venue,
+        "jcd": jcd,
+        "race_feature": None,
+        "water_feature": None,
+        "period": None,
+        "courses": {},
+        "source_feature": f"https://www.boatrace.jp/owpc/pc/site/place/stadium/br{jcd}/",
+        "source_stats": f"https://www.boatrace.jp/owpc/pc/data/stadium?jcd={jcd}",
+    }
+
+    try:
+        raw = _fetch_html_sync(result["source_feature"], timeout=10)
+        lines = _textify_fragment(raw).splitlines()
+
+        def section_after(heading: str, stop_heading: str | None = None) -> Optional[str]:
+            try:
+                start = next(i for i, line in enumerate(lines) if line.strip() == heading)
+            except StopIteration:
+                return None
+            collected = []
+            for line in lines[start + 1 :]:
+                value = line.strip()
+                if not value:
+                    continue
+                if stop_heading and value == stop_heading:
+                    break
+                if "詳細データはこちら" in value:
+                    break
+                if value.startswith("ボートレース場") and collected:
+                    break
+                collected.append(value)
+                if len(" ".join(collected)) >= 180:
+                    break
+            text = " ".join(collected).strip()
+            return text[:220] if text else None
+
+        result["race_feature"] = section_after("レースの特徴", "水面特性")
+        result["water_feature"] = section_after("水面特性")
+    except Exception as e:
+        print(f"[venue-feature] {venue}: {type(e).__name__}: {e}", flush=True)
+
+    try:
+        raw = _fetch_html_sync(result["source_stats"], timeout=10)
+        parser = TableRowsParser()
+        parser.feed(raw)
+
+        for row in parser.rows:
+            if len(row) < 13 or row[0].strip() not in {"1", "2", "3", "4", "5", "6"}:
+                continue
+            try:
+                course = int(row[0].strip())
+                placing = [float(str(row[i]).replace("%", "").strip()) for i in range(1, 7)]
+                methods = [float(str(row[i]).replace("%", "").strip()) for i in range(7, 13)]
+            except (TypeError, ValueError):
+                continue
+            key = str(course)
+            if key in result["courses"]:
+                continue
+            result["courses"][key] = {
+                "win_pct": placing[0],
+                "second_pct": placing[1],
+                "third_pct": placing[2],
+                "top2_pct": round(placing[0] + placing[1], 1),
+                "top3_pct": round(placing[0] + placing[1] + placing[2], 1),
+                "methods": {
+                    "逃げ": methods[0],
+                    "まくり": methods[1],
+                    "差し": methods[2],
+                    "まくり差し": methods[3],
+                    "抜き": methods[4],
+                    "恵まれ": methods[5],
+                },
+            }
+            if len(result["courses"]) == 6:
+                break
+
+        text = _textify_fragment(raw)
+        m = re.search(
+            r"集計期間\s*[:：]?\s*(\d{4}/\d{1,2}/\d{1,2})\s*[～〜~\-]\s*(\d{4}/\d{1,2}/\d{1,2})",
+            text,
+        )
+        if m:
+            result["period"] = f"{m.group(1)}～{m.group(2)}"
+    except Exception as e:
+        print(f"[venue-stats] {venue}: {type(e).__name__}: {e}", flush=True)
+
+    return _cache_set(cache_key, result)
+
+
+def _dominant_outer_course(profile: dict) -> tuple[int, float] | None:
+    choices = []
+    for course in range(2, 7):
+        row = (profile.get("courses") or {}).get(str(course)) or {}
+        if row.get("win_pct") is not None:
+            choices.append((course, float(row["win_pct"])))
+    return max(choices, key=lambda item: item[1]) if choices else None
+
+
 def venue_knowledge_answer_sync(question: str) -> Optional[str]:
     venue = _venue_from_question(question)
     if not venue:
@@ -1124,7 +1262,10 @@ def venue_knowledge_answer_sync(question: str) -> Optional[str]:
     q = _norm_knowledge_text(question)
     if not any(word in q for word in [
         "特徴", "水面", "水質", "潮", "干満", "満潮", "干潮",
-        "海水", "汽水", "淡水", "どんな場", "どんな水面"
+        "海水", "汽水", "淡水", "どんな場", "どんな水面",
+        "イン", "ダッシュ", "センター", "アウト", "まくり", "捲り",
+        "差し", "風", "向かい風", "追い風", "うねり", "波", "スタート",
+        "コース", "狙い目", "得意", "荒れ"
     ]):
         return None
 
@@ -1133,30 +1274,55 @@ def venue_knowledge_answer_sync(question: str) -> Optional[str]:
     tactical_data = _load_json_file_cached(VENUE_TACTICAL_PATH, "venue_tactical_priors", 300)
     row = ((tide_data.get("venues") or {}).get(str(jcd)) or {}) if jcd else {}
     tactical = ((tactical_data.get("venues") or {}).get(str(jcd)) or {}) if jcd else {}
+    official = _official_venue_features_sync(venue)
 
-    if not row and not tactical:
+    if not row and not tactical and not official:
         return None
 
     lines = [f"🌊 **{venue}の水面メモ**"]
     water = row.get("water_type")
     if water:
         lines.append(f"水質: **{water}**")
+
     if row:
         if row.get("tidal_difference"):
-            lines.append("干満差: **あり**。潮位は予想材料に入れる水面。")
-            if row.get("weight"):
-                lines.append(f"潮位の扱い: {row.get('weight')}")
+            weight = str(row.get("weight") or "normal")
+            weight_label = {
+                "strong": "重要度高め",
+                "thresholded": "条件付きで評価",
+                "normal": "通常評価",
+            }.get(weight, weight)
+            lines.append(f"干満差: **あり**｜潮位は予想材料（{weight_label}）")
         else:
             reason = row.get("exclusion_reason")
-            lines.append("干満差: **予想では基本的に除外**。")
+            lines.append("干満差: **予想では基本的に除外**")
             if reason:
                 lines.append(f"理由: {reason}")
-    if tactical.get("course1_win_pct") is not None:
-        period = tactical.get("period") or "掲載期間"
-        lines.append(
-            f"参考データ: {period}の1コース1着率 **{float(tactical['course1_win_pct']):.1f}%**"
-        )
-    lines.append("※場データは固定観念にせず、当日の風・展示・進入と合わせて見る。")
+
+    if official.get("race_feature"):
+        lines.append(f"レース特徴: {official['race_feature']}")
+    if official.get("water_feature"):
+        lines.append(f"水面特性: {official['water_feature']}")
+
+    course1 = ((official.get("courses") or {}).get("1") or {}).get("win_pct")
+    if course1 is None and tactical.get("course1_win_pct") is not None:
+        course1 = float(tactical["course1_win_pct"])
+    if course1 is not None:
+        period = official.get("period") or tactical.get("period") or "直近掲載期間"
+        lines.append(f"直近データ: **1コース1着率 {float(course1):.1f}%**（{period}）")
+
+    outer = _dominant_outer_course(official)
+    if outer and any(k in q for k in ["特徴", "イン", "ダッシュ", "センター", "アウト", "まくり", "捲り", "差し", "コース", "狙い目"]):
+        course, rate = outer
+        method_row = ((official.get("courses") or {}).get(str(course)) or {}).get("methods") or {}
+        usable = {k: float(v) for k, v in method_row.items() if k not in {"逃げ", "恵まれ"} and float(v) > 0}
+        method_text = ""
+        if usable:
+            method, method_rate = max(usable.items(), key=lambda item: item[1])
+            method_text = f"｜主な決まり手は{method} {method_rate:.1f}%"
+        lines.append(f"外側で1着率が最も高いのは **{course}コース {rate:.1f}%**{method_text}")
+
+    lines.append("※場の傾向は固定せず、当日の風・展示ST・進入・モーター気配を優先。")
     return "\n".join(lines)
 
 
@@ -1391,9 +1557,14 @@ async def on_message(message: discord.Message):
             effective_question = question
             venue = _venue_from_question(question)
             stats_words = ["的中率", "回収率", "roi", "成績", "調子", "今どう", "現状", "結果"]
-            if venue and any(k in question.lower() for k in stats_words):
+            venue_words = [
+                "特徴", "水面", "水質", "潮", "干満", "満潮", "干潮", "海水", "汽水", "淡水",
+                "イン", "ダッシュ", "センター", "アウト", "まくり", "捲り", "差し",
+                "風", "うねり", "波", "スタート", "コース", "狙い目", "荒れ"
+            ]
+            if venue and any(k in question.lower() for k in stats_words + venue_words):
                 _venue_context_by_user[message.author.id] = (venue, time.monotonic())
-            elif len(question) <= 16 and any(k in question.lower() for k in stats_words):
+            elif len(question) <= 18 and any(k in question.lower() for k in stats_words + venue_words):
                 ctx = _venue_context_by_user.get(message.author.id)
                 if ctx and time.monotonic() - ctx[1] <= 900:
                     effective_question = f"{ctx[0]} {question}"
