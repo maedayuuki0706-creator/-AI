@@ -44,13 +44,15 @@ def _prototype_message(record, stream):
             f"`{cover or 'なし'}`\n"
             f"📊 計{model['point_count']}点｜Grade {model['grade']}｜本番配信"
         )
+    if stream == 'prototype1':
+        from prototype12_delivery import model_message
+        return model_message(record, stream)
     weight = model['weights']
     picks = ' / '.join(model['picks'])
-    title = 'プロトタイプ1｜既存AI優先' if stream == 'prototype1' else 'プロトタイプ2｜日和AI優先'
     return (
-        f"🧪 **{title}**\n"
+        f"🧪 **プロトタイプ2｜PT3×既存メイン圧縮**\n"
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
-        f"⚖️ 既存 {int(weight['existing']*100)}% / 日和 {int(weight['hiyori']*100)}%\n"
+        f"⚖️ 既存 {int(weight.get('existing', 0)*100)}% / 日和 {int(weight.get('hiyori', 0)*100)}%\n"
         f"🎯 **買い目 {model['point_count']}点**\n"
         f"`{picks}`\n"
         f"📊 Grade {model['grade']}｜比較テスト配信"
