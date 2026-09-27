@@ -15,6 +15,7 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 import discord
+from turn_tactics import turn_tactics_answer
 
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "").strip()
 QUESTION_CHANNEL_NAME = os.getenv("DISCORD_QUESTION_CHANNEL_NAME", "質問").strip()
@@ -1175,7 +1176,7 @@ def encyclopedia_answer_sync(question: str, user_id: int) -> Optional[str]:
             "📚 **質問くん・競艇事典**\n"
             "用語・決まり手・展示・進入・風/潮・モーター・選手成績・コース別成績・"
             "当日結果・場別的中率まで聞けるで。\n"
-            "例: 「まくり差しって何？」「若松8Rの1号艇データ」"
+            "例: 「ツケマイって何？」「3がツケマイなら4は？」「若松8Rの1号艇データ」"
             "「常滑は潮見る？」「桐生1Rの結果」「今の常滑の的中率」"
         )
 
@@ -1231,6 +1232,8 @@ def build_instructions() -> str:
 - 「なぜこの艇を入れた？」のような質問で根拠データが無い場合は、断定せず「このメッセージだけでは根拠データまで確認できない」と明示する。
 - フォーメーションは、1着/2着/3着候補と点数を具体的に説明する。
 - ST、展示、逃げ率、逃し率、差し、まくり、まくり差し、チルト、前付けなどは初心者にも通じる言葉にする。
+- 先マイ・ツケマイ・握りマイなどの質問は、意味→成立条件→起こりうる展開→舟券で確認すべき材料の順に説明する。先マイと1着を同一視せず、ツケマイは内艇を抑える外側のまくりの一種とする。
+- 複数艇の展開質問は内艇・攻め艇・後続艇の動きを条件付きで説明し、データのない艇番・着順・的中確率を断定しない。
 - ギャンブルの結果を保証しない。「絶対」「確実に勝てる」などは使わない。
 - 回答は原則2〜6文。長くなる時は箇条書きを3〜5個まで。
 - 競艇AIナビ内の呼称: メイン=本線寄り、中穴くん=中配当狙い、穴くん=高配当スナイパー、厳選くん=配信数を絞った高信頼候補、日和=別視点データ、PT3=既存を軸に日和を補助利用する融合系。
@@ -1291,7 +1294,7 @@ async def answer_question(question: str, source: str, context_label: str) -> str
     if live:
         return live
 
-    fallback = glossary_answer(question, source)
+    fallback = turn_tactics_answer(question) or glossary_answer(question, source)
     if OPENAI_API_KEY:
         try:
             return await asyncio.to_thread(call_openai_sync, question, source, context_label)
@@ -1403,6 +1406,8 @@ async def on_message(message: discord.Message):
                 quick = await maybe_answer_course_stats(effective_question, "", message.author.id)
             if quick is None:
                 quick = await maybe_answer_racer_data(effective_question, "", message.author.id)
+            if quick is None and not message.reference and not MESSAGE_LINK_RE.search(effective_question) and not (RACE_RE.search(effective_question) or RACE_JP_RE.search(effective_question)):
+                quick = turn_tactics_answer(effective_question)
             if quick is None:
                 quick = await maybe_answer_encyclopedia(effective_question, message.author.id)
             if quick is None:
@@ -1428,6 +1433,8 @@ async def on_message(message: discord.Message):
                 answer = await maybe_answer_course_stats(effective_question, source, message.author.id)
             if answer is None:
                 answer = await maybe_answer_racer_data(effective_question, source, message.author.id)
+            if answer is None and turn_tactics_answer(effective_question):
+                answer = await answer_question(effective_question, source, context_label)
             if answer is None:
                 answer = await maybe_answer_encyclopedia(effective_question, message.author.id)
             if answer is None:
