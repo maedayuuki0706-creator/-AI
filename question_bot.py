@@ -1695,6 +1695,7 @@ async def on_message(message: discord.Message):
 def wait_for_discord_api():
     """Keep the service alive during Discord global 429s before starting discord.py."""
     url = "https://discord.com/api/v10/users/@me"
+    backoff = 30.0
     while True:
         req = urllib.request.Request(
             url,
@@ -1713,15 +1714,18 @@ def wait_for_discord_api():
             if e.code != 429:
                 print(f"[discord] preflight HTTP {e.code}; discord.py will handle login", flush=True)
                 return
-            retry_after = 30.0
+
+            retry_after = backoff
             try:
                 payload = json.loads(e.read().decode("utf-8", errors="replace") or "{}")
-                retry_after = float(payload.get("retry_after") or retry_after)
+                retry_after = max(retry_after, float(payload.get("retry_after") or 0))
             except Exception:
                 pass
-            retry_after = max(15.0, min(120.0, retry_after))
+
+            retry_after = max(30.0, min(600.0, retry_after))
             print(f"[discord] global 429 during startup; retry in {retry_after:.0f}s", flush=True)
             time.sleep(retry_after)
+            backoff = min(600.0, max(backoff * 2.0, retry_after * 1.5))
         except Exception as e:
             print(f"[discord] preflight skipped: {type(e).__name__}: {e}", flush=True)
             return
