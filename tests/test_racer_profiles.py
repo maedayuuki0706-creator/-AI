@@ -188,6 +188,33 @@ class RacerProfileTests(unittest.TestCase):
         finally:
             p.profile_for = original
 
+    def test_class_history_tracks_highest_and_latest_class(self):
+        racer = l._new_racer("4001", "選手A")
+        self.assertTrue(l._observe_class(racer, "A1", "20240101"))
+        self.assertTrue(l._observe_class(racer, "B2", "20260927"))
+        self.assertEqual(racer["highest_class_seen"], "A1")
+        self.assertEqual(racer["latest_class"], "B2")
+        self.assertEqual(racer["class_counts"]["A1"], 1)
+
+    def test_former_a_class_is_exposed_as_supplemental_signal(self):
+        original = p.profile_for
+        try:
+            p.profile_for = lambda _: {
+                "starts": 80,
+                "avg_st": .14,
+                "courses": {}, "venues": {}, "years": {},
+                "win_methods": {}, "course_win_methods": {},
+                "class_counts": {"A1": 20, "B2": 4},
+                "class_last_seen": {"A1": "20251201", "B2": "20260927"},
+                "highest_class_seen": "A1", "latest_class": "B2",
+            }
+            boat = {"racer_id": "4001", "lane": 5, "predicted_course": 5, "current_class": "B2"}
+            p.apply_profile(boat, "05")
+            self.assertEqual(boat["racer_profile_highest_class"], "A1")
+            self.assertEqual(boat["historical_class_signal"], 1.0)
+        finally:
+            p.profile_for = original
+
     def test_three_year_backfill_floor_and_cursor(self):
         state = {"backfill": {"next_day": "20221231"}}
         out = l.run_backfill(
