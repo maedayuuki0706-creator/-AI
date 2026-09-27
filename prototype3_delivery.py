@@ -20,6 +20,7 @@ import detailed_discord_notify as cards
 import four_way_prototype as trial
 import hiyori_model
 import hiyori_source
+from discord_formation import compress_picks
 
 ROOT = Path("data/prototype3_delivery")
 WEBHOOK_ENV = "PT3_DISCORD_WEBHOOK_URL"
@@ -167,6 +168,17 @@ def _pick_lines(picks, per_line=4):
     )
 
 
+def _compressed_pick_lines(picks, per_line=2):
+    """Losslessly compress Yuuki's main line for easier Discord scanning."""
+    if not picks:
+        return "なし"
+    formations = [item["text"] for item in compress_picks(picks)]
+    return "\n".join(
+        "  ".join(f"`{formation}`" for formation in formations[index:index + per_line])
+        for index in range(0, len(formations), per_line)
+    )
+
+
 def _reason_lines(model):
     """Describe only signals and picks actually stored with this prediction."""
     heads = []
@@ -218,7 +230,7 @@ def _prediction_message(record, *, selected=False):
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 **{record['deadline']}**",
         "",
         f"🎯 **ゆうきの本線｜{len(main)}点**",
-        _pick_lines(main),
+        _compressed_pick_lines(main),
         "",
         f"🛟 **展開の抑え｜{len(cover)}点**",
         _pick_lines(cover),
