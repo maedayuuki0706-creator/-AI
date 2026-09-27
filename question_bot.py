@@ -1634,12 +1634,48 @@ async def on_message(message: discord.Message):
             )
 
 
+def wait_for_discord_api():
+    """Keep the service alive during Discord global 429s before starting discord.py."""
+    url = "https://discord.com/api/v10/users/@me"
+    while True:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": f"Bot {BOT_TOKEN}",
+                "User-Agent": "boat-ai-question-bot/1.0",
+            },
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                if 200 <= int(resp.status) < 300:
+                    print("[discord] API preflight OK", flush=True)
+                    return
+        except urllib.error.HTTPError as e:
+            if e.code != 429:
+                print(f"[discord] preflight HTTP {e.code}; discord.py will handle login", flush=True)
+                return
+            retry_after = 30.0
+            try:
+                payload = json.loads(e.read().decode("utf-8", errors="replace") or "{}")
+                retry_after = float(payload.get("retry_after") or retry_after)
+            except Exception:
+                pass
+            retry_after = max(15.0, min(120.0, retry_after))
+            print(f"[discord] global 429 during startup; retry in {retry_after:.0f}s", flush=True)
+            time.sleep(retry_after)
+        except Exception as e:
+            print(f"[discord] preflight skipped: {type(e).__name__}: {e}", flush=True)
+            return
+
+
 def main():
     start_health_server()
     if not BOT_TOKEN:
         print("[waiting] DISCORD_BOT_TOKEN is not configured; health server remains online", flush=True)
         while True:
             time.sleep(3600)
+    wait_for_discord_api()
     client.run(BOT_TOKEN, log_handler=None)
 
 
