@@ -176,6 +176,37 @@ def _projected_exhibition_st(boat: Mapping[str, Any]) -> Any:
     return max(0.0, min(1.0, st - applied))
 
 
+def _exhibition_line_signals(boats: Iterable[Mapping[str, Any]]) -> Dict[int, float]:
+    """Detect a clearly fast adjacent three-course exhibition line.
+
+    This is deliberately conservative: it only fires when the three fastest
+    valid exhibition starts are consecutive courses and are either all 0.09 or
+    faster, or all 0.12 or faster with a visible gap to the fourth-fastest boat.
+    It is a small context clue, never a replacement for the base model.
+    """
+    rows = []
+    for boat in boats:
+        try:
+            course = int(boat.get("predicted_course") or boat.get("course") or boat.get("lane") or 0)
+            st = float(boat.get("exhibition_st"))
+        except (TypeError, ValueError):
+            continue
+        if 1 <= course <= 6 and 0 <= st <= 0.30:
+            rows.append((course, st))
+    if len(rows) < 4:
+        return {}
+    ranked = sorted(rows, key=lambda item: item[1])
+    top3 = ranked[:3]
+    courses = sorted(course for course, _ in top3)
+    if courses != list(range(courses[0], courses[0] + 3)):
+        return {}
+    slowest_top3 = max(st for _, st in top3)
+    fourth = ranked[3][1]
+    if not (slowest_top3 <= 0.09 or (slowest_top3 <= 0.12 and fourth - slowest_top3 >= 0.02)):
+        return {}
+    return {course: 1.0 for course in courses}
+
+
 def _grade(value: Any, default: float = 0.5) -> float:
     if value is None:
         return default
@@ -323,6 +354,15 @@ def score_boat(boat: Mapping[str, Any], race: Mapping[str, Any]) -> Dict[str, An
     history_signal = _historical_course_signal(boat, course)
     raw += 0.008 * history_signal
     parts["history"] = 0.5 + 0.5 * history_signal
+
+    # Supplemental context only. Each feature is capped below the existing
+    # historical-style adjustment so one special case cannot rewrite the model.
+    class_signal = _clip(boat.get("historical_class_signal") or 0.0, 0.0, 1.0)
+    exhibition_line_signal = _clip(boat.get("exhibition_line_signal") or 0.0, 0.0, 1.0)
+    raw += 0.004 * class_signal
+    raw += 0.004 * exhibition_line_signal
+    parts["class_history"] = 0.5 + 0.5 * class_signal
+    parts["exhibition_line"] = 0.5 + 0.5 * exhibition_line_signal
 
     if course == 1:
         raw *= 1.06
@@ -507,7 +547,11 @@ def _race_shape(
 
 def analyze_race(payload: Mapping[str, Any]) -> Dict[str, Any]:
     race = payload.get("race") if isinstance(payload.get("race"), Mapping) else payload
-    boats = payload.get("boats") or race.get("boats") or []
+    boats = [dict(b) for b in (payload.get("boats") or race.get("boats") or [])]
+    line_signals = _exhibition_line_signals(boats)
+    for boat in boats:
+        course = int(boat.get("predicted_course") or boat.get("course") or boat.get("lane") or 0)
+        boat["exhibition_line_signal"] = float(line_signals.get(course, 0.0))
     scored = [score_boat(b, race) for b in boats]
     scored.sort(key=lambda x: x["score"], reverse=True)
 
@@ -537,7 +581,7 @@ def analyze_race(payload: Mapping[str, Any]) -> Dict[str, Any]:
     race_shape = _race_shape(boats, scored, trifectas)
 
     return {
-        "model_version": "kyoutei-navi-course-v5-start-correction-unvalidated",
+        "model_version": "kyoutei-navi-course-v6-bounded-context",
         "venue": race.get("venue"),
         "boats": scored,
         "trifecta": trifectas,
