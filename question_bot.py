@@ -1388,34 +1388,91 @@ async def maybe_answer_encyclopedia(question: str, user_id: int) -> Optional[str
         return None
 
 
-def build_instructions() -> str:
-    return """あなたは競艇AIナビのDiscord質問係です。
-ユーザーの質問に、日本語で短く分かりやすく答えてください。
-予想メッセージの文脈が与えられた場合は、その内容を最優先で説明してください。
 
-重要:
+async def recent_conversation_text(message: discord.Message, max_items: int = 12) -> str:
+    """Build user-scoped conversation memory from Discord history.
+
+    This survives Render restarts because Discord itself is the source of truth.
+    Only the current user's messages and bot replies that reference those
+    messages are included, avoiding cross-user context leakage in shared channels.
+    """
+    try:
+        recent = [m async for m in message.channel.history(limit=40, before=message)]
+    except (discord.Forbidden, discord.HTTPException):
+        return ""
+
+    user_message_ids = {
+        m.id for m in recent
+        if getattr(m.author, "id", None) == message.author.id
+    }
+    bot_id = getattr(client.user, "id", None)
+    selected: list[str] = []
+
+    for item in reversed(recent):
+        author_id = getattr(item.author, "id", None)
+        text = message_text(item).strip()
+        if not text:
+            continue
+        text = text[:900]
+
+        if author_id == message.author.id:
+            selected.append(f"ユーザー: {text}")
+            continue
+
+        if bot_id is not None and author_id == bot_id:
+            ref = getattr(item, "reference", None)
+            ref_id = getattr(ref, "message_id", None) if ref else None
+            if ref_id in user_message_ids:
+                selected.append(f"バディ: {text}")
+
+    selected = selected[-max_items:]
+    joined = "\n".join(selected)
+    return joined[-6500:]
+
+
+def build_instructions() -> str:
+    return """あなたはDiscord上の「質問くん」です。役割は、ユーザーのバディ（相棒）として会話しながら、特に競艇を深く支えることです。
+質問には日本語で、自然で親しみやすく、必要な時だけ詳しく答えてください。単発FAQではなく、直近の会話の流れを踏まえて会話を続けます。
+予想メッセージや公式データなどの参照コンテキストが与えられた場合は、その内容を最優先してください。
+
+会話:
+- 「それ」「さっきの」「前のレース」などは、直近の会話履歴から対象を解決する。
+- 履歴にない内容を「覚えている」と装わない。分からない時は、分からない範囲だけ短く明示する。
+- 競艇以外の普通の質問や雑談にも自然に答えてよい。
+- ユーザーの言葉づかいに少し合わせてもよいが、過度なキャラ口調にはしない。
+- 回答は原則2〜8文。複雑な分析だけ必要に応じて箇条書きを使う。
+
+競艇:
 - 根拠が文脈にない数字・選手データ・結果・オッズ・展示気配を作らない。
-- 「なぜこの艇を入れた？」のような質問で根拠データが無い場合は、断定せず「このメッセージだけでは根拠データまで確認できない」と明示する。
+- 「なぜこの艇を入れた？」のような質問で根拠データが無い場合は、断定せず不足している材料を明示する。
 - フォーメーションは、1着/2着/3着候補と点数を具体的に説明する。
 - ST、展示、逃げ率、逃し率、差し、まくり、まくり差し、チルト、前付けなどは初心者にも通じる言葉にする。
-- 先マイ・ツケマイ・握りマイなどの質問は、意味→成立条件→起こりうる展開→舟券で確認すべき材料の順に説明する。先マイと1着を同一視せず、ツケマイは内艇を抑える外側のまくりの一種とする。
-- 複数艇の展開質問は内艇・攻め艇・後続艇の動きを条件付きで説明し、データのない艇番・着順・的中確率を断定しない。
+- 先マイ・ツケマイ・握りマイなどは、意味→成立条件→起こりうる展開→舟券で見る材料の順で考える。
+- 先マイと1着を同一視しない。ツケマイは内艇を抑える外側のまくりの一種として扱う。
+- 複数艇の展開質問は、内艇・攻め艇・後続艇の動きを条件付きで説明し、データのない着順や的中確率を断定しない。
+- 選手の現在級だけで能力を決めず、取得できる場合は過去級・実績・コース別傾向・近況も別軸で見る。
+- 展示STは本番STそのものではない。展示で遅れた選手が本番で踏み込む可能性など、選手特性も別材料として扱う。
+- 1つの的中例に合わせるために全ロジックを崩さず、再現性のある補助材料として考える。
 - ギャンブルの結果を保証しない。「絶対」「確実に勝てる」などは使わない。
-- 回答は原則2〜6文。長くなる時は箇条書きを3〜5個まで。
-- 競艇AIナビ内の呼称: メイン=本線寄り、中穴くん=中配当狙い、穴くん=高配当スナイパー、厳選くん=配信数を絞った高信頼候補、日和=別視点データ、PT3=既存を軸に日和を補助利用する融合系。
+
+競艇AIナビ内の呼称:
+メイン=本線寄り、中穴くん=中配当狙い、穴くん=高配当スナイパー、厳選くん=配信数を絞った高信頼候補、日和=別視点データ、PT3/新人予想家ゆうき=既存ロジックを軸に補助情報を融合する予想系。
 """
 
 
-def call_openai_sync(question: str, source: str, context_label: str) -> str:
+def call_openai_sync(question: str, source: str, context_label: str, conversation: str = "") -> str:
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is not configured")
-    input_text = f"""質問:
+    input_text = f"""直近の会話:
+{conversation if conversation else "(会話履歴なし)"}
+
+今回の質問:
 {question}
 
 参照元:
 {context_label}
 
-予想・会話コンテキスト:
+予想・データコンテキスト:
 {source if source else "(参照メッセージなし)"}
 """
     body = {
@@ -1455,7 +1512,7 @@ def call_openai_sync(question: str, source: str, context_label: str) -> str:
     return answer
 
 
-async def answer_question(question: str, source: str, context_label: str) -> str:
+async def answer_question(question: str, source: str, context_label: str, conversation: str = "") -> str:
     live = await live_venue_answer(question)
     if live:
         return live
@@ -1463,7 +1520,7 @@ async def answer_question(question: str, source: str, context_label: str) -> str
     fallback = turn_tactics_answer(question) or glossary_answer(question, source)
     if OPENAI_API_KEY:
         try:
-            return await asyncio.to_thread(call_openai_sync, question, source, context_label)
+            return await asyncio.to_thread(call_openai_sync, question, source, context_label, conversation)
         except Exception as e:
             print(f"[openai] {type(e).__name__}: {e}", flush=True)
     if fallback:
@@ -1598,6 +1655,7 @@ async def on_message(message: discord.Message):
                 context_label = "同一サーバー内の最近の予想メッセージ"
 
             source = message_text(source_message) if source_message else ""
+            conversation = await recent_conversation_text(message)
             resolve_race_context(message.author.id, effective_question, source)
             answer = await maybe_answer_race_result(effective_question)
             if answer is None:
@@ -1605,11 +1663,11 @@ async def on_message(message: discord.Message):
             if answer is None:
                 answer = await maybe_answer_racer_data(effective_question, source, message.author.id)
             if answer is None and turn_tactics_answer(effective_question):
-                answer = await answer_question(effective_question, source, context_label)
+                answer = await answer_question(effective_question, source, context_label, conversation)
             if answer is None:
                 answer = await maybe_answer_encyclopedia(effective_question, message.author.id)
             if answer is None:
-                answer = await answer_question(effective_question, source, context_label)
+                answer = await answer_question(effective_question, source, context_label, conversation)
 
             if source_message and source_message.jump_url:
                 answer = f"{answer}\n\n↪ 参照: {source_message.jump_url}"
