@@ -25,6 +25,7 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna").strip()
 PORT = int(os.getenv("PORT", "10000"))
 DISCORD_STARTUP_GRACE_SECONDS = float(os.getenv("DISCORD_STARTUP_GRACE_SECONDS", "20"))
 DISCORD_CONNECT_ENABLED = os.getenv("DISCORD_CONNECT_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
+DISCORD_PUBLIC_DIAGNOSTIC = os.getenv("DISCORD_PUBLIC_DIAGNOSTIC", "0").strip().lower() in {"1", "true", "yes", "on"}
 STARTUP_TEST_MESSAGE = os.getenv("STARTUP_TEST_MESSAGE", "").strip()
 RACER_PROFILE_PATH = os.getenv("RACER_PROFILE_PATH", "data/racer_profiles.json").strip()
 ENCYCLOPEDIA_PATH = os.getenv("ENCYCLOPEDIA_PATH", "data/boat_encyclopedia.json").strip()
@@ -1771,8 +1772,47 @@ def wait_for_discord_api():
             return
 
 
+def run_discord_public_diagnostic_once():
+    """One unauthenticated Discord request to distinguish IP-level blocking."""
+    req = urllib.request.Request(
+        "https://discord.com/api/v10/gateway",
+        headers={"User-Agent": "boat-ai-question-bot/1.0"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+            print(
+                f"[discord-public] status={resp.status} cf_ray={resp.headers.get('CF-Ray')!r} "
+                f"body={body[:200]!r}",
+                flush=True,
+            )
+    except urllib.error.HTTPError as e:
+        raw = ""
+        try:
+            raw = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+        print(
+            "[discord-public] HTTP diagnostic | "
+            f"status={e.code} scope={e.headers.get('X-RateLimit-Scope')!r} "
+            f"global_header={e.headers.get('X-RateLimit-Global')!r} "
+            f"retry_header={e.headers.get('Retry-After')!r} "
+            f"cf_ray={e.headers.get('CF-Ray')!r} body={raw[:300]!r}",
+            flush=True,
+        )
+    except Exception as e:
+        print(f"[discord-public] error={type(e).__name__}: {e}", flush=True)
+
+
 def main():
     start_health_server()
+    if DISCORD_PUBLIC_DIAGNOSTIC:
+        run_discord_public_diagnostic_once()
+        print("[discord-public] diagnostic stop; no bot login attempted", flush=True)
+        while True:
+            time.sleep(3600)
+
     if not DISCORD_CONNECT_ENABLED:
         print("[discord] connection disabled; health server remains online", flush=True)
         while True:
