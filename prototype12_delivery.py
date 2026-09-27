@@ -23,7 +23,7 @@ import hiyori_source
 ROOT = Path("data/prototype12_delivery")
 STREAMS = ("prototype1", "prototype2")
 WEBHOOKS = {
-    "prototype1": ("PROTO1_DISCORD_WEBHOOK_URL", "プロトタイプ1"),
+    "prototype1": ("PROTO1_DISCORD_WEBHOOK_URL", "鼻利きBOX予想家"),
     "prototype2": ("PROTO2_DISCORD_WEBHOOK_URL", "プロトタイプ2"),
 }
 
@@ -64,17 +64,42 @@ def post_webhook(url, payload):
 def model_message(record, stream):
     model = record["models"][stream]
     if stream == "prototype1":
-        title = "プロトタイプ1｜PT3＋穴スナイパー"
-        ratio = "PT3コア＋穴くん厳選ブースト（最大3点）"
-    else:
-        title = "プロトタイプ2｜PT3×既存メイン圧縮"
-        ratio = "PT3を既存メインとの一致度で7〜10点へ圧縮"
+        if model.get('selection_policy') != 'scent-box-exhibition-fusion-v1':
+            main = ' / '.join(model.get('main_picks') or [])
+            cover = ' / '.join(model.get('cover_picks') or [])
+            return (f"🧪 **PT1｜旧方式の未配信分**\n"
+                    f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
+                    f"本線 `{main}`\n迎え `{cover}`\n"
+                    f"計{model['point_count']}点｜旧方式")
+        lanes = ''.join(map(str, model["box_lanes"]))
+        cover = model.get("cover_formation") or ' / '.join(model["cover_picks"])
+        holes = ' / '.join(model["longshot_picks"]) or '条件を満たす穴目なし'
+        scent = model["scent_lane"]
+        reasons = model["boat_reasons"]
+        shape = model.get("race_shape") or {}
+        attacker = shape.get("best_attack_lane")
+        method = shape.get("best_attack_method") or "攻め"
+        scenario = (f"{attacker}号艇の{method}を想定" if attacker
+                    else "1マークの隊形は混戦を想定")
+        return (
+            f"👃 **鼻利きBOX予想家（PT1）｜{record['venue']} {record['rno']}R**\n"
+            f"締切 {record['deadline']}｜展示6艇確認済み\n"
+            f"**ここが匂う！ {scent}号艇**\n"
+            f"展示＋既存/日和＋展開：{scenario}\n"
+            + '\n'.join(f"{lane}号艇：{reasons[str(lane)]}" for lane in model["box_lanes"])
+            + f"\n📦 **BOX {lanes}（6点）**\n"
+            + f"🛟 **抜け目 {cover}（{len(model['cover_picks'])}点）**\n"
+            + f"💣 **穴目（{len(model['longshot_picks'])}点）** {holes}\n"
+            + f"「コイツから来そうな匂いがする！」\n"
+            + f"計{model['point_count']}点｜Grade {model['grade']}｜試験配信\n"
+            + "※3着内率と期待値は未校正のモデル推定値"
+        )
     main = " / ".join(model.get("main_picks") or [])
     cover = " / ".join(model.get("cover_picks") or [])
     return (
-        f"🧪 **{title}**\n"
+        f"🧪 **プロトタイプ2｜PT3×既存メイン圧縮**\n"
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
-        f"⚖️ {ratio}\n"
+        f"⚖️ PT3を既存メインとの一致度で7〜10点へ圧縮\n"
         f"◎ **本線 {len(model.get('main_picks') or [])}点**\n"
         f"`{main}`\n"
         f"○ **迎え {len(model.get('cover_picks') or [])}点**\n"
@@ -82,7 +107,6 @@ def model_message(record, stream):
         f"🎯 **合計 {model['point_count']}点**\n"
         f"📊 Grade {model['grade']}｜比較テスト配信"
     )
-
 
 def build_record(day, jcd, rno, deadline):
     captured = now_jst()
@@ -120,7 +144,7 @@ def build_record(day, jcd, rno, deadline):
 
     models = {
         "prototype1": trial._prototype1_attack(
-            hiyori, official, odds, native_hiyori),
+            hiyori, official, odds, native_hiyori, existing_native),
         "prototype2": trial._prototype2_compress(
             hiyori, official, odds, native_hiyori, existing_native),
     }

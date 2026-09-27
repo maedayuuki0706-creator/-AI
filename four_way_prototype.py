@@ -15,6 +15,7 @@ import json
 from math import isfinite
 import os
 from pathlib import Path
+import scent_box
 import tempfile
 from zoneinfo import ZoneInfo
 
@@ -24,12 +25,12 @@ import mid_value_selection
 import opportunity_alerts
 
 JST = ZoneInfo('Asia/Tokyo')
-VERSION = 'pt3-control-pt1-attack-pt2-compress-v2'
+VERSION = 'pt3-control-pt1-scent-box-pt2-compress-v1'
 POINTS = 10
 UNIT_YEN = 100
 STREAMS = ('existing', 'hiyori', 'prototype1', 'prototype2', 'prototype3')
 LABELS = {'existing': '既存', 'hiyori': '日和',
-          'prototype1': 'プロトタイプ1（PT3＋穴スナイパー）',
+          'prototype1': '鼻利きBOX予想家（PT1）',
           'prototype2': 'プロトタイプ2（PT3×既存メイン圧縮）',
           'prototype3': '新人予想家 ゆうき（日和本線＋中穴抑え）'}
 WEIGHTS = {'existing': (1.0, 0.0), 'hiyori': (0.0, 1.0),
@@ -192,72 +193,23 @@ def _analysis_with_odds(analysis, odds):
     return copied
 
 
-def _prototype1_attack(hiyori, existing, odds, native_hiyori):
-    """PT3 core plus only longshot candidates that pass the live sniper gate."""
+def _prototype1_attack(hiyori, existing, odds, native_hiyori, native_existing=()):
+    """Select a live three-boat BOX, coherent cover and up to three longshots."""
     p3 = _prototype3_card(hiyori, odds, native_hiyori)
-    core_target = min(10, len(p3['picks']))
-    main = list(p3['picks'][:core_target])
-
-    attack = _analysis_with_odds(existing, odds)
-    candidates = opportunity_alerts._candidate_rows(attack, 'long')
-    long_rows = opportunity_alerts._coherent_selection(candidates, 'long', attack)
-    score, breakdown = opportunity_alerts._score(attack, long_rows, 'long')
-    payload = {
-        'score': score,
-        'picks': long_rows,
-        'race_shape': dict(attack.get('race_shape') or {}),
-    }
-    sniper_live = opportunity_alerts._is_selected_longshot(payload, attack)
-
-    boosts = []
-    if sniper_live:
-        for row in long_rows:
-            combo = row.get('combination')
-            ev = row.get('expected_value')
-            if ev is None and row.get('odds') is not None:
-                ev = float(row['odds']) * float(row.get('probability') or 0)
-            if (combo and combo not in main and combo not in boosts
-                    and float(row.get('odds') or 0) >= 50.0 and float(ev or 0) >= 1.20):
-                boosts.append(combo)
-                if len(boosts) >= 3:
-                    break
-
-    # If there is no sniper signal, stay as the compact PT3 core rather than
-    # manufacturing extra longshot exposure.
-    picks = main + boosts
-    row_by_combo = {row['combination']: row for row in _analysis_with_odds(hiyori, odds)['trifecta']}
-    chosen = [row_by_combo[p] for p in main if p in row_by_combo]
-    # Longshot boosts use the existing model's probability diagnostics.
-    existing_by_combo = {row['combination']: row for row in attack['trifecta']}
-    chosen += [existing_by_combo[p] for p in boosts if p in existing_by_combo]
-    odds_complete = all(row.get('odds') is not None for row in chosen)
-    return {
+    card = scent_box.select(existing, hiyori, odds, native_existing,
+                           native_hiyori, p3['picks'])
+    card.update({
         'label': LABELS['prototype1'],
-        'weights': {'pt3_core': 1.0, 'longshot_sniper': 1.0},
-        'selection_policy': 'pt3-core-10-plus-longshot-sniper-max3',
-        'main_picks': main,
-        'cover_picks': boosts,
-        'picks': picks,
-        'point_count': len(picks),
-        'stake_yen': len(picks) * UNIT_YEN,
+        'weights': {'existing': .5, 'hiyori': .5, 'pt3_vote_bonus': .018},
         'heads': p3['heads'],
         'grade': p3['grade'],
-        'probability_mass': sum(float(row.get('probability') or 0) for row in chosen),
-        'estimated_return_yen': (sum(UNIT_YEN * float(row['expected_value']) for row in chosen)
-                                 if odds_complete and all(row.get('expected_value') is not None for row in chosen)
-                                 else None),
-        'odds_complete': odds_complete,
         'trifecta': p3['trifecta'],
-        'structure': {
-            'core_points': len(main),
-            'sniper_points': len(boosts),
-            'sniper_live': sniper_live,
-            'sniper_score': score,
-            'sniper_breakdown': breakdown,
-        },
+        'structure': {'box_points': 6, 'cover_points': len(card['cover_picks']),
+                      'longshot_points': len(card['longshot_picks']),
+                      'box_mass': card['box_mass']},
         'bridge': None,
-    }
-
+    })
+    return card
 
 def _prototype2_compress(hiyori, existing, odds, native_hiyori, native_existing):
     """Compress PT3 using agreement with the existing main model."""
@@ -363,7 +315,7 @@ def build_bundle(request, hiyori, source, now=None):
         parent = base if stream == 'existing' else hiyori
         models[stream] = _card(mixed, parent, stream, odds)
     models['prototype1'] = _prototype1_attack(
-        hiyori, base, odds, native['hiyori'])
+        hiyori, base, odds, native['hiyori'], native['existing'])
     models['prototype2'] = _prototype2_compress(
         hiyori, base, odds, native['hiyori'], native['existing'])
     models['prototype3'] = _prototype3_card(hiyori, odds, native['hiyori'])
@@ -376,7 +328,7 @@ def build_bundle(request, hiyori, source, now=None):
               'source_models': {'existing': base.get('model_version'), 'hiyori': hiyori.get('model_version')},
               'source_url': source.get('source_url'), 'features': deepcopy(hiyori['features']),
               'models': models, 'native_candidate_picks': native,
-              'comparison_note': 'PT1 uses a compact PT3 core plus live longshot-sniper boosts; PT2 compresses PT3 by agreement with the existing main model; PT3 remains unchanged.'}
+              'comparison_note': 'PT1 combines existing/Hiyori/exhibition/first-mark shape into a three-boat BOX, cover formation and up to three value longshots; PT2 and PT3 retain their own policies.'}
     record['digest'] = sha256(json.dumps(record, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     return record
 
@@ -452,6 +404,9 @@ def evaluate(record, result, now=None):
                           'profit_yen': returned-stake, 'roi': 100*returned/stake,
                           'manshu': any(int(payouts[c]) >= 10000 for c in winning),
                           'torigami': bool(winning) and returned < stake}
+        if stream == 'prototype1':
+            box = set(record['models'][stream].get('box_picks') or [])
+            models[stream]['box_hit'] = status == 'settled' and any(c in box for c in active if c in payouts)
     return {'key': record['key'], 'day': record['day'], 'venue': record['venue'],
             'version': VERSION, 'prediction_digest': record['digest'],
             'settled_at': aware(now or datetime.now(JST)).isoformat(),
@@ -478,6 +433,10 @@ def summarize(day):
                           'roi': 100*returned/stake if stake else None,
                           'manshu': sum(r['manshu'] for r in rows),
                           'torigami': sum(r['torigami'] for r in rows)}
+        if stream == 'prototype1':
+            box_hits = sum(r.get('box_hit', False) for r in rows)
+            totals[stream]['box_hits'] = box_hits
+            totals[stream]['box_hit_rate'] = 100*box_hits/len(rows) if rows else None
     pairs = {}
     for i, a in enumerate(STREAMS):
         for b in STREAMS[i+1:]:
@@ -489,7 +448,7 @@ def summarize(day):
     report = {'day': day, 'version': VERSION, 'mode': 'prospective_shadow',
               'generated_at': datetime.now(JST).isoformat(), 'point_count': POINTS, 'unit_yen': UNIT_YEN,
               'point_policy': {'existing': POINTS, 'hiyori': POINTS,
-                               'prototype1': 'pt3-core-10-plus-longshot-sniper-max3',
+                               'prototype1': scent_box.POLICY,
                                'prototype2': 'pt3-existing-consensus-grade-7-8-10',
                                'prototype3': 'hiyori-native-plus-mid-cover-cap16'},
               'recorded': len(predictions), 'pending': len(predictions)-len(results),
