@@ -17,6 +17,7 @@ PROFILE_PATH = Path("data/racer_profiles.json")
 DEFAULT_BACKFILL_FLOOR = "20200101"
 MAX_RECENT_RACE_KEYS = 50000
 FETCH_WORKERS = 8
+CLASS_ORDER = {"B2": 0, "B1": 1, "A2": 2, "A1": 3}
 
 
 def _parse_day(day: str) -> datetime:
@@ -194,9 +195,33 @@ def _new_racer(rid: str, name: str | None) -> dict:
         "years": {},
         "win_methods": {},
         "course_win_methods": {},
+        "class_counts": {},
+        "class_last_seen": {},
+        "highest_class_seen": None,
+        "latest_class": None,
+        "latest_class_day": None,
         "first_seen": None,
         "last_seen": None,
     }
+
+
+def _observe_class(racer: dict, class_label: object, day: str) -> bool:
+    label = str(class_label or "").upper()
+    if label not in CLASS_ORDER:
+        return False
+    counts = racer.setdefault("class_counts", {})
+    counts[label] = int(counts.get(label) or 0) + 1
+    last_seen = racer.setdefault("class_last_seen", {})
+    if day and (not last_seen.get(label) or day > str(last_seen.get(label))):
+        last_seen[label] = day
+    highest = racer.get("highest_class_seen")
+    if highest not in CLASS_ORDER or CLASS_ORDER[label] > CLASS_ORDER[highest]:
+        racer["highest_class_seen"] = label
+    latest_day = str(racer.get("latest_class_day") or "")
+    if day and (not latest_day or day >= latest_day):
+        racer["latest_class"] = label
+        racer["latest_class_day"] = day
+    return True
 
 
 def update_from_result(state: dict, result: dict) -> None:
@@ -279,22 +304,26 @@ def _load_state(anchor_day: str) -> dict:
             state = {}
     else:
         state = {}
-    state.setdefault("version", "racer-profile-v3-start-correction")
+    state.setdefault("version", "racer-profile-v4-class-history")
     state.setdefault("racers", {})
     state.setdefault("processed_races", [])
     state.setdefault("start_correction_processed_races", [])
+    state.setdefault("class_history_processed_races", [])
     state.setdefault("weight_anchor_day", anchor_day)
     state.setdefault("backfill", {})
     return state
 
 
 def _save_state(state: dict, *, last_learning_day: str) -> None:
-    state["version"] = "racer-profile-v3-start-correction"
+    state["version"] = "racer-profile-v4-class-history"
     state["updated_at"] = datetime.now(JST).isoformat()
     state["last_learning_day"] = last_learning_day
     # This recent-key guard is enough for overlapping current/retry runs; the
     # monotonic historical cursor prevents old days from being processed twice.
     state["processed_races"] = sorted(set(state.get("processed_races") or []))[-MAX_RECENT_RACE_KEYS:]
+    state["class_history_processed_races"] = sorted(
+        set(state.get("class_history_processed_races") or [])
+    )[-MAX_RECENT_RACE_KEYS:]
     PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     PROFILE_PATH.write_text(
         json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -378,6 +407,95 @@ def learn_day_into_state(state: dict, day: str) -> dict:
         "skipped": skipped,
         "failed": failed,
         "expected": expected,
+    }
+
+
+def _fetch_classes_one(day: str, jcd: str, rno: int) -> tuple[str, list[dict] | None]:
+    key = f"{day}:{str(jcd).zfill(2)}:{rno}"
+    try:
+        boats = base.parse_racelist_boats(day, str(jcd).zfill(2), rno)
+        return key, boats if len(boats) == 6 else None
+    except Exception:
+        return key, None
+
+
+def learn_class_history_day_into_state(state: dict, day: str) -> dict:
+    seen = set(state.get("class_history_processed_races") or [])
+    try:
+        venues = base.discover_venues(day)
+    except Exception as exc:
+        print(f"class history discover failed: day={day} {type(exc).__name__}")
+        return {"day": day, "fatal": True, "added": 0, "failed": 0}
+
+    jobs = []
+    for jcd in venues:
+        for rno in range(1, 13):
+            key = f"{day}:{str(jcd).zfill(2)}:{rno}"
+            if key not in seen:
+                jobs.append((str(jcd).zfill(2), rno))
+
+    added = 0
+    failed = 0
+    if jobs:
+        with ThreadPoolExecutor(max_workers=FETCH_WORKERS) as pool:
+            futures = [pool.submit(_fetch_classes_one, day, jcd, rno) for jcd, rno in jobs]
+            for future in as_completed(futures):
+                key, boats = future.result()
+                if not boats:
+                    failed += 1
+                    continue
+                for boat in boats:
+                    rid = str(boat.get("racer_id") or "")
+                    if not rid:
+                        continue
+                    racer = state.setdefault("racers", {}).setdefault(
+                        rid, _new_racer(rid, boat.get("name"))
+                    )
+                    if boat.get("name"):
+                        racer["name"] = boat["name"]
+                    _observe_class(racer, boat.get("current_class"), day)
+                seen.add(key)
+                added += 1
+
+    state["class_history_processed_races"] = sorted(seen)[-MAX_RECENT_RACE_KEYS:]
+    incomplete = bool(jobs) and failed > max(8, int(len(jobs) * 0.35))
+    print(f"class history day={day} venues={len(venues)} added={added} failed={failed}")
+    return {
+        "day": day, "fatal": False, "incomplete": incomplete,
+        "added": added, "failed": failed,
+    }
+
+
+def run_class_history_backfill(
+    state: dict, *, recent_day: str, days: int, floor_day: str
+) -> dict:
+    backfill = state.setdefault("class_history_backfill", {})
+    backfill["floor_day"] = floor_day
+    next_day = str(backfill.get("next_day") or _day_before(recent_day))
+    processed_days = 0
+    added_races = 0
+
+    for _ in range(max(0, int(days))):
+        if next_day < floor_day:
+            backfill["completed"] = True
+            break
+        summary = learn_class_history_day_into_state(state, next_day)
+        if summary.get("fatal") or summary.get("incomplete"):
+            break
+        processed_days += 1
+        added_races += int(summary.get("added") or 0)
+        backfill["last_completed_day"] = next_day
+        next_day = _day_before(next_day)
+        backfill["next_day"] = next_day
+        backfill["completed"] = next_day < floor_day
+
+    backfill["days_processed"] = int(backfill.get("days_processed") or 0) + processed_days
+    backfill["races_added"] = int(backfill.get("races_added") or 0) + added_races
+    backfill["next_day"] = next_day
+    return {
+        "processed_days": processed_days, "added_races": added_races,
+        "next_day": next_day, "completed": bool(backfill.get("completed")),
+        "floor_day": floor_day,
     }
 
 
@@ -501,8 +619,15 @@ def run_backfill(state: dict, *, recent_day: str, days: int, floor_day: str) -> 
 def learn(day: str, *, backfill_days: int = 0, backfill_floor: str = DEFAULT_BACKFILL_FLOOR) -> dict:
     state = _load_state(day)
     current = learn_day_into_state(state, day)
+    class_current = learn_class_history_day_into_state(state, day)
     start_current = learn_start_corrections_day_into_state(state, day)
     backfill = run_backfill(
+        state,
+        recent_day=day,
+        days=backfill_days,
+        floor_day=backfill_floor,
+    )
+    class_backfill = run_class_history_backfill(
         state,
         recent_day=day,
         days=backfill_days,
@@ -518,12 +643,16 @@ def learn(day: str, *, backfill_days: int = 0, backfill_floor: str = DEFAULT_BAC
     print(
         "racer profile learning complete: "
         f"day={day} current_added={current.get('added', 0)} "
+        f"class_current={class_current.get('added', 0)} "
         f"start_current={start_current.get('added', 0)} "
         f"backfill_days={backfill['processed_days']} "
+        f"class_backfill_days={class_backfill['processed_days']} "
         f"backfill_races={backfill['added_races']} "
         f"start_backfill_days={start_backfill['processed_days']} "
         f"start_backfill_races={start_backfill['added_races']} "
-        f"next={backfill['next_day']} start_next={start_backfill['next_day']} "
+        f"class_backfill_races={class_backfill['added_races']} "
+        f"next={backfill['next_day']} class_next={class_backfill['next_day']} "
+        f"start_next={start_backfill['next_day']} "
         f"racers={len(state.get('racers') or {})}"
     )
     return state
