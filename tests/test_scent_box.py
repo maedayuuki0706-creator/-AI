@@ -21,7 +21,7 @@ def analysis(preferred=(1, 4, 5), st=None):
 
 class ScentBoxTests(unittest.TestCase):
     def test_box_cover_and_holes_do_not_overlap(self):
-        base = analysis(st={1: .13, 4: .09, 5: .16})
+        base = analysis(st={1: .13, 2: .22, 3: .21, 4: .09, 5: .16, 6: .25})
         odds = {row['combination']: 200 for row in base['trifecta']}
         card = scent_box.select(base, base, odds)
         self.assertEqual(card['box_lanes'], [1, 4, 5])
