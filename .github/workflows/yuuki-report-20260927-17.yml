@@ -1,4 +1,4 @@
-name: Yuuki requested 20260927 17 report
+name: Yuuki requested 20260927 cutoff reports
 on:
   push:
     branches: [main]
@@ -23,7 +23,9 @@ jobs:
       - name: Send cutoff results to dedicated daily report channel
         env:
           DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
-        run: python yuuki_report_20260927_17.py
+        run: |
+          python yuuki_report_20260927_17.py --hour 13
+          python yuuki_report_20260927_17.py --hour 15
       - name: Persist snapshot and acknowledgement
         if: always()
         run: |
@@ -31,7 +33,7 @@ jobs:
           git config user.email actions@users.noreply.github.com
           git add data/yuuki_interim_reports/ 2>/dev/null || true
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Record requested Yuuki 20260927 17 report acknowledgement'
+          git commit -m 'Record requested Yuuki 20260927 13 and 15 report acknowledgements'
           for attempt in 1 2 3; do
             git pull --rebase origin main && git push origin HEAD:main && exit 0
           done
