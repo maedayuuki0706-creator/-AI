@@ -84,13 +84,13 @@ def model_message(record, stream):
         return (
             f"🐕 **嗅覚型予想家（PT1）｜{record['venue']} {record['rno']}R**\n"
             f"締切 {record['deadline']}｜展示6艇確認済み\n"
-            f"**ここが匂う！ {scent}号艇**\n"
+            f"**ここが匂う！ 当たりの匂いは{scent}号艇から**\n"
             f"展示＋既存/日和＋展開：{scenario}\n"
             + '\n'.join(f"{lane}号艇：{reasons[str(lane)]}" for lane in model["box_lanes"])
             + f"\n📦 **BOX {lanes}（6点）**\n"
             + f"🛟 **抜け目 {cover}（{len(model['cover_picks'])}点）**\n"
             + f"💣 **穴目（{len(model['longshot_picks'])}点）** {holes}\n"
-            + f"「コイツから来そうな匂いがする！」\n"
+            + f"「コイツから当たりの匂いがする！」\n"
             + f"計{model['point_count']}点｜Grade {model['grade']}｜試験配信\n"
             + "※3着内率と期待値は未校正のモデル推定値"
         )
