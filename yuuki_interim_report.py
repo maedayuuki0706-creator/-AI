@@ -48,7 +48,7 @@ def build(day: str, hour: int) -> dict:
         if delivered_at and delivered_at <= cutoff and receipt.get("key") == path.stem:
             deliveries[path.stem] = receipt
             parts = path.stem.split("_")
-            if len(parts) >= 4 and parts[1] in VENUES:
+            if len(parts) >= 3 and parts[1] in VENUES:
                 counts[VENUES[parts[1]]]["delivered"] += 1
 
     races = []
