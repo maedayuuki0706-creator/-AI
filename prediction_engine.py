@@ -11,6 +11,8 @@ from itertools import permutations
 from math import exp
 from typing import Any, Dict, Iterable, List, Mapping
 
+from market_structure import analyze_market_structure
+
 
 VENUE_PROFILES: Dict[str, Dict[str, float]] = {
     # Conservative course priors based on long-run venue tendencies.
@@ -579,13 +581,15 @@ def analyze_race(payload: Mapping[str, Any]) -> Dict[str, Any]:
     second_score = scored[1]["score"] if len(scored) > 1 else top_score
     confidence = _clip(0.5 + (top_score - second_score) * 2.5)
     race_shape = _race_shape(boats, scored, trifectas)
+    market_structure = analyze_market_structure(odds, trifectas)
 
     return {
-        "model_version": "kyoutei-navi-course-v6-bounded-context",
+        "model_version": "kyoutei-navi-course-v7-market-structure",
         "venue": race.get("venue"),
         "boats": scored,
         "trifecta": trifectas,
         "value_bets": value_bets[:20],
         "confidence": round(confidence, 3),
         "race_shape": race_shape,
+        "market_structure": market_structure,
     }
