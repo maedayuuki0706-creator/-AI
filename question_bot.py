@@ -1547,6 +1547,27 @@ async def maybe_answer_encyclopedia(question: str, user_id: int) -> Optional[str
 
 
 
+async def recent_water_type_from_history(message: discord.Message, max_items: int = 16) -> Optional[str]:
+    """Resolve the most recent explicit water type from this user's Discord history."""
+    try:
+        recent = [m async for m in message.channel.history(limit=max_items, before=message)]
+    except (discord.Forbidden, discord.HTTPException):
+        return None
+
+    # discord.py history is newest-first by default.
+    for item in recent:
+        try:
+            if item.author.id != message.author.id:
+                continue
+        except AttributeError:
+            continue
+        text = _norm_knowledge_text(item.content or "")
+        for kind in ("淡水", "海水", "汽水"):
+            if kind in text:
+                return kind
+    return None
+
+
 async def recent_conversation_text(message: discord.Message, max_items: int = 12) -> str:
     """Build user-scoped conversation memory from Discord history.
 
@@ -1797,6 +1818,19 @@ async def on_message(message: discord.Message):
             explicit_water = next((kind for kind in ("淡水", "海水", "汽水") if kind in qnorm), None)
             if explicit_water and not venue:
                 _water_context_by_user[message.author.id] = (explicit_water, time.monotonic())
+
+            water_follow_words = [
+                "特徴", "違い", "風", "向かい風", "追い風", "波", "うねり",
+                "スタート", "st", "ターン", "旋回", "乗り味", "浮力",
+                "モーター", "伸び", "出足", "潮", "干満", "狙い目", "影響"
+            ]
+            if not explicit_water and not venue and len(question) <= 24 and any(k in qnorm for k in water_follow_words):
+                history_water = await recent_water_type_from_history(message)
+                if history_water:
+                    _water_context_by_user[message.author.id] = (history_water, time.monotonic())
+                    effective_question = f"{history_water} {question}"
+                    print(f"[water-context] resolved={history_water}", flush=True)
+
             stats_words = ["的中率", "回収率", "roi", "成績", "調子", "今どう", "現状", "結果"]
             venue_words = [
                 "特徴", "水面", "水質", "潮", "干満", "満潮", "干潮", "海水", "汽水", "淡水",
@@ -1805,18 +1839,17 @@ async def on_message(message: discord.Message):
             ]
             if venue and any(k in question.lower() for k in stats_words + venue_words):
                 _venue_context_by_user[message.author.id] = (venue, time.monotonic())
-            elif len(question) <= 24 and any(k in qnorm for k in [
-                "特徴", "違い", "風", "波", "うねり", "スタート", "st",
-                "ターン", "旋回", "乗り味", "浮力", "モーター", "伸び", "出足",
-                "潮", "干満", "狙い目", "影響"
-            ]):
-                water_ctx = _water_context_by_user.get(message.author.id)
-                if water_ctx and time.monotonic() - water_ctx[1] <= 900:
-                    effective_question = f"{water_ctx[0]} {question}"
-                else:
-                    ctx = _venue_context_by_user.get(message.author.id)
-                    if ctx and time.monotonic() - ctx[1] <= 900:
-                        effective_question = f"{ctx[0]} {question}"
+            elif len(question) <= 24 and any(k in qnorm for k in water_follow_words):
+                # Prefer history-resolved water context above. Only fall back to
+                # the in-memory context when no explicit recent water type exists.
+                if effective_question == question:
+                    water_ctx = _water_context_by_user.get(message.author.id)
+                    if water_ctx and time.monotonic() - water_ctx[1] <= 900:
+                        effective_question = f"{water_ctx[0]} {question}"
+                    else:
+                        ctx = _venue_context_by_user.get(message.author.id)
+                        if ctx and time.monotonic() - ctx[1] <= 900:
+                            effective_question = f"{ctx[0]} {question}"
             elif len(question) <= 18 and any(k in question.lower() for k in stats_words + venue_words):
                 ctx = _venue_context_by_user.get(message.author.id)
                 if ctx and time.monotonic() - ctx[1] <= 900:
