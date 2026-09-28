@@ -1,0 +1,75 @@
+name: 新人予想家 ゆうき Interim Report
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - yuuki_interim_report.py
+      - yuuki_interim_report_request.json
+      - .github/workflows/yuuki-interim-report.yml
+  workflow_dispatch:
+    inputs:
+      day:
+        description: 'YYYYMMDD'
+        required: false
+        default: ''
+      hour:
+        description: '13, 15, or 17'
+        required: false
+        default: '13'
+  schedule:
+    - cron: '0 4 * * *'
+    - cron: '0 6 * * *'
+    - cron: '0 8 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: yuuki-interim-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ github.event_name != 'push' || startsWith(github.event.head_commit.message, 'Request Yuuki interim report ') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Send report
+        env:
+          TZ: Asia/Tokyo
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            python -u yuuki_interim_report.py --request yuuki_interim_report_request.json
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            DAY="${{ inputs.day }}"
+            HOUR="${{ inputs.hour }}"
+            if [ -n "$DAY" ]; then
+              python -u yuuki_interim_report.py --day "$DAY" --hour "$HOUR"
+            else
+              python -u yuuki_interim_report.py --hour "$HOUR"
+            fi
+          else
+            HOUR=$(TZ=Asia/Tokyo date +%H)
+            python -u yuuki_interim_report.py --hour "$((10#$HOUR))"
+          fi
+      - name: Persist snapshot and receipt
+        if: always()
+        run: |
+          git config user.name 'boat-ai-report-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add data/yuuki_interim_reports/ 2>/dev/null || true
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Record Yuuki interim report acknowledgement'
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+          done
+          exit 1
