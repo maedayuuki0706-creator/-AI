@@ -1,0 +1,28 @@
+name: Cleanup bad Yuuki 13 report
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/cleanup-yuuki-13-bad-report.yml
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete incorrect Discord message
+        env:
+          DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
+        run: |
+          python - <<'PY'
+          import os, urllib.request
+          base=os.environ["DISCORD_REPORT_WEBHOOK_URL"].rstrip("/")
+          url=base+"/messages/1553986014345957417"
+          req=urllib.request.Request(url, method="DELETE", headers={"User-Agent":"boat-ai-yuuki-cleanup/1.0"})
+          try:
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  print("deleted", r.status)
+          except urllib.error.HTTPError as e:
+              if e.code == 404:
+                  print("already gone")
+              else:
+                  raise
+          PY
