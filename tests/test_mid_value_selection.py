@@ -49,13 +49,13 @@ class MidValueSelectionTests(unittest.TestCase):
         rows = self.stub._candidate_rows(analysis, "long")
         self.assertEqual([row["combination"] for row in rows], ["4-1-6"])
 
-    def test_looser_selected_route_requires_stronger_value_support(self):
+    def test_strict_selected_route_requires_stronger_value_support(self):
         payload = {
-            "score": 70,
+            "score": 78,
             "composite_odds": 3.2,
             "picks": [
-                {"combination": "1-2-3", "odds": 9.0, "probability": 0.07, "expected_value": 1.20},
-                {"combination": "1-3-2", "odds": 14.0, "probability": 0.04, "expected_value": 1.22},
+                {"combination": "1-2-3", "odds": 9.0, "probability": 0.07, "expected_value": 1.35},
+                {"combination": "1-3-2", "odds": 14.0, "probability": 0.05, "expected_value": 1.32},
             ],
         }
         self.assertTrue(self.stub._is_selected_mid(payload))
@@ -64,7 +64,7 @@ class MidValueSelectionTests(unittest.TestCase):
         weak["picks"] = [dict(payload["picks"][0], expected_value=1.08), dict(payload["picks"][1], expected_value=1.10)]
         self.assertFalse(self.stub._is_selected_mid(weak))
 
-        low_score = dict(payload, score=67)
+        low_score = dict(payload, score=74)
         self.assertFalse(self.stub._is_selected_mid(low_score))
 
 
