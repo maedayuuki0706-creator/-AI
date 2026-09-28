@@ -1258,6 +1258,43 @@ def _dominant_outer_course(profile: dict) -> tuple[int, float] | None:
     return max(choices, key=lambda item: item[1]) if choices else None
 
 
+def water_type_list_answer_sync(question: str) -> Optional[str]:
+    """Answer cross-venue water-type questions such as '淡水の場は？'."""
+    q = _norm_knowledge_text(question)
+    targets = [kind for kind in ("淡水", "海水", "汽水") if kind in q]
+    if not targets:
+        return None
+
+    # Avoid stealing single-venue questions such as "児島は海水？".
+    if _venue_from_question(question):
+        return None
+
+    list_words = ["どこ", "どの場", "の場", "一覧", "全部", "教えて", "何場", "どれ"]
+    if not any(word in q for word in list_words):
+        return None
+
+    tide_data = _load_json_file_cached(VENUE_TIDE_PATH, "venue_tide_profiles", 300)
+    venues = tide_data.get("venues") or {}
+    lines = ["🌊 **水質別ボートレース場**"]
+    for kind in targets:
+        matched = []
+        for jcd, row in venues.items():
+            if str(row.get("water_type") or "") != kind:
+                continue
+            venue = str(row.get("venue") or "").strip()
+            if venue:
+                matched.append((str(jcd).zfill(2), venue))
+        matched.sort(key=lambda item: item[0])
+        names = [venue for _, venue in matched]
+        if names:
+            lines.append(f"{kind}: **{'・'.join(names)}**（{len(names)}場）")
+        else:
+            lines.append(f"{kind}: 該当場をデータから確認できませんでした。")
+
+    lines.append("気になる場名を続けて聞けば、潮・風・コース傾向まで掘れるで。")
+    return "\n".join(lines)
+
+
 def venue_knowledge_answer_sync(question: str) -> Optional[str]:
     venue = _venue_from_question(question)
     if not venue:
@@ -1330,6 +1367,10 @@ def venue_knowledge_answer_sync(question: str) -> Optional[str]:
 
 
 def encyclopedia_answer_sync(question: str, user_id: int) -> Optional[str]:
+    water_list = water_type_list_answer_sync(question)
+    if water_list:
+        return water_list
+
     venue_answer = venue_knowledge_answer_sync(question)
     if venue_answer:
         return venue_answer
