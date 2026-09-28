@@ -119,10 +119,10 @@ def analyze_market_structure(
         market_type = "完全混戦型"
     elif market_top_share < 0.55 and top10_unique_heads >= 3:
         market_type = "頭割れ型"
+    elif market_top_share >= 0.68 and dominant_top10_count >= 7 and spread_ratio >= 2.5:
+        market_type = "集中型"
     elif market_top_share >= 0.55 and dominant_top10_count >= 6:
         market_type = "ヒモ割れ型"
-    elif market_top_share >= 0.68 and dominant_top10_count >= 7:
-        market_type = "集中型"
     else:
         market_type = "中間型"
 
