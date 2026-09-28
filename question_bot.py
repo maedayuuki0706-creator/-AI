@@ -103,6 +103,7 @@ _last_reply_by_user: dict[int, float] = {}
 _race_context_by_user: dict[int, tuple[str, int, float]] = {}
 _venue_context_by_user: dict[int, tuple[str, float]] = {}
 _encyclopedia_context_by_user: dict[int, tuple[str, float]] = {}
+_water_context_by_user: dict[int, tuple[str, float]] = {}
 _stats_cache: dict[str, tuple[float, object]] = {}
 _startup_test_sent = False
 
@@ -1258,12 +1259,121 @@ def _dominant_outer_course(profile: dict) -> tuple[int, float] | None:
     return max(choices, key=lambda item: item[1]) if choices else None
 
 
-def water_type_list_answer_sync(question: str) -> Optional[str]:
+def water_type_concept_answer_sync(question: str, user_id: int) -> Optional[str]:
+    """Explain water-type characteristics and contextual follow-ups."""
+    q = _norm_knowledge_text(question)
+    explicit = next((kind for kind in ("淡水", "海水", "汽水") if kind in q), None)
+
+    if explicit and not _venue_from_question(question):
+        _water_context_by_user[user_id] = (explicit, time.monotonic())
+        kind = explicit
+    else:
+        kind = None
+        ctx = _water_context_by_user.get(user_id)
+        follow_words = [
+            "特徴", "違い", "風", "向かい風", "追い風", "波", "うねり",
+            "スタート", "st", "ターン", "旋回", "乗り味", "浮力", "モーター",
+            "伸び", "出足", "潮", "干満", "狙い目", "影響"
+        ]
+        if not explicit and len(q) <= 24 and any(word in q for word in follow_words):
+            if ctx and time.monotonic() - ctx[1] <= 900:
+                kind = ctx[0]
+
+    if not kind:
+        return None
+
+    # Leave cross-venue list questions to the dedicated list handler.
+    list_words = ["どこ", "どの場", "の場", "一覧", "全部", "何場", "どれ"]
+    if explicit and any(word in q for word in list_words):
+        return None
+
+    asks_wind = any(word in q for word in ["風", "向かい風", "追い風"])
+    asks_start = any(word in q for word in ["スタート", "st"])
+    asks_turn = any(word in q for word in ["ターン", "旋回", "乗り味"])
+    asks_motor = any(word in q for word in ["モーター", "伸び", "出足"])
+    asks_tide = any(word in q for word in ["潮", "干満", "満潮", "干潮"])
+    asks_feature = any(word in q for word in ["特徴", "違い", "浮力", "影響"])
+
+    basics = {
+        "淡水": (
+            "海水より塩分が少なく浮力は小さめ。艇が水に乗る感触や旋回時の掛かり方に差が出ることがある。"
+            "水質そのものによる潮汐は基本ないので、予想では風・波・水面形状・選手機力を切り分けて見やすい。"
+        ),
+        "海水": (
+            "淡水より浮力が大きめで、艇の乗り味に差が出ることがある。"
+            "海に開いた水面では潮位や流れが加わる場合があるが、常滑のように潮位影響を実質除外する場もある。"
+        ),
+        "汽水": (
+            "海水と淡水が混ざる水面。場によって塩分や流れの条件が変わり、潮位の影響を受けるケースもある。"
+            "水質だけで決めず、その場の水門・河川流・潮位条件までセットで見る。"
+        ),
+    }
+
+    lines = [f"🌊 **{kind}の見方**"]
+
+    if asks_wind:
+        if kind == "淡水":
+            lines.append(
+                "風の影響: **淡水だから風に強い/弱い、と一律には言えない**。"
+                "潮流の影響が少ないぶん、当日は風向・風速・波高・水面形状の影響を分けて評価しやすい。"
+            )
+        elif kind == "海水":
+            lines.append(
+                "風の影響: 風だけでなく**潮位・流れとの組み合わせ**を見る。"
+                "同じ追い風/向かい風でも、満潮・干潮や水面の開け方で1マークの流れ方が変わる。"
+            )
+        else:
+            lines.append(
+                "風の影響: **風＋潮・河川流**をセットで見る。"
+                "汽水は場ごとの差が大きいので、風向だけで決め打ちしない。"
+            )
+        lines.append("向かい風はSTの踏み込みや伸び、追い風は1マークでの流れや差し場に影響しうる。")
+        return "\n".join(lines)
+
+    if asks_start:
+        lines.append(
+            "スタート: 水質だけでSTを決めない。**風向・風速、起こし位置、進入、選手のST傾向**を優先。"
+            "淡水/海水の違いは乗り味の補助材料として扱う。"
+        )
+        return "\n".join(lines)
+
+    if asks_turn:
+        lines.append(
+            f"ターン/乗り味: {basics[kind]} "
+            "展示では1マークの入り、艇の掛かり、出口の押し、ターン後の加速まで見る。"
+        )
+        return "\n".join(lines)
+
+    if asks_motor:
+        lines.append(
+            "モーター: 水質だけで機力評価は決めない。展示タイム、直線の伸び、出足・回り足、"
+            "そのモーターの近況を同じ水面条件で照らし合わせる。"
+        )
+        return "\n".join(lines)
+
+    if asks_tide:
+        if kind == "淡水":
+            lines.append("潮: **淡水水面は基本的に潮位差を予想材料にしない**。ただし河川なら流れや増減水は別物として確認。")
+        else:
+            lines.append("潮: 場ごとに影響度が違う。潮位対象場では満潮/干潮と風向を重ねて見る。")
+        return "\n".join(lines)
+
+    if asks_feature or explicit:
+        lines.append(f"特徴: {basics[kind]}")
+        lines.append("予想では水質単独で決めず、**風・波・進入・展示ST・モーター・場特性**とセットで使う。")
+        return "\n".join(lines)
+
+    return None
+
+
+def water_type_list_answer_sync(question: str, user_id: int) -> Optional[str]:
     """Answer cross-venue water-type questions such as '淡水の場は？'."""
     q = _norm_knowledge_text(question)
     targets = [kind for kind in ("淡水", "海水", "汽水") if kind in q]
     if not targets:
         return None
+    if len(targets) == 1 and not _venue_from_question(question):
+        _water_context_by_user[user_id] = (targets[0], time.monotonic())
 
     # Avoid stealing single-venue questions such as "児島は海水？".
     if _venue_from_question(question):
@@ -1367,9 +1477,13 @@ def venue_knowledge_answer_sync(question: str) -> Optional[str]:
 
 
 def encyclopedia_answer_sync(question: str, user_id: int) -> Optional[str]:
-    water_list = water_type_list_answer_sync(question)
+    water_list = water_type_list_answer_sync(question, user_id)
     if water_list:
         return water_list
+
+    water_concept = water_type_concept_answer_sync(question, user_id)
+    if water_concept:
+        return water_concept
 
     venue_answer = venue_knowledge_answer_sync(question)
     if venue_answer:
@@ -1679,6 +1793,10 @@ async def on_message(message: discord.Message):
         try:
             effective_question = question
             venue = _venue_from_question(question)
+            qnorm = _norm_knowledge_text(question)
+            explicit_water = next((kind for kind in ("淡水", "海水", "汽水") if kind in qnorm), None)
+            if explicit_water and not venue:
+                _water_context_by_user[message.author.id] = (explicit_water, time.monotonic())
             stats_words = ["的中率", "回収率", "roi", "成績", "調子", "今どう", "現状", "結果"]
             venue_words = [
                 "特徴", "水面", "水質", "潮", "干満", "満潮", "干潮", "海水", "汽水", "淡水",
@@ -1687,6 +1805,18 @@ async def on_message(message: discord.Message):
             ]
             if venue and any(k in question.lower() for k in stats_words + venue_words):
                 _venue_context_by_user[message.author.id] = (venue, time.monotonic())
+            elif len(question) <= 24 and any(k in qnorm for k in [
+                "特徴", "違い", "風", "波", "うねり", "スタート", "st",
+                "ターン", "旋回", "乗り味", "浮力", "モーター", "伸び", "出足",
+                "潮", "干満", "狙い目", "影響"
+            ]):
+                water_ctx = _water_context_by_user.get(message.author.id)
+                if water_ctx and time.monotonic() - water_ctx[1] <= 900:
+                    effective_question = f"{water_ctx[0]} {question}"
+                else:
+                    ctx = _venue_context_by_user.get(message.author.id)
+                    if ctx and time.monotonic() - ctx[1] <= 900:
+                        effective_question = f"{ctx[0]} {question}"
             elif len(question) <= 18 and any(k in question.lower() for k in stats_words + venue_words):
                 ctx = _venue_context_by_user.get(message.author.id)
                 if ctx and time.monotonic() - ctx[1] <= 900:
