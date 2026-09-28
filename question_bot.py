@@ -1287,7 +1287,10 @@ def water_type_concept_answer_sync(question: str, user_id: int) -> Optional[str]
     if explicit and any(word in q for word in list_words):
         return None
 
-    asks_wind = any(word in q for word in ["風", "向かい風", "追い風"])
+    asks_headwind = any(word in q for word in ["向かい風", "向い風"])
+    asks_tailwind = any(word in q for word in ["追い風", "追風"])
+    asks_crosswind = "横風" in q
+    asks_wind = "風" in q
     asks_start = any(word in q for word in ["スタート", "st"])
     asks_turn = any(word in q for word in ["ターン", "旋回", "乗り味"])
     asks_motor = any(word in q for word in ["モーター", "伸び", "出足"])
@@ -1310,6 +1313,41 @@ def water_type_concept_answer_sync(question: str, user_id: int) -> Optional[str]
     }
 
     lines = [f"🌊 **{kind}の見方**"]
+
+    if asks_tailwind:
+        lines = [f"🌊 **{kind} × 追い風**"]
+        lines.append(
+            "追い風はスタート方向へ後ろから押す風。**STが届きやすくなる一方、1マークで艇が流れて差し場ができる場合**がある。"
+        )
+        if kind == "淡水":
+            lines.append("淡水では潮汐を基本切り離せるので、風速・波高・水面形状と展示の乗りやすさを重点確認。")
+        elif kind == "海水":
+            lines.append("海水では**潮位・流れとの重なり**で影響が変わる。追い風だけで差し有利と決め打ちしない。")
+        else:
+            lines.append("汽水では**潮・河川流との向き**まで合わせて見る。同じ追い風でも効き方が変わりやすい。")
+        return "\n".join(lines)
+
+    if asks_headwind:
+        lines = [f"🌊 **{kind} × 向かい風**"]
+        lines.append(
+            "向かい風はスタート方向から正面に受ける風。**STの踏み込み、直線の伸び、1マークへの入り**に影響しうる。"
+        )
+        if kind == "淡水":
+            lines.append("淡水では潮汐より、風速・波高・選手のST修正力と展示気配を優先して見る。")
+        elif kind == "海水":
+            lines.append("海水では潮位・流れと重なると水面の荒れ方も変わるので、展示と本番の差に注意。")
+        else:
+            lines.append("汽水では河川流や潮との向きが加わるため、風向単独では評価しない。")
+        return "\n".join(lines)
+
+    if asks_crosswind:
+        lines = [f"🌊 **{kind} × 横風**"]
+        lines.append(
+            "横風はスタート隊形やターン姿勢を崩す要因。**風向の振れ幅と展示STのばらつき**を一緒に見る。"
+        )
+        if kind in {"海水", "汽水"}:
+            lines.append("海水・汽水では潮や流れも加わるので、風だけで進入・着順を決め打ちしない。")
+        return "\n".join(lines)
 
     if asks_wind:
         if kind == "淡水":
