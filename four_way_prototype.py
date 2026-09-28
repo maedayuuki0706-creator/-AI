@@ -23,6 +23,7 @@ import bridge_learning
 import detailed_discord_notify as cards
 import mid_value_selection
 import opportunity_alerts
+from market_structure import analyze_market_structure
 
 JST = ZoneInfo('Asia/Tokyo')
 VERSION = 'pt3-control-pt1-scent-box-pt2-compress-v1'
@@ -132,6 +133,7 @@ def _prototype3_variant(hiyori, odds, native_hiyori, main_points, cover_points=N
         odd = odds.get(row['combination'])
         row['odds'] = odd
         row['expected_value'] = row['probability'] * odd if odd is not None else None
+    analysis['market_structure'] = analyze_market_structure(odds, analysis['trifecta'])
 
     main = list(dict.fromkeys(native_hiyori))[:main_points if cover_points is not None else 16]
     if not main:
@@ -175,6 +177,7 @@ def _prototype3_variant(hiyori, odds, native_hiyori, main_points, cover_points=N
         'odds_complete': odds_complete,
         'trifecta': analysis['trifecta'],
         'structure': analysis.get('conviction_structure'),
+        'market_structure': analysis.get('market_structure'),
         'bridge': None,
     }
 
