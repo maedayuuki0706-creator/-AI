@@ -1262,7 +1262,7 @@ def _dominant_outer_course(profile: dict) -> tuple[int, float] | None:
 def water_type_concept_answer_sync(question: str, user_id: int) -> Optional[str]:
     """Explain water-type characteristics and contextual follow-ups."""
     q = _norm_knowledge_text(question)
-    explicit = next((kind for kind in ("淡水", "海水", "汽水") if kind in q), None)
+    explicit = _first_water_type(q)
 
     if explicit and not _venue_from_question(question):
         _water_context_by_user[user_id] = (explicit, time.monotonic())
@@ -1317,7 +1317,8 @@ def water_type_concept_answer_sync(question: str, user_id: int) -> Optional[str]
     if asks_tailwind:
         lines = [f"🌊 **{kind} × 追い風**"]
         lines.append(
-            "追い風はスタート方向へ後ろから押す風。**STが届きやすくなる一方、1マークで艇が流れて差し場ができる場合**がある。"
+            "追い風は、**握って回る艇が1マークで流れやすく、差しが効きやすくなる**のが基本セオリー。"
+            "強くなるほどインが先マイしても膨らみ、2コース差しが届く形に注意。"
         )
         if kind == "淡水":
             lines.append("淡水では潮汐を基本切り離せるので、風速・波高・水面形状と展示の乗りやすさを重点確認。")
@@ -1330,7 +1331,8 @@ def water_type_concept_answer_sync(question: str, user_id: int) -> Optional[str]
     if asks_headwind:
         lines = [f"🌊 **{kind} × 向かい風**"]
         lines.append(
-            "向かい風はスタート方向から正面に受ける風。**STの踏み込み、直線の伸び、1マークへの入り**に影響しうる。"
+            "向かい風は、**インの加速がつきにくくなり、センター〜ダッシュのまくりが効きやすくなる**のが基本セオリー。"
+            "強くなるほどスロー勢のSTが難しくなり、4カドなど外の攻めが生きるケースに注意。"
         )
         if kind == "淡水":
             lines.append("淡水では潮汐より、風速・波高・選手のST修正力と展示気配を優先して見る。")
@@ -1618,24 +1620,43 @@ async def maybe_answer_encyclopedia(question: str, user_id: int) -> Optional[str
 
 
 
-async def recent_water_type_from_history(message: discord.Message, max_items: int = 16) -> Optional[str]:
-    """Resolve the most recent explicit water type from this user's Discord history."""
+def _first_water_type(text: str) -> Optional[str]:
+    """Return the earliest explicit water-type mention."""
+    hits = []
+    for kind in ("淡水", "海水", "汽水"):
+        pos = text.find(kind)
+        if pos >= 0:
+            hits.append((pos, kind))
+    return min(hits)[1] if hits else None
+
+
+async def recent_water_type_from_history(message: discord.Message, max_items: int = 20) -> Optional[str]:
+    """Resolve the nearest water topic from user messages or bot reply headings."""
     try:
         recent = [m async for m in message.channel.history(limit=max_items, before=message)]
     except (discord.Forbidden, discord.HTTPException):
         return None
 
+    bot_id = getattr(client.user, "id", None)
+
     # discord.py history is newest-first by default.
     for item in recent:
-        try:
-            if item.author.id != message.author.id:
-                continue
-        except AttributeError:
-            continue
-        text = _norm_knowledge_text(item.content or "")
-        for kind in ("淡水", "海水", "汽水"):
-            if kind in text:
+        author_id = getattr(item.author, "id", None)
+        raw = item.content or ""
+
+        if author_id == message.author.id:
+            kind = _first_water_type(_norm_knowledge_text(raw))
+            if kind:
                 return kind
+            continue
+
+        # Use only the bot's topic heading. Generic body text can mention
+        # multiple water types and must not be used for topic resolution.
+        if bot_id is not None and author_id == bot_id:
+            m = re.search(r"\*\*(淡水|海水|汽水)(?:の見方|の特徴|の水面|水面メモ|\s*×)", raw)
+            if m:
+                return m.group(1)
+
     return None
 
 
@@ -1886,9 +1907,10 @@ async def on_message(message: discord.Message):
             effective_question = question
             venue = _venue_from_question(question)
             qnorm = _norm_knowledge_text(question)
-            explicit_water = next((kind for kind in ("淡水", "海水", "汽水") if kind in qnorm), None)
+            explicit_water = _first_water_type(qnorm)
             if explicit_water and not venue:
                 _water_context_by_user[message.author.id] = (explicit_water, time.monotonic())
+                print(f"[water-context] explicit={explicit_water}", flush=True)
 
             water_follow_words = [
                 "特徴", "違い", "風", "向かい風", "追い風", "波", "うねり",
@@ -1900,7 +1922,7 @@ async def on_message(message: discord.Message):
                 if history_water:
                     _water_context_by_user[message.author.id] = (history_water, time.monotonic())
                     effective_question = f"{history_water} {question}"
-                    print(f"[water-context] resolved={history_water}", flush=True)
+                    print(f"[water-context] history={history_water}", flush=True)
 
             stats_words = ["的中率", "回収率", "roi", "成績", "調子", "今どう", "現状", "結果"]
             venue_words = [
