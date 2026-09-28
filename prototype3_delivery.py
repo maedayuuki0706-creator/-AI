@@ -199,6 +199,23 @@ def _reason_lines(model):
             f"（次点{second[0]}号艇 {second[1]:.1%}）"
         )
 
+    market = model.get("market_structure") or {}
+    if market.get("available"):
+        market_type = market.get("market_type") or "中間型"
+        split_index = market.get("split_index")
+        if market.get("actionability") == "market_split_model_clear":
+            lane = market.get("model_top_head")
+            edge = market.get("model_market_head_edge_pp")
+            lines.append(
+                f"・オッズ構造は**{market_type}**（割れ指数 {split_index:.0f}）"
+                f"／AI最上位{lane}号艇は市場より**+{float(edge or 0):.1f}pt**評価"
+            )
+        elif market.get("actionability") == "split_but_model_unclear":
+            lines.append(
+                f"・オッズ構造は**{market_type}**（割れ指数 {split_index:.0f}）"
+                "だが、AI側も頭を絞り切れていないため強加点なし"
+            )
+
     main = set(model.get("main_picks") or [])
     ranked_main = []
     for row in model.get("trifecta") or []:
