@@ -68,6 +68,23 @@ def install(opportunity_alerts_module):
             rows.append(item)
             seen.add(combo)
 
+        # Market split is only a ranking refinement, never an admission rule.
+        # Candidates must already clear probability/EV gates above.  When the
+        # public head market is divided but the model is materially clearer,
+        # modestly prefer tickets headed by lanes the model rates above market.
+        market = analysis.get("market_structure") or {}
+        if market.get("actionability") == "market_split_model_clear":
+            head_edges = market.get("head_edge_pp") or {}
+            for row in rows:
+                combo = str(row.get("combination") or "")
+                head = combo.split("-")[0] if combo else ""
+                edge_pp = max(0.0, _num(head_edges.get(head), 0.0))
+                if edge_pp <= 0:
+                    continue
+                boost = 1.0 + min(0.12, edge_pp * 0.006)
+                row["_quality"] = _num(row.get("_quality")) * boost
+                row["_market_edge_boost"] = round(boost, 3)
+
         rows.sort(
             key=lambda row: (
                 _num(row.get("_quality")),
