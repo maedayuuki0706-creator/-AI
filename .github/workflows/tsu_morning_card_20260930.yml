@@ -1,0 +1,39 @@
+name: Tsu Morning Card 2026-09-30
+
+on:
+  schedule:
+    # 2026-09-30 08:00 JST = 2026-09-29 23:00 UTC
+    - cron: "0 23 29 9 *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "send_tsu_morning_card.py"
+      - ".github/workflows/tsu_morning_card_20260930.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Preview on code changes
+        if: ${{ github.event_name == 'push' }}
+        env:
+          TSU_TARGET_DAY: "20260930"
+        run: python send_tsu_morning_card.py --dry-run
+
+      - name: Send Tsu morning card
+        if: ${{ github.event_name != 'push' }}
+        env:
+          TSU_TARGET_DAY: "20260930"
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python send_tsu_morning_card.py
