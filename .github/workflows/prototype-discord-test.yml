@@ -11,7 +11,7 @@ jobs:
   send-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Test Prototype 1 webhook
+      - name: Test Prototype 1 webhook with prediction format
         env:
           WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
         run: |
@@ -19,8 +19,14 @@ jobs:
             echo "PROTO1_DISCORD_WEBHOOK_URL is not set"
             exit 1
           fi
+          cat > /tmp/proto1_payload.json <<'JSON'
+          {
+            "username": "嗅覚型予想家",
+            "content": "🧪 **文面テスト｜実際の予想ではありません**\n🐕 **嗅覚型予想家（PT1）｜サンプル水面 1R**\n締切 TEST｜展示6艇確認済み\n**ここが匂う！ 当たりの匂いは4号艇から**\n展示＋既存/日和＋展開：4号艇のまくり差しを想定\n1号艇：展示ST 0.12・3着内推定 58%\n4号艇：展示ST 0.07・展示ST上位・展開の攻め候補（まくり差し）・3着内推定 64%\n5号艇：展示ST 0.10・展示ST上位・3着内推定 55%\n📦 **BOX 145（6点）**\n🛟 **抜け目 1-45-23（4点）**\n💣 **穴目（3点）** 4-6-1 / 5-6-4 / 6-4-5\n「コイツから当たりの匂いがする！」\n計13点｜Grade A｜文面テスト\n※数値・買い目は表示確認用のサンプルです"
+          }
+          JSON
           curl -fsS -H "Content-Type: application/json" \
-            -d '{"username":"プロトタイプ1","content":"🧪 プロトタイプ1 配信テスト成功"}' \
+            --data-binary @/tmp/proto1_payload.json \
             "$WEBHOOK_URL"
 
       - name: Test Prototype 2 webhook
