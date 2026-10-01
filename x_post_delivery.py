@@ -19,7 +19,7 @@ import urllib.request
 
 from direct_discord_notify import JST
 from x_api_client import credentials_configured, post_text as post_to_x
-from x_delivery_policy import validate_live_row, weighted_length
+from x_delivery_policy import SOURCE_SAFETY_LEAD_SECONDS, validate_live_row, weighted_length
 import x_delivery_store as outbox
 
 STATE_DIR = Path("data/x_post_delivery")
@@ -298,7 +298,10 @@ def _send_once(record: dict, source: str, post: str) -> bool:
     key = _race_key(record)
     if not day or key.endswith(":0"):
         return False
-    validate_live_row({**record, "source": source, "sent_at": datetime.now(JST).isoformat()})
+    validate_live_row(
+        {**record, "source": source, "sent_at": datetime.now(JST).isoformat()},
+        min_lead_seconds=SOURCE_SAFETY_LEAD_SECONDS,
+    )
     if not post or weighted_length(post) > 280:
         raise ValueError("invalid X prediction text")
 
