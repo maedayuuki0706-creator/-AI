@@ -5,9 +5,11 @@ import unicodedata
 
 JST = timezone(timedelta(hours=9))
 ALLOWED_SOURCES = {"厳選くん", "厳選中穴"}
+MIN_PUBLISH_LEAD_SECONDS = 10 * 60
+SOURCE_SAFETY_LEAD_SECONDS = 11 * 60
 
 
-def validate_live_row(row: dict, now: datetime | None = None) -> None:
+def validate_live_row(row: dict, now: datetime | None = None, *, min_lead_seconds: int = MIN_PUBLISH_LEAD_SECONDS) -> None:
     now = now or datetime.now(JST)
     if row.get("source") not in ALLOWED_SOURCES or row.get("resend"):
         raise ValueError("not an eligible selected prediction")
@@ -17,8 +19,9 @@ def validate_live_row(row: dict, now: datetime | None = None) -> None:
     if not re.fullmatch(r"\d{2}:\d{2}", str(row.get("deadline") or "")):
         raise ValueError("prediction deadline is missing")
     deadline = datetime.strptime(day + " " + row["deadline"], "%Y%m%d %H:%M").replace(tzinfo=JST)
-    if (deadline - now).total_seconds() <= 30:
-        raise ValueError("prediction deadline reached or too close")
+    lead_seconds = (deadline - now).total_seconds()
+    if lead_seconds < int(min_lead_seconds):
+        raise ValueError("prediction is inside the X ten-minute cutoff")
     sent_at = datetime.fromisoformat(str(row.get("sent_at") or ""))
     if sent_at.tzinfo is None:
         raise ValueError("prediction timestamp must include timezone")
