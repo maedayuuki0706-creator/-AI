@@ -13,6 +13,7 @@ import urllib.request
 import daily_report as daily
 import direct_discord_notify as boat_source
 from prediction_engine_v2 import analyze_race_v2
+from x_api_client import post_text as post_to_x
 
 ROOT = Path(__file__).resolve().parent
 WEB_ROOT = ROOT / "web"
@@ -201,6 +202,18 @@ def maybe_send_pt3_startup_test() -> None:
         print(f"PT3 startup test failed: {type(exc).__name__}: {exc}", flush=True)
 
 
+def maybe_send_x_intro_test() -> None:
+    nonce = os.getenv("X_INTRO_TEST_NONCE", "").strip()
+    text = os.getenv("X_INTRO_TEST_TEXT", "").strip()
+    if not nonce or not text:
+        return
+    try:
+        post_id = post_to_x(text)
+        print(f"X intro test sent nonce={nonce} post_id={post_id}", flush=True)
+    except Exception as exc:
+        print(f"X intro test failed nonce={nonce}: {type(exc).__name__}: {exc}", flush=True)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "BoatAINavi/2.0"
 
@@ -315,6 +328,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     maybe_send_pt3_startup_test()
+    maybe_send_x_intro_test()
     port = int(os.getenv("PORT", "10000"))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Boat AI Navi listening on {port}", flush=True)
