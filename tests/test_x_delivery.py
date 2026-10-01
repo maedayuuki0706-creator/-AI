@@ -34,7 +34,7 @@ class Clock(datetime):
 
 def row(**overrides):
     return {"day": DAY, "jcd": "08", "rno": 1, "venue": "常滑",
-            "deadline": "12:10", "source": "厳選くん", "resend": False,
+            "deadline": "12:12", "source": "厳選くん", "resend": False,
             "sent_at": NOW.isoformat(), "post": "常滑 1R\n1-234-234\nぜひフォローお願いします！",
             "main": ["1-2-3", "1-2-4", "1-3-2", "1-3-4", "1-4-2", "1-4-3"],
             **overrides}
@@ -109,7 +109,8 @@ class XDeliveryTests(unittest.TestCase):
 
     def test_deadlines_freshness_sources_and_dates_fail_closed(self):
         policy.validate_live_row(row())
-        for overrides in ({"deadline": "12:00"}, {"deadline": "--:--"}, {"deadline": "bad"},
+        policy.validate_live_row(row(deadline="12:10"))  # exact ten-minute boundary is allowed
+        for overrides in ({"deadline": "12:09"}, {"deadline": "12:00"}, {"deadline": "--:--"}, {"deadline": "bad"},
                           {"day": "20261001"}, {"source": "穴くん"}, {"resend": True},
                           {"sent_at": (NOW - timedelta(minutes=16)).isoformat()},
                           {"sent_at": (NOW + timedelta(minutes=2)).isoformat()},
