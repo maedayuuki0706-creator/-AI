@@ -13,7 +13,7 @@ import urllib.request
 import daily_report as daily
 import direct_discord_notify as boat_source
 from prediction_engine_v2 import analyze_race_v2
-from x_api_client import post_text as post_to_x
+from x_api_client import post_text as post_to_x, verify_user_context
 
 ROOT = Path(__file__).resolve().parent
 WEB_ROOT = ROOT / "web"
@@ -208,6 +208,8 @@ def maybe_send_x_intro_test() -> None:
     if not nonce or not text:
         return
     try:
+        verified = verify_user_context()
+        print(f"X auth verified as {verified}", flush=True)
         post_id = post_to_x(text)
         print(f"X intro test sent nonce={nonce} post_id={post_id}", flush=True)
     except Exception as exc:
