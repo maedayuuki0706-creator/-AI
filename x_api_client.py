@@ -36,7 +36,7 @@ def credentials_configured() -> bool:
     return all(os.getenv(key, "").strip() for key in ENV_KEYS)
 
 
-def _oauth_header(method: str, url: str) -> str:
+def _oauth_header(method: str, url: str, body: bytes | None = None) -> str:
     consumer_key, consumer_secret, access_token, access_secret = _credentials()
     oauth = {
         "oauth_consumer_key": consumer_key,
@@ -46,6 +46,9 @@ def _oauth_header(method: str, url: str) -> str:
         "oauth_token": access_token,
         "oauth_version": "1.0",
     }
+    if body is not None:
+        body_digest = hashlib.sha1(body).digest()
+        oauth["oauth_body_hash"] = base64.b64encode(body_digest).decode("ascii")
 
     parsed = urllib.parse.urlsplit(url)
     query_pairs = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
@@ -75,7 +78,7 @@ def post_text(text: str) -> str:
         X_POST_URL,
         data=body,
         headers={
-            "Authorization": _oauth_header("POST", X_POST_URL),
+            "Authorization": _oauth_header("POST", X_POST_URL, body),
             "Content-Type": "application/json",
             "Accept": "application/json",
             "User-Agent": "Boat-AI-Navi/x-auto-post-v1",
