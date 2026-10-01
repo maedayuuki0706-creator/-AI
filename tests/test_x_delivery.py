@@ -66,6 +66,8 @@ class XDeliveryTests(unittest.TestCase):
         delivery._REPORTED_BLOCKS.clear()
         api._X_SYNC_POSTED.clear()
         api._X_SYNC_UNCERTAIN.clear()
+        api._X_RESULT_POSTED.clear()
+        api._X_RESULT_UNCERTAIN.clear()
         self.remote = {}
         self.archived = ""
 
