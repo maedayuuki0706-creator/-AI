@@ -218,7 +218,7 @@ def install(app):
     def selected_message(record):
         score = int(record.get("selection_score") or 0)
         strong = score >= STRONG_SELECTED_THRESHOLD
-        title = "🔥🔥 **厳選くんの勝負レース【強厳選】**" if strong else "🔥 **厳選くんの勝負レース**"
+        title = "## 🔥 通常厳選\n**メインAI・厳選くん｜🔥 強厳選**" if strong else "## 🔥 通常厳選\n**メインAI・厳選くん**"
         intro = random.choice(GENSEN_KUN_LINES)
 
         heads = record.get("heads") or {}
@@ -288,10 +288,10 @@ def install(app):
         )
 
         return (
-            f"{intro}\n\n"
             f"{title}\n"
-            f"**【{record.get('venue')} {record.get('rno')}R】**\n"
+            f"🏁 **{record.get('venue')} {record.get('rno')}R**\n"
             f"⏰ 締切 **{record.get('deadline')}**　⭐ **{score}/100**　評価 **{record.get('grade')}**\n"
+            f"{intro}\n"
             f"━━━━━━━━━━━━\n"
             f"{thick_section}"
             f"🎯 **本線（{len(regular_main)}点）**\n{main_text}\n\n"

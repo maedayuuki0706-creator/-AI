@@ -352,11 +352,12 @@ def _selected_message(record):
     main = " / ".join(record.get("main") or []) or "-"
     cover = " / ".join((record.get("cover") or [])[:6]) or "-"
     return (
-        f"🔥 **厳選予想｜{record.get('venue')} {record.get('rno')}R**\n"
-        f"締切 **{record.get('deadline')}** / 評価 **{record.get('grade')}** / 展示反映済み"
+        f"## 🔥 通常厳選\n**メインAI・厳選くん**\n"
+        f"🏁 **{record.get('venue')} {record.get('rno')}R**\n"
+        f"⏰ 締切 **{record.get('deadline')}** / 評価 **{record.get('grade')}** / 展示反映済み"
         f"{top_text}\n"
-        f"◎ 本線：{main}\n"
-        f"○ 押さえ：{cover}\n"
+        f"\n🎯 **本線**\n{main}\n"
+        f"\n🛡️ **押さえ**\n{cover}\n\n"
         f"選定理由：A/B評価＋展示確定＋確率/EV条件クリア\n"
         f"EV候補：{ev_text}"
     )

@@ -511,10 +511,11 @@ def _selected_mid_message(message):
     )
     body = str(message).replace(
         "🔥 **中穴予想｜",
-        "🚨 **厳選中穴予想｜",
+        "🏁 **",
         1,
     )
-    return f"{random.choice(intros)}\n\n{body}"
+    body = body.replace("締切 **", "⏰ 締切 **", 1)
+    return f"## 🟡 中穴厳選\n**中穴くんの厳選レース**\n{body}\n\n💬 {random.choice(intros)}"
 
 
 def _send(env_name, content):

@@ -241,7 +241,7 @@ def _prediction_message(record, *, selected=False):
     model = record["model"]
     main = model.get("main_picks") or []
     cover = model.get("cover_picks") or []
-    heading = "🏅 **新人予想家 ゆうき｜厳選予想**" if selected else "🎩 **新人予想家 ゆうき｜勝負予想**"
+    heading = "## 🏅 ゆうき厳選\n**新人予想家 ゆうきの厳選レース**" if selected else "🎩 **新人予想家 ゆうき｜勝負予想**"
     lines = [
         heading,
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 **{record['deadline']}**",
