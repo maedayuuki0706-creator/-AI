@@ -66,7 +66,15 @@ def _x_sync_post_row(day: str, jcd: str, rno: int) -> dict:
             matches.append(row)
     if not matches:
         raise ValueError("eligible archived X post not found")
-    return matches[-1]
+    row = matches[-1]
+    try:
+        sent_at = datetime.fromisoformat(str(row.get("sent_at") or ""))
+        age_seconds = (datetime.now(JST) - sent_at.astimezone(JST)).total_seconds()
+    except Exception as exc:
+        raise ValueError("archived X post timestamp invalid") from exc
+    if age_seconds < -60 or age_seconds > 900:
+        raise ValueError("archived X post is not fresh")
+    return row
 
 
 def sync_archived_prediction_to_x(day: str, jcd: str, rno: int) -> dict:
