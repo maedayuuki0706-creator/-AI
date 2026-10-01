@@ -73,6 +73,10 @@ jobs:
           DISCORD_WEBHOOK_MID_ODDS_SELECTED: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
           DISCORD_WEBHOOK_LONGSHOT: ${{ secrets.DISCORD_WEBHOOK_LONGSHOT }}
           X_POST_DISCORD_WEBHOOK_URL: ${{ secrets.X_POST_DISCORD_WEBHOOK_URL }}
+          X_CONSUMER_KEY: ${{ secrets.X_CONSUMER_KEY }}
+          X_CONSUMER_SECRET: ${{ secrets.X_CONSUMER_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
           NOTIFY_WATCH_SECONDS: ${{ github.event_name == 'schedule' && '1380' || '1380' }}
         run: python delivery_guard_runner.py
 
