@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -69,7 +70,7 @@ def _x_sync_post_row(day: str, jcd: str, rno: int) -> dict:
     row = matches[-1]
     try:
         sent_at = datetime.fromisoformat(str(row.get("sent_at") or ""))
-        age_seconds = (datetime.now(JST) - sent_at.astimezone(JST)).total_seconds()
+        age_seconds = (datetime.now(boat_source.JST) - sent_at.astimezone(boat_source.JST)).total_seconds()
     except Exception as exc:
         raise ValueError("archived X post timestamp invalid") from exc
     if age_seconds < -60 or age_seconds > 900:
