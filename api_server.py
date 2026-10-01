@@ -15,6 +15,7 @@ import urllib.request
 
 import daily_report as daily
 import direct_discord_notify as boat_source
+from discord_formation import expand_formation
 from prediction_engine_v2 import analyze_race_v2
 from x_api_client import post_text as post_to_x, verify_user_context, credentials_configured, XPostRejected
 from x_delivery_policy import validate_live_row, weighted_length
@@ -28,6 +29,8 @@ X_SYNC_RAW_BASE = "https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/
 _X_SYNC_LOCK = threading.Lock()
 _X_SYNC_POSTED: dict[str, str] = {}
 _X_SYNC_UNCERTAIN: set[str] = set()
+_X_RESULT_POSTED: dict[str, str] = {}
+_X_RESULT_UNCERTAIN: set[str] = set()
 
 
 class XArchiveUnavailable(RuntimeError):
@@ -58,7 +61,7 @@ def _x_sync_state(day: str, ref: str) -> dict:
     return value
 
 
-def _x_sync_post_row(day: str, jcd: str, rno: int, ref: str) -> dict:
+def _x_archive_post_row(day: str, jcd: str, rno: int, ref: str) -> dict:
     raw = _raw_text(f"data/x_post_delivery/{day}_posts.jsonl", ref)
     matches = []
     for line in raw.splitlines():
@@ -78,7 +81,11 @@ def _x_sync_post_row(day: str, jcd: str, rno: int, ref: str) -> dict:
             matches.append(row)
     if not matches:
         raise ValueError("eligible archived X post not found")
-    row = matches[0]
+    return matches[0]
+
+
+def _x_sync_post_row(day: str, jcd: str, rno: int, ref: str) -> dict:
+    row = _x_archive_post_row(day, jcd, rno, ref)
     validate_live_row(row)
     return row
 
@@ -124,6 +131,130 @@ def sync_archived_prediction_to_x(day: str, jcd: str, rno: int, archive_ref: str
         _X_SYNC_UNCERTAIN.discard(key)
         print(f"X sync post sent: {key} post_id={post_id}", flush=True)
         return {"ok": True, "already": False, "key": key, "post_id": post_id}
+
+
+
+def _archived_pick_set(row: dict) -> set[str]:
+    picks = set()
+    for value in row.get("picks") or []:
+        text = str(value.get("combination") if isinstance(value, dict) else value or "").strip()
+        if re.fullmatch(r"[1-6]-[1-6]-[1-6]", text):
+            picks.add(text)
+        elif re.fullmatch(r"[1-6]+-[1-6]+-[1-6]+", text):
+            picks.update(expand_formation(text))
+    if picks:
+        return picks
+    for line in str(row.get("post") or "").splitlines():
+        text = line.strip()
+        if re.fullmatch(r"[1-6]+-[1-6]+-[1-6]+", text):
+            try:
+                picks.update(expand_formation(text))
+            except ValueError:
+                pass
+    return picks
+
+
+def _result_text(row: dict, winner: str, payout: int, hit: bool) -> str:
+    venue = str(row.get("venue") or row.get("jcd") or "")
+    rno = int(row.get("rno") or 0)
+    source = str(row.get("source") or "厳選")
+    odds = float(payout) / 100.0
+    if hit:
+        lines = [
+            f"🎯 結果｜{venue} {rno}R",
+            f"{winner}　{odds:.1f}倍",
+            "",
+            f"✅ {source} 的中！",
+            "次の無料予想も配信します。",
+        ]
+    else:
+        lines = [
+            f"📊 結果｜{venue} {rno}R",
+            f"{winner}　{odds:.1f}倍",
+            "",
+            "❌ 不的中",
+            "的中もハズレも結果公開します。",
+        ]
+    text = "\n".join(lines).strip()
+    if weighted_length(text) > 280:
+        raise ValueError("X result text is too long")
+    return text
+
+
+def sync_archived_result_to_x(day: str, jcd: str, rno: int, archive_ref: str = "", attempt_id: str = "") -> dict:
+    day = str(day or "").strip()
+    jcd = str(jcd or "").zfill(2)
+    rno = int(rno or 0)
+    if not re.fullmatch(r"20\d{6}", day) or not re.fullmatch(r"\d{2}", jcd) or not 1 <= rno <= 12:
+        raise ValueError("invalid race key")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(archive_ref)) or not re.fullmatch(r"[0-9a-f]{32}", str(attempt_id)):
+        raise ValueError("a durable archive commit and result attempt are required")
+    key = f"{day}:{jcd}:{rno}"
+
+    with _X_SYNC_LOCK:
+        state = _x_sync_state(day, archive_ref)
+        if key not in set(map(str, state.get("x_posted_races") or [])):
+            raise ValueError("prediction was not posted to X")
+        if key in set(map(str, state.get("x_result_races") or [])):
+            return {
+                "ok": True,
+                "already": True,
+                "key": key,
+                "post_id": str((state.get("x_result_post_ids") or {}).get(key) or ""),
+            }
+        if key in _X_RESULT_POSTED:
+            return {"ok": True, "already": True, "key": key, "post_id": _X_RESULT_POSTED[key]}
+        if key in _X_RESULT_UNCERTAIN:
+            raise RuntimeError("previous X result delivery outcome is uncertain")
+
+        attempt = (state.get("x_result_attempts") or {}).get(key) or {}
+        if attempt.get("id") != attempt_id or attempt.get("status") != "reserved":
+            raise ValueError("result delivery attempt is not reserved in the durable outbox")
+
+        original_post_id = str((state.get("x_post_ids") or {}).get(key) or "").strip()
+        if not original_post_id.isdigit():
+            raise ValueError("original X post id is missing")
+
+        row = _x_archive_post_row(day, jcd, rno, archive_ref)
+        result = _load_official_result(day, jcd, rno)
+        if result.get("status") != "settled":
+            return {
+                "ok": False,
+                "error": "official result pending",
+                "definitely_not_posted": True,
+                "retryable": True,
+            }
+        payouts = result.get("payouts") or {}
+        if not payouts:
+            return {
+                "ok": False,
+                "error": "official payout unavailable",
+                "definitely_not_posted": True,
+                "retryable": True,
+            }
+        winner, payout = max(((str(combo), int(yen)) for combo, yen in payouts.items()), key=lambda item: item[1])
+        hit = winner in _archived_pick_set(row)
+        text = _result_text(row, winner, payout, hit)
+
+        _X_RESULT_UNCERTAIN.add(key)
+        try:
+            post_id = post_to_x(text, reply_to=original_post_id)
+        except XPostRejected as exc:
+            if 400 <= exc.status < 500:
+                _X_RESULT_UNCERTAIN.discard(key)
+            raise
+        _X_RESULT_POSTED[key] = post_id
+        _X_RESULT_UNCERTAIN.discard(key)
+        print(f"X result sent: {key} winner={winner} odds={payout / 100:.1f} hit={hit} post_id={post_id}", flush=True)
+        return {
+            "ok": True,
+            "already": False,
+            "key": key,
+            "post_id": post_id,
+            "winner": winner,
+            "odds": payout / 100.0,
+            "hit": hit,
+        }
 
 
 def body_json(handler: BaseHTTPRequestHandler) -> dict:
@@ -428,17 +559,19 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
 
-        if path == "/api/x-sync":
+        if path in {"/api/x-sync", "/api/x-result"}:
             try:
                 payload = body_json(self)
-                result = sync_archived_prediction_to_x(
+                fn = sync_archived_prediction_to_x if path == "/api/x-sync" else sync_archived_result_to_x
+                result = fn(
                     payload.get("day"),
                     payload.get("jcd"),
                     int(payload.get("rno") or 0),
                     str(payload.get("archive_ref") or ""),
                     str(payload.get("attempt_id") or ""),
                 )
-                self.send_json(200, result)
+                status = 200 if result.get("ok") else 409
+                self.send_json(status, result)
             except (ValueError, json.JSONDecodeError) as e:
                 self.send_json(400, {"ok": False, "error": str(e), "definitely_not_posted": True, "retryable": False})
             except XPostRejected as e:
@@ -446,7 +579,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(502, {"ok": False, "error": f"X HTTP {e.status}",
                                      "definitely_not_posted": 400 <= e.status < 500,
                                      "retryable": e.status == 429})
-            except XArchiveUnavailable as e:
+            except XArchiveUnavailable:
                 self.send_json(502, {"ok": False, "error": "archive temporarily unavailable",
                                      "definitely_not_posted": True, "retryable": True})
             except urllib.error.HTTPError as e:
