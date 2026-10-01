@@ -210,6 +210,45 @@ class XDeliveryTests(unittest.TestCase):
             self.assertEqual(delivery.sync_archived_via_render(DAY), 0)
         ready.assert_not_called()
 
+
+    def test_result_reply_uses_decimal_odds_and_original_post(self):
+        state = {
+            "x_posted_races": [KEY],
+            "x_post_ids": {KEY: "2105651010316488732"},
+            "x_result_attempts": {KEY: {"id": ATTEMPT, "status": "reserved"}},
+        }
+        archived = row(deadline="11:50", picks=["3-1-4"])
+        with patch.object(api, "_x_sync_state", return_value=state), \
+             patch.object(api, "_x_archive_post_row", return_value=archived), \
+             patch.object(api, "_load_official_result", return_value={
+                 "status": "settled", "payouts": {"3-1-4": 3940}, "refund_lanes": []
+             }), \
+             patch.object(api, "post_to_x", return_value="999") as post:
+            result = api.sync_archived_result_to_x(DAY, "08", 1, COMMIT, ATTEMPT)
+        self.assertTrue(result["hit"])
+        self.assertEqual(result["odds"], 39.4)
+        text_arg = post.call_args.args[0]
+        self.assertIn("39.4倍", text_arg)
+        self.assertNotIn("3,940円", text_arg)
+        self.assertEqual(post.call_args.kwargs["reply_to"], "2105651010316488732")
+
+    def test_result_miss_is_still_published(self):
+        state = {
+            "x_posted_races": [KEY],
+            "x_post_ids": {KEY: "2105651010316488732"},
+            "x_result_attempts": {KEY: {"id": ATTEMPT, "status": "reserved"}},
+        }
+        with patch.object(api, "_x_sync_state", return_value=state), \
+             patch.object(api, "_x_archive_post_row", return_value=row(deadline="11:50", picks=["1-2-3"])), \
+             patch.object(api, "_load_official_result", return_value={
+                 "status": "settled", "payouts": {"3-1-4": 3940}, "refund_lanes": []
+             }), \
+             patch.object(api, "post_to_x", return_value="1000") as post:
+            result = api.sync_archived_result_to_x(DAY, "08", 1, COMMIT, ATTEMPT)
+        self.assertFalse(result["hit"])
+        self.assertIn("❌ 不的中", post.call_args.args[0])
+        self.assertIn("39.4倍", post.call_args.args[0])
+
     def test_server_uses_same_post_id_for_duplicate_attempt(self):
         with patch.object(api, "_x_sync_state", return_value=self.reserve()), \
              patch.object(api, "_x_sync_post_row", return_value=row()), \
