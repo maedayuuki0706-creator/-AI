@@ -20,6 +20,7 @@ STATE_DIR = Path("data/x_post_delivery")
 WEBHOOK_ENV = "X_POST_DISCORD_WEBHOOK_URL"
 BASE_HASHTAGS = "#競艇 #ボートレース #競艇予想 #無料予想"
 FORMAT_VERSION = "v2-formation"
+RENDER_SYNC_URL = "https://boat-ai-navi-public.onrender.com/api/x-sync"
 
 def _hashtags(venue: str = "") -> str:
     venue = str(venue or "").strip()
@@ -364,6 +365,78 @@ def resend_live_race(day: str, jcd: str, rno: int) -> None:
     print(f"X post {FORMAT_VERSION} resent {day} {jcd} {rno}R", flush=True)
 
 
+
+def sync_archived_via_render(day: str | None = None) -> int:
+    """Post archived selected predictions through Render and persist X ids."""
+    day = str(day or datetime.now(JST).strftime("%Y%m%d"))
+    posts_path = STATE_DIR / f"{day}_posts.jsonl"
+    if not posts_path.exists():
+        print(f"X sync: no archived posts for {day}", flush=True)
+        return 0
+
+    state = _load(day)
+    x_posted = set(map(str, state.get("x_posted_races") or []))
+    x_ids = dict(state.get("x_post_ids") or {})
+    candidates: dict[str, tuple[str, int]] = {}
+
+    for line in posts_path.read_text(encoding="utf-8").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict) or bool(row.get("resend")):
+            continue
+        if str(row.get("source") or "") not in {"厳選くん", "厳選中穴"}:
+            continue
+        jcd = str(row.get("jcd") or "").zfill(2)
+        rno = int(row.get("rno") or 0)
+        if not 1 <= rno <= 12:
+            continue
+        key = f"{day}:{jcd}:{rno}"
+        candidates[key] = (jcd, rno)
+
+    sent_count = 0
+    changed = False
+    for key, (jcd, rno) in candidates.items():
+        if key in x_posted:
+            continue
+        body = json.dumps({"day": day, "jcd": jcd, "rno": rno}).encode("utf-8")
+        req = urllib.request.Request(
+            RENDER_SYNC_URL,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "Boat-AI-Navi/github-x-sync-v1",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as response:
+                result = json.loads(response.read().decode("utf-8"))
+        except Exception as exc:
+            print(f"X sync failed for {key}: {type(exc).__name__}: {exc}", flush=True)
+            continue
+        if not isinstance(result, dict) or not result.get("ok"):
+            print(f"X sync rejected for {key}: {result!r}", flush=True)
+            continue
+
+        x_posted.add(key)
+        post_id = str(result.get("post_id") or "")
+        if post_id:
+            x_ids[key] = post_id
+        changed = True
+        if not result.get("already"):
+            sent_count += 1
+        print(f"X sync ok: {key} post_id={post_id or '-'}", flush=True)
+
+    if changed:
+        state["x_posted_races"] = sorted(x_posted)
+        state["x_post_ids"] = x_ids
+        _save(day, state)
+    return sent_count
+
+
 def smoke_test() -> None:
     now = datetime.now(JST)
     sample = [
@@ -382,6 +455,7 @@ def smoke_test() -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke-test", action="store_true")
+    parser.add_argument("--sync-render", action="store_true")
     parser.add_argument("--resend-race", action="store_true")
     parser.add_argument("--day")
     parser.add_argument("--jcd")
@@ -391,5 +465,8 @@ if __name__ == "__main__":
         if not (args.day and args.jcd and args.rno):
             parser.error("--resend-race requires --day --jcd --rno")
         resend_live_race(args.day, args.jcd, args.rno)
+    elif args.sync_render:
+        count = sync_archived_via_render(args.day)
+        print(f"X Render sync complete: posted={count}", flush=True)
     elif args.smoke_test:
         smoke_test()
