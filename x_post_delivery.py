@@ -301,6 +301,9 @@ def _build_post(venue: str, rno: int, deadline: str, picks, *, label: str, score
         *compact,
         "",
         "📊 展示・気象・モーター反映済",
+        "",
+        "🔔 次の無料予想も配信します",
+        "ぜひフォローお願いします！",
         _hashtags(venue),
     ])
 
