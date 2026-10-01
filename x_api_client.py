@@ -72,12 +72,18 @@ def _oauth_header(method: str, url: str) -> str:
     )
 
 
-def post_text(text: str) -> str:
+def post_text(text: str, *, reply_to: str | None = None) -> str:
     text = str(text or "").strip()
     if not text:
         raise ValueError("X post text is empty")
 
-    body = json.dumps({"text": text}, ensure_ascii=False).encode("utf-8")
+    payload = {"text": text}
+    reply_to = str(reply_to or "").strip()
+    if reply_to:
+        if not reply_to.isdigit():
+            raise ValueError("X reply target must be a numeric post id")
+        payload["reply"] = {"in_reply_to_tweet_id": reply_to}
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(
         X_POST_URL,
         data=body,
