@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 import uuid
 
-X_POST_URL = "https://api.x.com/2/tweets"
+X_POST_URL = "https://api.twitter.com/2/tweets"
 ENV_KEYS = (
     "X_CONSUMER_KEY",
     "X_CONSUMER_SECRET",
