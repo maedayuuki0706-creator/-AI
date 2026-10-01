@@ -28,6 +28,7 @@ BASE_HASHTAGS = "#競艇 #ボートレース #競艇予想 #無料予想"
 FORMAT_VERSION = "v2-formation"
 RENDER_SYNC_URL = "https://boat-ai-navi-public.onrender.com/api/x-sync"
 RENDER_RESULT_URL = "https://boat-ai-navi-public.onrender.com/api/x-result"
+# Settled results are published as replies to the original X prediction.
 _RECEIPTS_DIRTY: set[str] = set()
 _REPORTED_BLOCKS: set[str] = set()
 _STATE_LOCK = threading.RLock()
