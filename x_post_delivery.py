@@ -1,7 +1,7 @@
-"""Send copy-ready X prediction drafts to the dedicated Discord channel.
+"""Publish selected live prediction posts to X and mirror them to Discord.
 
-This does NOT post to X directly. It mirrors only genuinely selected live
-predictions to Discord so the operator can copy/paste them to X.
+Only genuinely selected live predictions are eligible. Discord remains the
+copy-ready mirror and fallback while X posting is handled automatically.
 """
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ import re
 import urllib.request
 
 from direct_discord_notify import JST
+from x_api_client import credentials_configured, post_text as post_to_x
 
 STATE_DIR = Path("data/x_post_delivery")
 WEBHOOK_ENV = "X_POST_DISCORD_WEBHOOK_URL"
@@ -36,10 +37,12 @@ def _load(day: str) -> dict:
         value = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(value, dict):
             value.setdefault("sent_races", [])
+            value.setdefault("x_posted_races", [])
+            value.setdefault("x_post_ids", {})
             return value
     except (OSError, ValueError):
         pass
-    return {"day": day, "sent_races": [], "updated_at": None}
+    return {"day": day, "sent_races": [], "x_posted_races": [], "x_post_ids": {}, "updated_at": None}
 
 
 def _save(day: str, state: dict) -> None:
@@ -248,16 +251,40 @@ def _send_once(record: dict, source: str, post: str) -> bool:
 
     state = _load(day)
     sent = set(map(str, state.get("sent_races") or []))
-    if key in sent:
+    x_posted = set(map(str, state.get("x_posted_races") or []))
+    if key in sent and key in x_posted:
         return False
 
-    _send_discord(_wrap_for_discord(post, source))
-    _archive_post(record, source, post)
-    sent.add(key)
-    state["sent_races"] = sorted(sent)
-    _save(day, state)
-    print(f"X draft sent: {source} {key}", flush=True)
-    return True
+    did_work = False
+
+    if key not in x_posted:
+        if credentials_configured():
+            try:
+                post_id = post_to_x(post)
+                x_posted.add(key)
+                state["x_posted_races"] = sorted(x_posted)
+                state.setdefault("x_post_ids", {})[key] = post_id
+                _save(day, state)
+                print(f"X auto post sent: {source} {key} post_id={post_id}", flush=True)
+                did_work = True
+            except Exception as exc:
+                print(
+                    f"X auto post failed: {source} {key}: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+        else:
+            print(f"X auto post skipped: credentials missing for {source} {key}", flush=True)
+
+    if key not in sent:
+        _send_discord(_wrap_for_discord(post, source))
+        _archive_post(record, source, post)
+        sent.add(key)
+        state["sent_races"] = sorted(sent)
+        _save(day, state)
+        print(f"X Discord mirror sent: {source} {key}", flush=True)
+        did_work = True
+
+    return did_work
 
 
 def _build_post(venue: str, rno: int, deadline: str, picks, *, label: str, score: int | None = None) -> str:
