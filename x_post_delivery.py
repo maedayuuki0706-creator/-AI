@@ -388,6 +388,13 @@ def sync_archived_via_render(day: str | None = None) -> int:
             continue
         if str(row.get("source") or "") not in {"厳選くん", "厳選中穴"}:
             continue
+        try:
+            sent_at = datetime.fromisoformat(str(row.get("sent_at") or ""))
+            age_seconds = (datetime.now(JST) - sent_at.astimezone(JST)).total_seconds()
+        except Exception:
+            continue
+        if age_seconds < -60 or age_seconds > 900:
+            continue
         jcd = str(row.get("jcd") or "").zfill(2)
         rno = int(row.get("rno") or 0)
         if not 1 <= rno <= 12:
