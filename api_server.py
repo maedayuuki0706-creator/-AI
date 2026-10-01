@@ -7,7 +7,9 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import re
+import threading
 from urllib.parse import parse_qs, urlparse
+import urllib.error
 import urllib.request
 
 import daily_report as daily
@@ -18,6 +20,82 @@ from x_api_client import post_text as post_to_x, verify_user_context
 ROOT = Path(__file__).resolve().parent
 WEB_ROOT = ROOT / "web"
 DATA_ROOT = ROOT / "data"
+
+X_SYNC_ALLOWED_SOURCES = {"厳選くん", "厳選中穴"}
+X_SYNC_RAW_BASE = "https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/main"
+_X_SYNC_LOCK = threading.Lock()
+_X_SYNC_POSTED: set[str] = set()
+
+
+def _raw_text(path: str) -> str:
+    url = f"{X_SYNC_RAW_BASE}/{path.lstrip('/')}"
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Boat-AI-Navi/x-sync-v1", "Accept": "text/plain"},
+        method="GET",
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return response.read().decode("utf-8")
+
+
+def _x_sync_state(day: str) -> dict:
+    try:
+        value = json.loads(_raw_text(f"data/x_post_delivery/{day}.json"))
+        return value if isinstance(value, dict) else {}
+    except Exception:
+        return {}
+
+
+def _x_sync_post_row(day: str, jcd: str, rno: int) -> dict:
+    raw = _raw_text(f"data/x_post_delivery/{day}_posts.jsonl")
+    matches = []
+    for line in raw.splitlines():
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        if (
+            str(row.get("day") or "") == day
+            and str(row.get("jcd") or "").zfill(2) == jcd
+            and int(row.get("rno") or 0) == rno
+            and str(row.get("source") or "") in X_SYNC_ALLOWED_SOURCES
+            and not bool(row.get("resend"))
+        ):
+            matches.append(row)
+    if not matches:
+        raise ValueError("eligible archived X post not found")
+    return matches[-1]
+
+
+def sync_archived_prediction_to_x(day: str, jcd: str, rno: int) -> dict:
+    day = str(day or "").strip()
+    jcd = str(jcd or "").zfill(2)
+    rno = int(rno or 0)
+    if not re.fullmatch(r"20\d{6}", day) or not re.fullmatch(r"\d{2}", jcd) or not 1 <= rno <= 12:
+        raise ValueError("invalid race key")
+    key = f"{day}:{jcd}:{rno}"
+
+    with _X_SYNC_LOCK:
+        state = _x_sync_state(day)
+        if key in set(map(str, state.get("x_posted_races") or [])):
+            return {"ok": True, "already": True, "key": key, "post_id": str((state.get("x_post_ids") or {}).get(key) or "")}
+        if key in _X_SYNC_POSTED:
+            return {"ok": True, "already": True, "key": key, "post_id": ""}
+
+        row = _x_sync_post_row(day, jcd, rno)
+        post = str(row.get("post") or "").strip()
+        # Keep the first production rollout conservative: hashtag-free posts
+        # are known to pass the account's current X write policy.
+        post = "\n".join(line for line in post.splitlines() if not line.lstrip().startswith("#")).strip()
+        if not post:
+            raise ValueError("archived X post is empty")
+
+        post_id = post_to_x(post)
+        _X_SYNC_POSTED.add(key)
+        print(f"X sync post sent: {key} post_id={post_id}", flush=True)
+        return {"ok": True, "already": False, "key": key, "post_id": post_id}
 
 
 def body_json(handler: BaseHTTPRequestHandler) -> dict:
@@ -312,7 +390,27 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path.rstrip("/") != "/predict":
+        path = parsed.path.rstrip("/") or "/"
+
+        if path == "/api/x-sync":
+            try:
+                payload = body_json(self)
+                result = sync_archived_prediction_to_x(
+                    payload.get("day"),
+                    payload.get("jcd"),
+                    int(payload.get("rno") or 0),
+                )
+                self.send_json(200, result)
+            except (ValueError, json.JSONDecodeError) as e:
+                self.send_json(400, {"ok": False, "error": str(e)})
+            except urllib.error.HTTPError as e:
+                self.send_json(502, {"ok": False, "error": f"archive HTTP {e.code}"})
+            except Exception as e:
+                print(f"X sync failed: {type(e).__name__}: {e}", flush=True)
+                self.send_json(500, {"ok": False, "error": type(e).__name__})
+            return
+
+        if path != "/predict":
             self.send_json(404, {"ok": False, "error": "not found"})
             return
         try:
