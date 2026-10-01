@@ -613,17 +613,17 @@ def install(app):
                     "score_version": payload["score_version"], "status": "sniper_skip",
                 })
                 continue
+            if selected_mid:
+                try:
+                    x_post_delivery.send_selected_mid(record, payload)
+                except Exception as exc:
+                    print(
+                        f"x draft failed selected_mid {record.get('jcd')} {record.get('rno')}R: "
+                        f"{type(exc).__name__}",
+                        flush=True,
+                    )
             try:
                 _send(target_env, message)
-                if selected_mid:
-                    try:
-                        x_post_delivery.send_selected_mid(record, payload)
-                    except Exception as exc:
-                        print(
-                            f"x draft failed selected_mid {record.get('jcd')} {record.get('rno')}R: "
-                            f"{type(exc).__name__}",
-                            flush=True,
-                        )
                 _append_log({
                     "day": record.get("day"),
                     "jcd": record.get("jcd"),

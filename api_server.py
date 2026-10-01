@@ -16,7 +16,8 @@ import urllib.request
 import daily_report as daily
 import direct_discord_notify as boat_source
 from prediction_engine_v2 import analyze_race_v2
-from x_api_client import post_text as post_to_x, verify_user_context
+from x_api_client import post_text as post_to_x, verify_user_context, credentials_configured, XPostRejected
+from x_delivery_policy import validate_live_row, weighted_length
 
 ROOT = Path(__file__).resolve().parent
 WEB_ROOT = ROOT / "web"
@@ -25,30 +26,40 @@ DATA_ROOT = ROOT / "data"
 X_SYNC_ALLOWED_SOURCES = {"厳選くん", "厳選中穴"}
 X_SYNC_RAW_BASE = "https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/main"
 _X_SYNC_LOCK = threading.Lock()
-_X_SYNC_POSTED: set[str] = set()
+_X_SYNC_POSTED: dict[str, str] = {}
+_X_SYNC_UNCERTAIN: set[str] = set()
 
 
-def _raw_text(path: str) -> str:
-    url = f"{X_SYNC_RAW_BASE}/{path.lstrip('/')}"
+class XArchiveUnavailable(RuntimeError):
+    pass
+
+
+def _raw_text(path: str, ref: str = "main") -> str:
+    if ref != "main" and not re.fullmatch(r"[0-9a-f]{40}", ref):
+        raise ValueError("invalid archive commit")
+    url = f"{X_SYNC_RAW_BASE.rsplit('/', 1)[0]}/{ref}/{path.lstrip('/')}"
     request = urllib.request.Request(
         url,
         headers={"User-Agent": "Boat-AI-Navi/x-sync-v1", "Accept": "text/plain"},
         method="GET",
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return response.read().decode("utf-8")
-
-
-def _x_sync_state(day: str) -> dict:
     try:
-        value = json.loads(_raw_text(f"data/x_post_delivery/{day}.json"))
-        return value if isinstance(value, dict) else {}
-    except Exception:
-        return {}
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return response.read().decode("utf-8")
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise XArchiveUnavailable(type(exc).__name__) from exc
 
 
-def _x_sync_post_row(day: str, jcd: str, rno: int) -> dict:
-    raw = _raw_text(f"data/x_post_delivery/{day}_posts.jsonl")
+def _x_sync_state(day: str, ref: str) -> dict:
+    # A failed state read must never be interpreted as permission to repost.
+    value = json.loads(_raw_text(f"data/x_post_delivery/{day}.json", ref))
+    if not isinstance(value, dict):
+        raise ValueError("invalid delivery state")
+    return value
+
+
+def _x_sync_post_row(day: str, jcd: str, rno: int, ref: str) -> dict:
+    raw = _raw_text(f"data/x_post_delivery/{day}_posts.jsonl", ref)
     matches = []
     for line in raw.splitlines():
         try:
@@ -67,42 +78,50 @@ def _x_sync_post_row(day: str, jcd: str, rno: int) -> dict:
             matches.append(row)
     if not matches:
         raise ValueError("eligible archived X post not found")
-    row = matches[-1]
-    try:
-        sent_at = datetime.fromisoformat(str(row.get("sent_at") or ""))
-        age_seconds = (datetime.now(boat_source.JST) - sent_at.astimezone(boat_source.JST)).total_seconds()
-    except Exception as exc:
-        raise ValueError("archived X post timestamp invalid") from exc
-    if age_seconds < -60 or age_seconds > 900:
-        raise ValueError("archived X post is not fresh")
+    row = matches[0]
+    validate_live_row(row)
     return row
 
 
-def sync_archived_prediction_to_x(day: str, jcd: str, rno: int) -> dict:
+def sync_archived_prediction_to_x(day: str, jcd: str, rno: int, archive_ref: str = "", attempt_id: str = "") -> dict:
     day = str(day or "").strip()
     jcd = str(jcd or "").zfill(2)
     rno = int(rno or 0)
     if not re.fullmatch(r"20\d{6}", day) or not re.fullmatch(r"\d{2}", jcd) or not 1 <= rno <= 12:
         raise ValueError("invalid race key")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(archive_ref)) or not re.fullmatch(r"[0-9a-f]{32}", str(attempt_id)):
+        raise ValueError("a durable archive commit and attempt are required")
     key = f"{day}:{jcd}:{rno}"
 
     with _X_SYNC_LOCK:
-        state = _x_sync_state(day)
+        state = _x_sync_state(day, archive_ref)
         if key in set(map(str, state.get("x_posted_races") or [])):
             return {"ok": True, "already": True, "key": key, "post_id": str((state.get("x_post_ids") or {}).get(key) or "")}
         if key in _X_SYNC_POSTED:
-            return {"ok": True, "already": True, "key": key, "post_id": ""}
+            return {"ok": True, "already": True, "key": key, "post_id": _X_SYNC_POSTED[key]}
+        if key in _X_SYNC_UNCERTAIN:
+            raise RuntimeError("previous X delivery outcome is uncertain")
+        attempt = (state.get("x_attempts") or {}).get(key) or {}
+        if attempt.get("id") != attempt_id or attempt.get("status") != "reserved":
+            raise ValueError("delivery attempt is not reserved in the durable outbox")
 
-        row = _x_sync_post_row(day, jcd, rno)
+        row = _x_sync_post_row(day, jcd, rno, archive_ref)
         post = str(row.get("post") or "").strip()
         # Keep the first production rollout conservative: hashtag-free posts
         # are known to pass the account's current X write policy.
         post = "\n".join(line for line in post.splitlines() if not line.lstrip().startswith("#")).strip()
-        if not post:
-            raise ValueError("archived X post is empty")
-
-        post_id = post_to_x(post)
-        _X_SYNC_POSTED.add(key)
+        if not post or weighted_length(post) > 280:
+            raise ValueError("archived X post is empty or too long")
+        validate_live_row(row)
+        _X_SYNC_UNCERTAIN.add(key)
+        try:
+            post_id = post_to_x(post)
+        except XPostRejected as exc:
+            if 400 <= exc.status < 500:
+                _X_SYNC_UNCERTAIN.discard(key)
+            raise
+        _X_SYNC_POSTED[key] = post_id
+        _X_SYNC_UNCERTAIN.discard(key)
         print(f"X sync post sent: {key} post_id={post_id}", flush=True)
         return {"ok": True, "already": False, "key": key, "post_id": post_id}
 
@@ -354,6 +373,14 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
 
+        if path == "/api/x-status":
+            self.send_json(200, {"ok": True, "delivery_version": 2,
+                                 "credentials_configured": credentials_configured(),
+                                 "intro_test_enabled": bool(os.getenv("X_INTRO_TEST_NONCE", "").strip()
+                                                             and os.getenv("X_INTRO_TEST_TEXT", "").strip()),
+                                 "outbox_branch": "x-delivery-state"})
+            return
+
         if path == "/api/summary":
             state = read_json(DATA_ROOT / "learning_state.json", {})
             self.send_json(200, {
@@ -408,12 +435,23 @@ class Handler(BaseHTTPRequestHandler):
                     payload.get("day"),
                     payload.get("jcd"),
                     int(payload.get("rno") or 0),
+                    str(payload.get("archive_ref") or ""),
+                    str(payload.get("attempt_id") or ""),
                 )
                 self.send_json(200, result)
             except (ValueError, json.JSONDecodeError) as e:
-                self.send_json(400, {"ok": False, "error": str(e)})
+                self.send_json(400, {"ok": False, "error": str(e), "definitely_not_posted": True, "retryable": False})
+            except XPostRejected as e:
+                print(f"X sync rejected: HTTP {e.status}", flush=True)
+                self.send_json(502, {"ok": False, "error": f"X HTTP {e.status}",
+                                     "definitely_not_posted": 400 <= e.status < 500,
+                                     "retryable": e.status == 429})
+            except XArchiveUnavailable as e:
+                self.send_json(502, {"ok": False, "error": "archive temporarily unavailable",
+                                     "definitely_not_posted": True, "retryable": True})
             except urllib.error.HTTPError as e:
-                self.send_json(502, {"ok": False, "error": f"archive HTTP {e.code}"})
+                self.send_json(502, {"ok": False, "error": f"archive HTTP {e.code}",
+                                     "definitely_not_posted": True, "retryable": True})
             except Exception as e:
                 print(f"X sync failed: {type(e).__name__}: {e}", flush=True)
                 self.send_json(500, {"ok": False, "error": type(e).__name__})

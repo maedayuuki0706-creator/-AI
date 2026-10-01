@@ -21,6 +21,12 @@ ENV_KEYS = (
 )
 
 
+class XPostRejected(RuntimeError):
+    def __init__(self, status: int, detail: str):
+        self.status = status
+        super().__init__(f"X HTTP {status}: {detail[:500]}")
+
+
 def _pct(value: str) -> str:
     return urllib.parse.quote(str(value), safe="~-._")
 
@@ -94,7 +100,7 @@ def post_text(text: str) -> str:
             detail = exc.read().decode("utf-8", errors="replace")
         except Exception:
             detail = ""
-        raise RuntimeError(f"X HTTP {exc.code}: {detail[:500]}") from exc
+        raise XPostRejected(exc.code, detail) from exc
 
     data = payload.get("data") or {}
     post_id = str(data.get("id") or "").strip()

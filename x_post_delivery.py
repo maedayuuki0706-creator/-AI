@@ -11,16 +11,29 @@ import json
 import os
 from pathlib import Path
 import re
+import threading
+import time
+import uuid
+import urllib.error
 import urllib.request
 
 from direct_discord_notify import JST
 from x_api_client import credentials_configured, post_text as post_to_x
+from x_delivery_policy import validate_live_row, weighted_length
+import x_delivery_store as outbox
 
 STATE_DIR = Path("data/x_post_delivery")
 WEBHOOK_ENV = "X_POST_DISCORD_WEBHOOK_URL"
 BASE_HASHTAGS = "#競艇 #ボートレース #競艇予想 #無料予想"
 FORMAT_VERSION = "v2-formation"
 RENDER_SYNC_URL = "https://boat-ai-navi-public.onrender.com/api/x-sync"
+_RECEIPTS_DIRTY: set[str] = set()
+_REPORTED_BLOCKS: set[str] = set()
+_STATE_LOCK = threading.RLock()
+_WORKER_LOCK = threading.Lock()
+_WORKER: threading.Thread | None = None
+_PENDING_DAYS: set[str] = set()
+_LAST_WARM = 0.0
 
 def _hashtags(venue: str = "") -> str:
     venue = str(venue or "").strip()
@@ -47,19 +60,61 @@ def _load(day: str) -> dict:
 
 
 def _save(day: str, state: dict) -> None:
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    state["updated_at"] = datetime.now(JST).isoformat()
-    path = _state_path(day)
-    path.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    with _STATE_LOCK:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        state = outbox.merge_state(_load(day), state)
+        state["updated_at"] = datetime.now(JST).isoformat()
+        path = _state_path(day)
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary.replace(path)
+
+
+def request_sync(day: str | None = None) -> None:
+    """Wake one background sender, keeping X/API latency off Discord's path."""
+    global _WORKER
+    day = str(day or datetime.now(JST).strftime("%Y%m%d"))
+    if os.getenv("X_ASYNC_DELIVERY") != "1":
+        sync_archived_via_render(day)
+        return
+    with _WORKER_LOCK:
+        _PENDING_DAYS.add(day)
+        if _WORKER is not None and _WORKER.is_alive():
+            return
+        def work():
+            global _WORKER, _LAST_WARM
+            while True:
+                with _WORKER_LOCK:
+                    if not _PENDING_DAYS:
+                        _WORKER = None
+                        return
+                    pending = sorted(_PENDING_DAYS)
+                    _PENDING_DAYS.clear()
+                for pending_day in pending:
+                    try:
+                        if outbox.configured() and time.monotonic() - _LAST_WARM >= 240:
+                            check_render_ready()
+                            _LAST_WARM = time.monotonic()
+                        sync_archived_via_render(pending_day)
+                    except Exception as exc:
+                        print(f"::error::X outbox worker failed: {type(exc).__name__}", flush=True)
+        _WORKER = threading.Thread(target=work, name="x-live-outbox", daemon=True)
+        _WORKER.start()
+
+
+def flush_pending(timeout: int = 180) -> None:
+    worker = _WORKER
+    if worker is not None:
+        worker.join(timeout)
+        if worker.is_alive():
+            raise RuntimeError("X sender did not drain before the watcher checkpoint")
 
 
 def _archive_post(record: dict, source: str, post: str, *, resend: bool = False) -> None:
     day = str(record.get("day") or "")
     if not day:
         return
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
     path = STATE_DIR / f"{day}_posts.jsonl"
     row = {
         "day": day,
@@ -73,8 +128,15 @@ def _archive_post(record: dict, source: str, post: str, *, resend: bool = False)
         "post": post,
         "sent_at": datetime.now(JST).isoformat(),
     }
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+    if path.exists() and not resend:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            old = json.loads(line)
+            if _race_key(old) == _race_key(record) and not old.get("resend"):
+                return
+    previous = path.read_text(encoding="utf-8") if path.exists() else ""
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(previous + json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(path)
 
 
 def _race_key(record: dict) -> str:
@@ -212,31 +274,18 @@ def _compact_picks(values) -> list[str]:
 
 def _fit_post(lines: list[str]) -> str:
     text = "\n".join(lines).strip()
-    if len(text) <= 280:
+    if weighted_length(text) <= 280:
         return text
-
-    trimmed = [line for line in lines if not line.startswith("展示・気象")]
+    trimmed = [line for line in lines if "展示・気象" not in line and not line.startswith("#")]
     text = "\n".join(trimmed).strip()
-    if len(text) <= 280:
+    if weighted_length(text) <= 280:
         return text
-    trimmed = [line for line in trimmed if not line.startswith("#")]
+    trimmed = [line for line in trimmed if line and not line.startswith("🔔")]
     text = "\n".join(trimmed).strip()
-    if len(text) <= 280:
+    if weighted_length(text) <= 280:
         return text
-
-    header = trimmed[:4]
-    tokens = []
-    for line in trimmed[4:]:
-        if line.startswith("#"):
-            continue
-        tokens.extend(line.split())
-    body = []
-    for token in tokens:
-        candidate = "\n".join(header + [" ".join(body + [token])]).strip()
-        if len(candidate) > 276:
-            break
-        body.append(token)
-    return "\n".join(header + ([" ".join(body)] if body else [])).strip()
+    # Never silently remove tickets or the requested follow invitation.
+    raise ValueError("X prediction exceeds 280 weighted characters")
 
 
 def _wrap_for_discord(post: str, source: str) -> str:
@@ -249,6 +298,9 @@ def _send_once(record: dict, source: str, post: str) -> bool:
     key = _race_key(record)
     if not day or key.endswith(":0"):
         return False
+    validate_live_row({**record, "source": source, "sent_at": datetime.now(JST).isoformat()})
+    if not post or weighted_length(post) > 280:
+        raise ValueError("invalid X prediction text")
 
     state = _load(day)
     sent = set(map(str, state.get("sent_races") or []))
@@ -258,8 +310,19 @@ def _send_once(record: dict, source: str, post: str) -> bool:
 
     did_work = False
 
+    # Write the outbox before any external send; a Discord outage must not
+    # erase the X prediction or make it depend on the 23-minute watcher exit.
+    _archive_post(record, source, post)
+
     if key not in x_posted:
-        if credentials_configured():
+        if outbox.configured():
+            try:
+                request_sync(day)
+                did_work = True
+            except Exception as exc:
+                print(f"::error::X live checkpoint failed: {key} {type(exc).__name__}", flush=True)
+            state = _load(day)
+        elif credentials_configured():
             try:
                 post_id = post_to_x(post)
                 x_posted.add(key)
@@ -278,7 +341,6 @@ def _send_once(record: dict, source: str, post: str) -> bool:
 
     if key not in sent:
         _send_discord(_wrap_for_discord(post, source))
-        _archive_post(record, source, post)
         sent.add(key)
         state["sent_races"] = sorted(sent)
         _save(day, state)
@@ -366,81 +428,128 @@ def resend_live_race(day: str, jcd: str, rno: int) -> None:
 
 
 
+def check_render_ready() -> dict:
+    request = urllib.request.Request(
+        RENDER_SYNC_URL.rsplit("/", 1)[0] + "/x-status",
+        headers={"User-Agent": "boat-ai-x-preflight"},
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        result = json.loads(response.read().decode("utf-8"))
+    if result.get("delivery_version") != 2 or not result.get("credentials_configured"):
+        raise RuntimeError("Render X delivery v2 is not ready")
+    return result
+
+
+def _checkpoint(day: str, state: dict) -> tuple[dict, str]:
+    _save(day, state)
+    state = _load(day)
+    _RECEIPTS_DIRTY.add(day)
+    merged, commit = outbox.publish_state(day, state)
+    _save(day, merged)
+    _RECEIPTS_DIRTY.discard(day)
+    return merged, commit
+
+
 def sync_archived_via_render(day: str | None = None) -> int:
-    """Post archived selected predictions through Render and persist X ids."""
+    """Deliver the durable outbox immediately and retry only definite failures.
+
+    An interrupted/ambiguous attempt is held for reconciliation, rather than
+    blindly reposted after a server or runner restart.
+    """
     day = str(day or datetime.now(JST).strftime("%Y%m%d"))
     posts_path = STATE_DIR / f"{day}_posts.jsonl"
+    state = _load(day)
+    if day in _RECEIPTS_DIRTY:
+        state, _ = _checkpoint(day, state)
     if not posts_path.exists():
-        print(f"X sync: no archived posts for {day}", flush=True)
         return 0
 
-    state = _load(day)
-    x_posted = set(map(str, state.get("x_posted_races") or []))
-    x_ids = dict(state.get("x_post_ids") or {})
-    candidates: dict[str, tuple[str, int]] = {}
-
+    candidates = {}
     for line in posts_path.read_text(encoding="utf-8").splitlines():
         try:
             row = json.loads(line)
+            validate_live_row(row)
+            jcd = str(row.get("jcd") or "").zfill(2)
+            rno = int(row.get("rno") or 0)
+            if not re.fullmatch(r"(?:0[1-9]|1[0-9]|2[0-4])", jcd) or not 1 <= rno <= 12:
+                continue
+            key = _race_key(row)
+            if key not in set(state.get("x_posted_races") or []):
+                candidates.setdefault(key, row)
+        except (ValueError, TypeError, AttributeError):
+            continue
+    if not candidates:
+        return 0
+    if not outbox.configured():
+        raise RuntimeError("X delivery requires GITHUB_TOKEN for durable live checkpoints")
+
+    check_render_ready()
+    state = outbox.merge_state(outbox.load_state(day), state)
+    _save(day, state)
+    outbox.publish_archive(day, posts_path.read_text(encoding="utf-8"))
+    sent_count = 0
+    for key, row in candidates.items():
+        if key in set(state.get("x_posted_races") or []):
+            continue
+        previous = (state.get("x_attempts") or {}).get(key) or {}
+        if previous.get("status") in {"reserved", "uncertain", "blocked"}:
+            if key not in _REPORTED_BLOCKS:
+                print(f"::error::X delivery needs reconciliation: {key} status={previous['status']}", flush=True)
+                _REPORTED_BLOCKS.add(key)
+            continue
+        if previous.get("status") == "retryable":
+            elapsed = (datetime.now(JST) - datetime.fromisoformat(previous["at"])).total_seconds()
+            if elapsed < 60:
+                continue
+        try:
+            validate_live_row(row)
         except ValueError:
             continue
-        if not isinstance(row, dict) or bool(row.get("resend")):
-            continue
-        if str(row.get("source") or "") not in {"厳選くん", "厳選中穴"}:
-            continue
+        attempt_id = uuid.uuid4().hex
+        state.setdefault("x_attempts", {})[key] = {
+            "id": attempt_id, "status": "reserved", "at": datetime.now(JST).isoformat(),
+        }
         try:
-            sent_at = datetime.fromisoformat(str(row.get("sent_at") or ""))
-            age_seconds = (datetime.now(JST) - sent_at.astimezone(JST)).total_seconds()
+            state, archive_ref = _checkpoint(day, state)
         except Exception:
-            continue
-        if age_seconds < -60 or age_seconds > 900:
-            continue
-        jcd = str(row.get("jcd") or "").zfill(2)
-        rno = int(row.get("rno") or 0)
-        if not 1 <= rno <= 12:
-            continue
-        key = f"{day}:{jcd}:{rno}"
-        candidates[key] = (jcd, rno)
-
-    sent_count = 0
-    changed = False
-    for key, (jcd, rno) in candidates.items():
-        if key in x_posted:
-            continue
-        body = json.dumps({"day": day, "jcd": jcd, "rno": rno}).encode("utf-8")
+            # No Render request has been made, so a later retry is safe even
+            # if the GitHub checkpoint response itself was interrupted.
+            state["x_attempts"][key]["status"] = "retryable"
+            _save(day, state)
+            raise
+        body = json.dumps({"day": day, "jcd": row["jcd"], "rno": row["rno"],
+                           "archive_ref": archive_ref, "attempt_id": attempt_id}).encode("utf-8")
         req = urllib.request.Request(
-            RENDER_SYNC_URL,
-            data=body,
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "User-Agent": "Boat-AI-Navi/github-x-sync-v1",
-            },
-            method="POST",
+            RENDER_SYNC_URL, data=body,
+            headers={"Content-Type": "application/json", "Accept": "application/json",
+                     "User-Agent": "Boat-AI-Navi/github-x-sync-v2"}, method="POST",
         )
+        result = None
         try:
-            with urllib.request.urlopen(req, timeout=120) as response:
+            with urllib.request.urlopen(req, timeout=90) as response:
                 result = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            try:
+                result = json.loads(exc.read().decode("utf-8"))
+            except Exception:
+                pass
         except Exception as exc:
-            print(f"X sync failed for {key}: {type(exc).__name__}: {exc}", flush=True)
-            continue
-        if not isinstance(result, dict) or not result.get("ok"):
-            print(f"X sync rejected for {key}: {result!r}", flush=True)
-            continue
+            print(f"::error::X sync response uncertain: {key} {type(exc).__name__}", flush=True)
 
-        x_posted.add(key)
-        post_id = str(result.get("post_id") or "")
-        if post_id:
-            x_ids[key] = post_id
-        changed = True
-        if not result.get("already"):
-            sent_count += 1
-        print(f"X sync ok: {key} post_id={post_id or '-'}", flush=True)
-
-    if changed:
-        state["x_posted_races"] = sorted(x_posted)
-        state["x_post_ids"] = x_ids
-        _save(day, state)
+        if isinstance(result, dict) and result.get("ok") and result.get("post_id"):
+            state["x_posted_races"] = sorted(set(state.get("x_posted_races") or []) | {key})
+            state.setdefault("x_post_ids", {})[key] = str(result["post_id"])
+            state["x_attempts"].pop(key, None)
+            sent_count += int(not result.get("already"))
+            print(f"X sync ok: {key} post_id={result['post_id']}", flush=True)
+        else:
+            status = "uncertain"
+            if isinstance(result, dict) and result.get("definitely_not_posted"):
+                status = "retryable" if result.get("retryable") else "blocked"
+            state["x_attempts"][key]["status"] = status
+            print(f"::error::X sync failed: {key} status={status}", flush=True)
+        # Persist each receipt immediately; do not wait for all races or exit.
+        state, _ = _checkpoint(day, state)
     return sent_count
 
 
@@ -463,6 +572,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke-test", action="store_true")
     parser.add_argument("--sync-render", action="store_true")
+    parser.add_argument("--check-render", action="store_true")
     parser.add_argument("--resend-race", action="store_true")
     parser.add_argument("--day")
     parser.add_argument("--jcd")
@@ -472,6 +582,14 @@ if __name__ == "__main__":
         if not (args.day and args.jcd and args.rno):
             parser.error("--resend-race requires --day --jcd --rno")
         resend_live_race(args.day, args.jcd, args.rno)
+    elif args.check_render:
+        print(json.dumps(check_render_ready(), sort_keys=True))
+        outbox._ensure_branch()
+        outbox._update("data/x_post_delivery/preflight.json", lambda old: json.dumps({
+            "checked_at": datetime.now(JST).isoformat(), "delivery_version": 2,
+            "workflow_run": os.getenv("GITHUB_RUN_ID", ""),
+        }, sort_keys=True) + "\n")
+        print("X durable outbox write access: ready")
     elif args.sync_render:
         count = sync_archived_via_render(args.day)
         print(f"X Render sync complete: posted={count}", flush=True)

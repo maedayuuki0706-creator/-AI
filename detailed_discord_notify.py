@@ -439,7 +439,10 @@ def log_prediction_with_virtual(record):
         return
     try:
         if _is_selected_record(record):
-            _send_selected_discord(_selected_message(record))
+            try:
+                _send_selected_discord(_selected_message(record))
+            except Exception as exc:
+                print(f"selected Discord alert failed {record.get('jcd')} {record.get('rno')}R: {type(exc).__name__}")
             try:
                 x_post_delivery.send_selected_record(record)
             except Exception as exc:

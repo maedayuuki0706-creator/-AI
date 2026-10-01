@@ -24,6 +24,7 @@ import selection_scoring
 import sokuhou_character
 import stake_tracking
 import water_affinity
+import x_post_delivery
 
 bridge_learning.install(app)
 # Install before selection scoring so same-day venue form can be logged and may
@@ -175,6 +176,11 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
             result = attempt()
         except Exception as exc:
             print(f'Notification pass failed: {type(exc).__name__}', flush=True)
+            result = 1
+        try:
+            x_post_delivery.request_sync()
+        except Exception as exc:
+            print(f'::error::X outbox pass failed: {type(exc).__name__}', flush=True)
             result = 1
         try:
             hit_alerts_fast.check_and_send()

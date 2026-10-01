@@ -36,7 +36,10 @@ def main() -> int:
     runner.run_opportunity_smoke_test_once()
     if os.getenv("SUMMARY_ONLY") == "1":
         return runner.resend_prediction_summary(os.getenv("SUMMARY_DAY", "20260913"))
-    return run_continuous(int(os.getenv("NOTIFY_WATCH_SECONDS", "0")))
+    try:
+        return run_continuous(int(os.getenv("NOTIFY_WATCH_SECONDS", "0")))
+    finally:
+        runner.x_post_delivery.flush_pending()
 
 
 if __name__ == "__main__":

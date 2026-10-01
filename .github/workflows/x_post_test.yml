@@ -6,6 +6,11 @@ on:
     paths:
       - ".github/workflows/x_post_test.yml"
       - "x_post_delivery.py"
+      - "x_delivery_policy.py"
+      - "x_delivery_store.py"
+      - "x_api_client.py"
+      - "api_server.py"
+      - "tests/test_x_delivery.py"
   workflow_dispatch:
 
 jobs:
@@ -21,9 +26,10 @@ jobs:
           python-version: "3.12"
 
       - name: Validate X draft delivery
-        run: python -m py_compile x_post_delivery.py
+        run: python -m unittest discover -s tests -p 'test_x_delivery.py' -v
 
       - name: Send X draft smoke test to Discord
+        if: github.event_name == 'workflow_dispatch'
         env:
           X_POST_DISCORD_WEBHOOK_URL: ${{ secrets.X_POST_DISCORD_WEBHOOK_URL }}
         run: python x_post_delivery.py --smoke-test
