@@ -12,6 +12,7 @@ import urllib.request
 import uuid
 
 X_POST_URL = "https://api.twitter.com/2/tweets"
+X_VERIFY_URL = "https://api.twitter.com/1.1/account/verify_credentials.json"
 ENV_KEYS = (
     "X_CONSUMER_KEY",
     "X_CONSUMER_SECRET",
@@ -103,3 +104,26 @@ def post_text(text: str) -> str:
     if not post_id:
         raise RuntimeError(f"X response missing post id: {payload}")
     return post_id
+
+
+def verify_user_context() -> str:
+    request = urllib.request.Request(
+        X_VERIFY_URL,
+        headers={
+            "Authorization": _oauth_header("GET", X_VERIFY_URL),
+            "Accept": "application/json",
+            "User-Agent": "Boat-AI-Navi/x-auth-check-v1",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+            screen_name = str(payload.get("screen_name") or payload.get("name") or "").strip()
+            return screen_name or "verified"
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            detail = ""
+        raise RuntimeError(f"X verify HTTP {exc.code}: {detail[:500]}") from exc
