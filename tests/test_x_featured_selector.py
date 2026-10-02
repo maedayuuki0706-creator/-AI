@@ -51,6 +51,38 @@ class FeaturedXSelectorTests(unittest.TestCase):
         )
         self.assertIsNone(featured._confidence_candidate({"models": [m]}))
 
+    def test_ticket_plan_is_10_plus_8_and_keeps_every_one_percent_alt_head(self):
+        rows = {}
+        for first in range(1, 7):
+            for second in range(1, 7):
+                if second == first:
+                    continue
+                for third in range(1, 7):
+                    if third in {first, second}:
+                        continue
+                    combo = f"{first}-{second}-{third}"
+                    rows[combo] = {
+                        "odds": 12.0 + first * 7 + second + third,
+                        "ev": 0.9 + first * 0.08,
+                        "prob": 0.04 - first * 0.003 - second * 0.0002 - third * 0.0001,
+                    }
+        model = self.model(
+            heads={"1": 0.62, "2": 0.16, "3": 0.09, "4": 0.06, "5": 0.04, "6": 0.03},
+            main=[
+                "1-2-3", "1-2-4", "1-3-2", "1-3-4", "1-4-2",
+                "2-1-3", "2-3-1", "3-1-2", "4-1-2", "5-1-2",
+            ],
+            rows=rows,
+        )
+        plan = featured._ticket_plan({"models": [model]})
+        self.assertIsNotNone(plan)
+        self.assertEqual(len(plan["main"]), 10)
+        self.assertEqual(len(plan["cover"]), 8)
+        self.assertEqual(set(plan["eligible_alt_heads"]), set("23456"))
+        cover_heads = {combo.split("-")[0] for combo in plan["cover"]}
+        self.assertTrue(set("23456").issubset(cover_heads))
+        self.assertTrue(all(not combo.startswith("1-") for combo in plan["cover"]))
+
 
 if __name__ == "__main__":
     unittest.main()
