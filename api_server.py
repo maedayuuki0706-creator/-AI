@@ -162,9 +162,14 @@ def sync_archived_exhibition_to_x(day: str, jcd: str, rno: int, archive_ref: str
         try:
             post_id = post_to_x(post, reply_to=original_post_id)
         except XPostRejected as exc:
-            if 400 <= exc.status < 500:
-                _X_EXHIBITION_UNCERTAIN.discard(key)
-            raise
+            if exc.status == 403:
+                fallback = post + f"\n記録 {day[-4:]}-{rno}R"
+                post_id = post_to_x(fallback)
+                print(f"X exhibition reply fallback sent: {key} post_id={post_id}", flush=True)
+            else:
+                if 400 <= exc.status < 500:
+                    _X_EXHIBITION_UNCERTAIN.discard(key)
+                raise
         _X_EXHIBITION_POSTED[key] = post_id
         _X_EXHIBITION_UNCERTAIN.discard(key)
         print(f"X exhibition update sent: {key} post_id={post_id}", flush=True)
@@ -336,9 +341,17 @@ def sync_archived_result_to_x(day: str, jcd: str, rno: int, archive_ref: str = "
         try:
             post_id = post_to_x(text, reply_to=original_post_id)
         except XPostRejected as exc:
-            if 400 <= exc.status < 500:
-                _X_RESULT_UNCERTAIN.discard(key)
-            raise
+            if exc.status == 403:
+                # Some X reply attempts are rejected even though standalone
+                # posting is still allowed. Fall back once so result delivery
+                # remains automatic.
+                fallback = text + f"\n記録 {day[-4:]}-{rno}R"
+                post_id = post_to_x(fallback)
+                print(f"X result reply fallback sent: {key} post_id={post_id}", flush=True)
+            else:
+                if 400 <= exc.status < 500:
+                    _X_RESULT_UNCERTAIN.discard(key)
+                raise
         _X_RESULT_POSTED[key] = post_id
         _X_RESULT_UNCERTAIN.discard(key)
         print(f"X result sent: {key} winner={winner} odds={payout / 100:.1f} hit={hit} post_id={post_id}", flush=True)
