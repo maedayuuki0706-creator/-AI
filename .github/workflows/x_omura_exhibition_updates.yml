@@ -1,0 +1,60 @@
+name: Omura Exhibition X Updates
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - "x_omura_exhibition_updates.py"
+      - "x_delivery_store.py"
+      - "api_server.py"
+      - ".github/workflows/x_omura_exhibition_updates.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: x-omura-exhibition-20261002
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      TZ: Asia/Tokyo
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout latest state
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate updater
+        run: python -m py_compile x_omura_exhibition_updates.py x_delivery_store.py api_server.py
+
+      - name: Post exhibition-confirmed revisions
+        run: python -u x_omura_exhibition_updates.py
+
+      - name: Persist exhibition archive and receipts
+        if: always()
+        run: |
+          if [ -z "$(git status --porcelain data/x_post_delivery/)" ]; then
+            echo "No Omura exhibition state changes"
+            exit 0
+          fi
+          git config user.name "boat-ai-omura-exhibition-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/x_post_delivery/
+          git commit -m "Record Omura exhibition X update" || exit 0
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+          done
+          exit 1
