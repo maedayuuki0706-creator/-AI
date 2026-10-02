@@ -1,0 +1,40 @@
+name: X Result Auto Post
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "x_post_delivery.py"
+      - "api_server.py"
+      - "x_delivery_store.py"
+      - ".github/workflows/x_result_sync.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: x-result-auto-post
+  cancel-in-progress: false
+
+jobs:
+  sync-results:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Publish settled X results
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python x_post_delivery.py --sync-results
