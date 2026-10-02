@@ -22,6 +22,9 @@ MIN_LEAD_SECONDS = 11 * 60
 MAX_LEAD_SECONDS = 40 * 60
 MIN_VALUE_ODDS = 25.0
 MAX_VALUE_ODDS = 180.0
+MAIN_POINTS = 10
+COVER_POINTS = 8
+MIN_ALT_HEAD_PROB = 0.01
 
 
 def _read(path: Path) -> dict:
@@ -134,6 +137,152 @@ def _value_rows(model: dict, focus_heads: set[str] | None = None) -> list[tuple[
             out.append((combo, {"odds": odds, "ev": ev, "prob": prob}))
     out.sort(key=lambda item: (item[1]["prob"] * item[1]["ev"], item[1]["ev"], item[1]["odds"]), reverse=True)
     return out
+
+
+def _aggregate_trifecta(models: list[dict]) -> dict[str, dict]:
+    """Combine full trifecta tables without hiding low-frequency alternate heads."""
+    combined: dict[str, dict] = {}
+    for model in models:
+        main = set(model.get("main") or [])
+        for combo, row in (model.get("tri") or {}).items():
+            parts = str(combo).split("-")
+            if len(parts) != 3 or len(set(parts)) != 3 or any(part not in "123456" for part in parts):
+                continue
+            try:
+                prob = float(row.get("prob") or 0)
+                ev = float(row.get("ev") or 0)
+                odds = float(row.get("odds") or 0)
+            except (TypeError, ValueError):
+                continue
+            item = combined.setdefault(
+                combo,
+                {
+                    "count": 0,
+                    "prob_sum": 0.0,
+                    "max_prob": 0.0,
+                    "max_ev": 0.0,
+                    "odds": 0.0,
+                    "main_support": 0,
+                },
+            )
+            item["count"] += 1
+            item["prob_sum"] += prob
+            item["max_prob"] = max(item["max_prob"], prob)
+            item["max_ev"] = max(item["max_ev"], ev)
+            item["odds"] = max(item["odds"], odds)
+            if combo in main:
+                item["main_support"] += 1
+    for item in combined.values():
+        item["avg_prob"] = item["prob_sum"] / max(1, item["count"])
+    return combined
+
+
+def _alt_head_probabilities(models: list[dict]) -> dict[str, float]:
+    """Use the strongest live model signal so a >=1% alternate head is never hidden."""
+    out = {}
+    for lane in "23456":
+        values = []
+        for model in models:
+            try:
+                values.append(float((model.get("heads") or {}).get(lane) or 0))
+            except (TypeError, ValueError):
+                continue
+        out[lane] = max(values, default=0.0)
+    return out
+
+
+def _main_rank(meta: dict) -> tuple:
+    return (
+        int(meta.get("main_support") or 0),
+        float(meta.get("avg_prob") or 0),
+        float(meta.get("max_prob") or 0),
+        float(meta.get("max_ev") or 0),
+        float(meta.get("odds") or 0),
+    )
+
+
+def _cover_rank(meta: dict) -> tuple:
+    prob = float(meta.get("avg_prob") or 0)
+    ev = max(0.25, min(float(meta.get("max_ev") or 0), 3.0))
+    return (
+        int(meta.get("main_support") or 0),
+        prob * ev,
+        prob,
+        float(meta.get("max_ev") or 0),
+        float(meta.get("odds") or 0),
+    )
+
+
+def _ticket_plan(race: dict) -> dict | None:
+    """Build 10 main + up to 8 covers after exhibition-based models are complete.
+
+    Every 2-6 head with at least a 1% head probability in any live model gets
+    at least one exact trifecta in the cover section. Remaining cover slots
+    stay non-1-head whenever possible.
+    """
+    models = race.get("models") or []
+    rows = _aggregate_trifecta(models)
+    if not rows:
+        return None
+
+    ranked_main = sorted(rows, key=lambda combo: _main_rank(rows[combo]), reverse=True)
+    main = ranked_main[:MAIN_POINTS]
+    used = set(main)
+
+    alt_heads = _alt_head_probabilities(models)
+    eligible = [
+        lane for lane, probability in sorted(
+            alt_heads.items(), key=lambda item: item[1], reverse=True
+        )
+        if probability >= MIN_ALT_HEAD_PROB
+    ]
+
+    cover: list[str] = []
+    for lane in eligible:
+        lane_rows = [
+            combo for combo in rows
+            if combo.startswith(f"{lane}-") and combo not in used
+        ]
+        if not lane_rows:
+            continue
+        combo = max(lane_rows, key=lambda value: _cover_rank(rows[value]))
+        cover.append(combo)
+        used.add(combo)
+
+    non1_rows = sorted(
+        (
+            combo for combo in rows
+            if not combo.startswith("1-") and combo not in used
+        ),
+        key=lambda combo: _cover_rank(rows[combo]),
+        reverse=True,
+    )
+    for combo in non1_rows:
+        if len(cover) >= COVER_POINTS:
+            break
+        cover.append(combo)
+        used.add(combo)
+
+    if len(cover) < COVER_POINTS:
+        for combo in ranked_main:
+            if len(cover) >= COVER_POINTS:
+                break
+            if combo in used:
+                continue
+            cover.append(combo)
+            used.add(combo)
+
+    head_note = "・".join(
+        f"{lane}={alt_heads[lane] * 100:.1f}%"
+        for lane in eligible
+    )
+    return {
+        "main": main,
+        "cover": cover[:COVER_POINTS],
+        "eligible_alt_heads": eligible,
+        "alt_head_probabilities": alt_heads,
+        "note": f"展示反映｜AI頭評価 {head_note}" if head_note else "展示反映",
+    }
 
 
 def _overlap_candidate(race: dict) -> dict | None:
@@ -308,8 +457,20 @@ def run(now: datetime | None = None) -> int:
         pick = _candidate(race)
         if not pick:
             continue
+        plan = _ticket_plan(race)
+        if not plan or len(plan["main"]) < MAIN_POINTS:
+            continue
         diversity_bonus = 4 if pick["source"] not in used_modes else 0
-        pick = {**pick, "race": race, "key": key, "rank": pick["score"] + diversity_bonus}
+        pick = {
+            **pick,
+            "race": race,
+            "key": key,
+            "rank": pick["score"] + diversity_bonus,
+            "main_picks": plan["main"],
+            "cover_picks": plan["cover"],
+            "picks": plan["main"] + plan["cover"],
+            "note": plan["note"],
+        }
         candidates.append(pick)
 
     candidates.sort(key=lambda item: (item["rank"], -int(item["race"]["rno"])), reverse=True)
@@ -332,6 +493,8 @@ def run(now: datetime | None = None) -> int:
                 item["picks"],
                 source=item["source"],
                 note=item["note"],
+                main_picks=item["main_picks"],
+                cover_picks=item["cover_picks"],
             )
         except Exception as exc:
             print(f"X featured send failed {item['key']}: {type(exc).__name__}: {exc}", flush=True)
