@@ -19,7 +19,7 @@ from x_delivery_policy import weighted_length
 
 DAY = "20261002"
 JCD = "24"
-RACES = range(6, 13)
+RACES = (10, 11, 12)
 MIN_LEAD_SECONDS = 11 * 60
 MAX_LEAD_SECONDS = 45 * 60
 MAIN_POINTS = 10
