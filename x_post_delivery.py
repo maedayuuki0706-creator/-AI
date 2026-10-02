@@ -58,12 +58,14 @@ def _load(day: str) -> dict:
             value.setdefault("x_result_races", [])
             value.setdefault("x_result_post_ids", {})
             value.setdefault("x_result_attempts", {})
+            value.setdefault("x_featured_races", [])
+            value.setdefault("x_featured_modes", {})
             return value
     except (OSError, ValueError):
         pass
     return {"day": day, "sent_races": [], "x_posted_races": [], "x_post_ids": {},
             "x_result_races": [], "x_result_post_ids": {}, "x_result_attempts": {},
-            "updated_at": None}
+            "x_featured_races": [], "x_featured_modes": {}, "updated_at": None}
 
 
 def _save(day: str, state: dict) -> None:
