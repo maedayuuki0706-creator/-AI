@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent
 WEB_ROOT = ROOT / "web"
 DATA_ROOT = ROOT / "data"
 
-X_SYNC_ALLOWED_SOURCES = {"厳選くん", "厳選中穴"}
+X_SYNC_ALLOWED_SOURCES = {"厳選くん", "厳選中穴", "AI重なり本線", "配当期待本線"}
 X_SYNC_RAW_BASE = "https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/main"
 _X_SYNC_LOCK = threading.Lock()
 _X_SYNC_POSTED: dict[str, str] = {}
