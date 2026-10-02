@@ -88,6 +88,12 @@ def _update(path: str, merge) -> tuple[str, str]:
     raise RuntimeError("X outbox changed concurrently; retry next pass")
 
 
+def load_archive(day: str) -> str:
+    _ensure_branch()
+    raw, _ = _read(f"data/x_post_delivery/{day}_posts.jsonl")
+    return raw
+
+
 def publish_archive(day: str, local: str) -> str:
     def merge(old):
         rows, seen = [], set()
