@@ -4,7 +4,7 @@ import re
 import unicodedata
 
 JST = timezone(timedelta(hours=9))
-ALLOWED_SOURCES = {"厳選くん", "厳選中穴"}
+ALLOWED_SOURCES = {"厳選くん", "厳選中穴", "AI重なり本線", "配当期待本線"}
 MIN_PUBLISH_LEAD_SECONDS = 10 * 60
 SOURCE_SAFETY_LEAD_SECONDS = 11 * 60
 
