@@ -408,6 +408,37 @@ def send_selected_mid(record: dict, payload: dict) -> bool:
     return _send_once(enriched, "厳選中穴", post)
 
 
+
+def send_featured_record(record: dict, picks, *, source: str, note: str = "") -> bool:
+    """Publish one high-value non-1-head main selection to X."""
+    if source not in {"AI重なり本線", "配当期待本線"}:
+        raise ValueError("invalid featured X source")
+    raw_picks = _unique_picks(picks)
+    if not raw_picks:
+        return False
+    venue = record.get("venue") or str(record.get("jcd") or "")
+    rno = int(record.get("rno") or 0)
+    deadline = str(record.get("deadline") or "--:--")
+    title = "🤝 AI重なり・本線" if source == "AI重なり本線" else "🔥 配当期待・本線"
+    compact = _compact_picks(raw_picks)
+    lines = [
+        f"🚤注目本線｜{venue} {rno}R",
+        f"⏰締切 {deadline}",
+        "",
+        title,
+        "🎯 1号艇以外の頭狙い",
+        *compact,
+    ]
+    note = str(note or "").strip()
+    if note:
+        lines += ["", f"📊 {note}"]
+    lines += ["", "🔔 次の無料予想も配信します", "ぜひフォローお願いします！"]
+    post = _fit_post(lines)
+    enriched = dict(record)
+    enriched["x_picks"] = raw_picks
+    return _send_once(enriched, source, post)
+
+
 def resend_live_race(day: str, jcd: str, rno: int) -> None:
     """Rebuild one live existing-main card and resend it in X v2 format."""
     import direct_discord_notify as base
