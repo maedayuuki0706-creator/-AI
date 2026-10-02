@@ -472,8 +472,12 @@ def maybe_send_x_intro_test() -> None:
     try:
         verified = verify_user_context()
         print(f"X auth verified as {verified}", flush=True)
-        post_id = post_to_x(text)
-        print(f"X intro test sent nonce={nonce} post_id={post_id}", flush=True)
+        posts = [part.strip() for part in text.split("\n---XPOST---\n") if part.strip()]
+        for index, post in enumerate(posts, 1):
+            if weighted_length(post) > 280:
+                raise ValueError(f"X intro post {index} is too long")
+            post_id = post_to_x(post)
+            print(f"X intro test sent nonce={nonce} index={index}/{len(posts)} post_id={post_id}", flush=True)
     except Exception as exc:
         print(f"X intro test failed nonce={nonce}: {type(exc).__name__}: {exc}", flush=True)
 
