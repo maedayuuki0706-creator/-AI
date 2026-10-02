@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -69,7 +70,7 @@ def _read(path: str) -> tuple[str, str | None]:
 
 def _update(path: str, merge) -> tuple[str, str]:
     _ensure_branch()
-    for _ in range(3):
+    for attempt in range(8):
         old, sha = _read(path)
         content = merge(old)
         if content == old:
@@ -83,9 +84,12 @@ def _update(path: str, merge) -> tuple[str, str]:
             value = _request(f"/contents/{path}", payload, method="PUT")
             return content, value["commit"]["sha"]
         except urllib.error.HTTPError as exc:
-            if exc.code != 409:
+            # Multiple workflows can legitimately checkpoint the same durable
+            # outbox. Re-read the newest blob and retry instead of failing the run.
+            if exc.code not in (409, 422):
                 raise
-    raise RuntimeError("X outbox changed concurrently; retry next pass")
+            time.sleep(min(0.25 * (attempt + 1), 2.0))
+    raise RuntimeError("X outbox remained busy after concurrent update retries")
 
 
 def load_archive(day: str) -> str:
