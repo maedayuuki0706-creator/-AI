@@ -1,0 +1,72 @@
+name: X Featured Value Picks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - "data/prototype12_delivery/predictions/**"
+      - "data/prototype3_delivery/predictions/**"
+      - "x_featured_selector.py"
+      - "x_post_delivery.py"
+      - "x_delivery_policy.py"
+      - "x_delivery_store.py"
+      - "api_server.py"
+      - ".github/workflows/x-featured-value.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: x-featured-value-main
+  cancel-in-progress: false
+
+jobs:
+  feature:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout latest prediction data
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate featured selector
+        run: python -m py_compile x_featured_selector.py x_post_delivery.py api_server.py
+
+      - name: Select up to two featured value races
+        env:
+          TZ: Asia/Tokyo
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          X_POST_DISCORD_WEBHOOK_URL: ${{ secrets.X_POST_DISCORD_WEBHOOK_URL }}
+        run: python -u x_featured_selector.py
+
+      - name: Sync pending X predictions and results
+        if: always()
+        env:
+          TZ: Asia/Tokyo
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python -u x_post_delivery.py --sync-render
+
+      - name: Persist X featured archive and receipts
+        if: always()
+        run: |
+          if [ -z "$(git status --porcelain data/x_post_delivery/)" ]; then
+            echo "No X state changes"
+            exit 0
+          fi
+          git config user.name "boat-ai-x-featured-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/x_post_delivery/
+          git commit -m "Record featured X value selection" || exit 0
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+          done
+          exit 1
