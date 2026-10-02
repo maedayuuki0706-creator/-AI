@@ -129,7 +129,8 @@ def rationale(analysis: dict) -> str:
         key=lambda item: item[1],
         reverse=True,
     )
-    alt_text = " ".join(f"{lane}={p*100:.1f}%" for lane, p in alt[:3])
+    circled = {"1": "①", "2": "②", "3": "③", "4": "④", "5": "⑤", "6": "⑥"}
+    alt_text = " ".join(f"{circled.get(lane, lane)}{p*100:.1f}%" for lane, p in alt[:3])
 
     exhibition = [b for b in inputs if b.get("exhibition_time") is not None]
     fastest = min(exhibition, key=lambda b: float(b["exhibition_time"])) if exhibition else None
@@ -140,12 +141,12 @@ def rationale(analysis: dict) -> str:
 
     signals = []
     if fastest:
-        signals.append(f"T①{fastest['lane']}")
+        signals.append(f"展示1位{circled.get(str(fastest['lane']), fastest['lane'])}")
     if best_st:
-        signals.append(f"ST①{best_st['lane']}")
+        signals.append(f"ST1位{circled.get(str(best_st['lane']), best_st['lane'])}")
     if best_motor:
-        signals.append(f"M①{best_motor['lane']}")
-    return f"逆転頭 {alt_text}｜{'・'.join(signals)}".strip("｜")
+        signals.append(f"モーター1位{circled.get(str(best_motor['lane']), best_motor['lane'])}")
+    return f"逆転候補 {alt_text}｜{' / '.join(signals)}".strip("｜")
 
 
 def make_post(rno: int, deadline: str, main: list[str], cover: list[str], analysis: dict) -> str:
