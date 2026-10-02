@@ -45,6 +45,12 @@ jobs:
           TZ: Asia/Tokyo
         run: python -u live_status.py
 
+      - name: Publish settled X results
+        env:
+          TZ: Asia/Tokyo
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python -u x_post_delivery.py --sync-results
+
       - name: Persist live scoreboard
         run: |
           mkdir -p data/live_status
