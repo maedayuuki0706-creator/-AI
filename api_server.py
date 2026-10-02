@@ -135,6 +135,19 @@ def sync_archived_prediction_to_x(day: str, jcd: str, rno: int, archive_ref: str
 
 
 def _archived_pick_set(row: dict) -> set[str]:
+    """Return exactly the tickets users could see in the X prediction post."""
+    visible = set()
+    for line in str(row.get("post") or "").splitlines():
+        text = line.strip()
+        if re.fullmatch(r"[1-6]+-[1-6]+-[1-6]+", text):
+            try:
+                visible.update(expand_formation(text))
+            except ValueError:
+                pass
+    if visible:
+        return visible
+
+    # Legacy fallback for older archives without parseable post text.
     picks = set()
     for value in row.get("picks") or []:
         text = str(value.get("combination") if isinstance(value, dict) else value or "").strip()
@@ -142,15 +155,6 @@ def _archived_pick_set(row: dict) -> set[str]:
             picks.add(text)
         elif re.fullmatch(r"[1-6]+-[1-6]+-[1-6]+", text):
             picks.update(expand_formation(text))
-    if picks:
-        return picks
-    for line in str(row.get("post") or "").splitlines():
-        text = line.strip()
-        if re.fullmatch(r"[1-6]+-[1-6]+-[1-6]+", text):
-            try:
-                picks.update(expand_formation(text))
-            except ValueError:
-                pass
     return picks
 
 
