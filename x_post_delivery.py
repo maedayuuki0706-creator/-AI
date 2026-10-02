@@ -28,6 +28,7 @@ BASE_HASHTAGS = "#競艇 #ボートレース #競艇予想 #無料予想"
 FORMAT_VERSION = "v2-formation"
 RENDER_SYNC_URL = "https://boat-ai-navi-public.onrender.com/api/x-sync"
 RENDER_RESULT_URL = "https://boat-ai-navi-public.onrender.com/api/x-result"
+STANDARD_X_FEED_ENABLED = os.getenv("X_STANDARD_FEED_ENABLED", "0") == "1"
 # Settled results are published as replies to the original X prediction.
 _RECEIPTS_DIRTY: set[str] = set()
 _REPORTED_BLOCKS: set[str] = set()
@@ -388,6 +389,8 @@ def _build_post(venue: str, rno: int, deadline: str, picks, *, label: str, score
 
 
 def send_selected_record(record: dict) -> bool:
+    if not STANDARD_X_FEED_ENABLED:
+        return False
     raw_picks = _record_picks(record)
     if not raw_picks:
         return False
@@ -399,6 +402,8 @@ def send_selected_record(record: dict) -> bool:
 
 
 def send_selected_mid(record: dict, payload: dict) -> bool:
+    if not STANDARD_X_FEED_ENABLED:
+        return False
     raw_picks = payload.get("picks") or []
     if not raw_picks:
         return False
@@ -522,6 +527,9 @@ def sync_archived_via_render(day: str | None = None) -> int:
             jcd = str(row.get("jcd") or "").zfill(2)
             rno = int(row.get("rno") or 0)
             if not re.fullmatch(r"(?:0[1-9]|1[0-9]|2[0-4])", jcd) or not 1 <= rno <= 12:
+                continue
+            source = str(row.get("source") or "")
+            if not STANDARD_X_FEED_ENABLED and source in {"厳選くん", "厳選中穴"}:
                 continue
             key = _race_key(row)
             if key not in set(state.get("x_posted_races") or []):
