@@ -107,10 +107,11 @@ def publish_archive(day: str, local: str) -> str:
 
 def merge_state(remote: dict, local: dict) -> dict:
     result = {**remote, **local}
-    for field in ("sent_races", "x_posted_races", "x_result_races"):
+    for field in ("sent_races", "x_posted_races", "x_result_races", "x_featured_races"):
         result[field] = sorted(set(remote.get(field) or []) | set(local.get(field) or []))
     result["x_post_ids"] = {**(remote.get("x_post_ids") or {}), **(local.get("x_post_ids") or {})}
     result["x_result_post_ids"] = {**(remote.get("x_result_post_ids") or {}), **(local.get("x_result_post_ids") or {})}
+    result["x_featured_modes"] = {**(remote.get("x_featured_modes") or {}), **(local.get("x_featured_modes") or {})}
     # A confirmed receipt always wins over an interrupted attempt.
     attempts = {**(remote.get("x_attempts") or {}), **(local.get("x_attempts") or {})}
     for key in result["x_posted_races"]:
