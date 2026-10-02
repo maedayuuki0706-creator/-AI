@@ -14,6 +14,7 @@ import uuid
 
 import direct_discord_notify as base
 import x_delivery_store as outbox
+import x_post_delivery as xpost
 from x_delivery_policy import weighted_length
 
 DAY = "20261002"
@@ -116,8 +117,8 @@ def build_plan(analysis: dict) -> tuple[list[str], list[str]]:
 
 
 def compact_exact(picks: list[str]) -> list[str]:
-    # Keep exact tickets visible. Ten + eight still fits comfortably on X.
-    return picks
+    """Compact only when every rendered formation exactly matches selected tickets."""
+    return xpost._compact_picks(picks)
 
 
 def rationale(analysis: dict) -> str:
@@ -149,12 +150,15 @@ def rationale(analysis: dict) -> str:
 
 def make_post(rno: int, deadline: str, main: list[str], cover: list[str], analysis: dict) -> str:
     lines = [
-        f"🚤大村 {rno}R｜展示反映版｜締切 {deadline}",
-        f"🎯本線 {len(main)}点",
-        " ".join(compact_exact(main)),
-        f"🛡️抑え・逆転候補 {len(cover)}点",
-        " ".join(compact_exact(cover)),
-        f"👀{rationale(analysis)}",
+        f"🚤大村 {rno}R｜展示反映｜締切 {deadline}",
+        "",
+        f"🎯 本線 {len(main)}点",
+        *compact_exact(main),
+        "",
+        f"🛡️ 抑え・逆転候補 {len(cover)}点",
+        *compact_exact(cover),
+        "",
+        f"👀 {rationale(analysis)}",
     ]
     text = "\n".join(lines)
     if weighted_length(text) <= 280:
