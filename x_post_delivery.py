@@ -643,7 +643,7 @@ def sync_results_via_render(day: str | None = None) -> int:
             key in x_posted
             and key not in x_result
             and not bool(row.get("resend"))
-            and str(row.get("source") or "") in {"厳選くん", "厳選中穴"}
+            and str(row.get("source") or "") in {"厳選くん", "厳選中穴", "AI重なり本線", "配当期待本線"}
             and _result_due(row)
         ):
             rows.setdefault(key, row)
