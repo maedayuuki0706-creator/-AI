@@ -9,8 +9,10 @@ on:
       - "x_delivery_policy.py"
       - "x_delivery_store.py"
       - "x_api_client.py"
+      - "x_featured_selector.py"
       - "api_server.py"
       - "tests/test_x_delivery.py"
+      - "tests/test_x_featured_selector.py"
   workflow_dispatch:
 
 jobs:
@@ -26,7 +28,10 @@ jobs:
           python-version: "3.12"
 
       - name: Validate X draft delivery
-        run: python -m unittest discover -s tests -p 'test_x_delivery.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_x_delivery.py' -v
+          python -m unittest discover -s tests -p 'test_x_featured_selector.py' -v
+          python -m py_compile x_featured_selector.py x_post_delivery.py api_server.py
 
       - name: Send X draft smoke test to Discord
         if: github.event_name == 'workflow_dispatch'
