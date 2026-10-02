@@ -309,6 +309,27 @@ def _opportunity_picks(row: dict) -> set[str]:
 
 
 def _load_official_result(day: str, jcd: str, rno: int) -> dict:
+    """Load the settled result from our committed official snapshot first.
+
+    Render can occasionally receive an incomplete/blocked BOAT RACE result page
+    even after the repository collector has already confirmed the race. Using
+    the committed snapshot keeps X result replies aligned with the same official
+    result data used by the scoring pipeline.
+    """
+    day = str(day or "").strip()
+    jcd = str(jcd or "").zfill(2)
+    rno = int(rno or 0)
+    snapshot_path = (
+        f"data/prototype_scoreboard/{day}/official/"
+        f"{day}_{jcd}_{rno:02d}.json"
+    )
+    try:
+        snapshot = json.loads(_raw_text(snapshot_path, "main"))
+        if isinstance(snapshot, dict) and snapshot.get("status") == "settled" and snapshot.get("payouts"):
+            return snapshot
+    except Exception:
+        pass
+
     try:
         raw = boat_source.fetch(boat_source.official_url("raceresult", day, jcd, rno))
         return daily.parse_payout(raw)
