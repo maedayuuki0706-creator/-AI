@@ -115,6 +115,8 @@ def _x_archive_update_row(day: str, jcd: str, rno: int, ref: str) -> dict:
 
 
 def sync_archived_exhibition_to_x(day: str, jcd: str, rno: int, archive_ref: str = "", attempt_id: str = "") -> dict:
+    if os.getenv("X_EXHIBITION_UPDATES_ENABLED", "0") != "1":
+        raise ValueError("exhibition X updates are disabled")
     day = str(day or "").strip()
     jcd = str(jcd or "").zfill(2)
     rno = int(rno or 0)
