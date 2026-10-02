@@ -29,6 +29,8 @@ X_SYNC_RAW_BASE = "https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/
 _X_SYNC_LOCK = threading.Lock()
 _X_SYNC_POSTED: dict[str, str] = {}
 _X_SYNC_UNCERTAIN: set[str] = set()
+_X_EXHIBITION_POSTED: dict[str, str] = {}
+_X_EXHIBITION_UNCERTAIN: set[str] = set()
 _X_RESULT_POSTED: dict[str, str] = {}
 _X_RESULT_UNCERTAIN: set[str] = set()
 
@@ -88,6 +90,90 @@ def _x_sync_post_row(day: str, jcd: str, rno: int, ref: str) -> dict:
     row = _x_archive_post_row(day, jcd, rno, ref)
     validate_live_row(row)
     return row
+
+
+def _x_archive_update_row(day: str, jcd: str, rno: int, ref: str) -> dict:
+    raw = _raw_text(f"data/x_post_delivery/{day}_updates.jsonl", ref)
+    matches = []
+    for line in raw.splitlines():
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        if (
+            str(row.get("day") or "") == day
+            and str(row.get("jcd") or "").zfill(2) == jcd
+            and int(row.get("rno") or 0) == rno
+            and str(row.get("source") or "") in X_SYNC_ALLOWED_SOURCES
+        ):
+            matches.append(row)
+    if not matches:
+        raise ValueError("eligible exhibition update not found")
+    return matches[-1]
+
+
+def sync_archived_exhibition_to_x(day: str, jcd: str, rno: int, archive_ref: str = "", attempt_id: str = "") -> dict:
+    day = str(day or "").strip()
+    jcd = str(jcd or "").zfill(2)
+    rno = int(rno or 0)
+    if not re.fullmatch(r"20\d{6}", day) or not re.fullmatch(r"\d{2}", jcd) or not 1 <= rno <= 12:
+        raise ValueError("invalid race key")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(archive_ref)) or not re.fullmatch(r"[0-9a-f]{32}", str(attempt_id)):
+        raise ValueError("a durable archive commit and attempt are required")
+    key = f"{day}:{jcd}:{rno}"
+
+    with _X_SYNC_LOCK:
+        state = _x_sync_state(day, archive_ref)
+        updated = set(map(str, state.get("x_exhibition_update_races") or []))
+        if key in updated:
+            return {
+                "ok": True,
+                "already": True,
+                "key": key,
+                "post_id": str((state.get("x_exhibition_update_ids") or {}).get(key) or ""),
+            }
+        if key not in set(map(str, state.get("x_posted_races") or [])):
+            raise ValueError("base prediction was not posted to X")
+        if key in _X_EXHIBITION_POSTED:
+            return {"ok": True, "already": True, "key": key, "post_id": _X_EXHIBITION_POSTED[key]}
+        if key in _X_EXHIBITION_UNCERTAIN:
+            raise RuntimeError("previous exhibition update outcome is uncertain")
+
+        attempt = (state.get("x_exhibition_attempts") or {}).get(key) or {}
+        if attempt.get("id") != attempt_id or attempt.get("status") != "reserved":
+            raise ValueError("exhibition update attempt is not reserved in the durable outbox")
+
+        original_post_id = str((state.get("x_post_ids") or {}).get(key) or "").strip()
+        if not original_post_id.isdigit():
+            raise ValueError("original X post id is missing")
+
+        row = _x_archive_update_row(day, jcd, rno, archive_ref)
+        validate_live_row(row)
+        post = str(row.get("post") or "").strip()
+        post = "\n".join(line for line in post.splitlines() if not line.lstrip().startswith("#")).strip()
+        if not post or weighted_length(post) > 280:
+            raise ValueError("archived exhibition update is empty or too long")
+
+        _X_EXHIBITION_UNCERTAIN.add(key)
+        try:
+            post_id = post_to_x(post, reply_to=original_post_id)
+        except XPostRejected as exc:
+            if 400 <= exc.status < 500:
+                _X_EXHIBITION_UNCERTAIN.discard(key)
+            raise
+        _X_EXHIBITION_POSTED[key] = post_id
+        _X_EXHIBITION_UNCERTAIN.discard(key)
+        print(f"X exhibition update sent: {key} post_id={post_id}", flush=True)
+        return {"ok": True, "already": False, "key": key, "post_id": post_id}
+
+
+def _x_result_prediction_row(day: str, jcd: str, rno: int, ref: str, state: dict) -> dict:
+    key = f"{day}:{jcd}:{rno}"
+    if key in set(map(str, state.get("x_exhibition_update_races") or [])):
+        return _x_archive_update_row(day, jcd, rno, ref)
+    return _x_archive_post_row(day, jcd, rno, ref)
 
 
 def sync_archived_prediction_to_x(day: str, jcd: str, rno: int, archive_ref: str = "", attempt_id: str = "") -> dict:
@@ -215,11 +301,15 @@ def sync_archived_result_to_x(day: str, jcd: str, rno: int, archive_ref: str = "
         if attempt.get("id") != attempt_id or attempt.get("status") != "reserved":
             raise ValueError("result delivery attempt is not reserved in the durable outbox")
 
-        original_post_id = str((state.get("x_post_ids") or {}).get(key) or "").strip()
+        update_ids = state.get("x_exhibition_update_ids") or {}
+        if key in set(map(str, state.get("x_exhibition_update_races") or [])):
+            original_post_id = str(update_ids.get(key) or "").strip()
+        else:
+            original_post_id = str((state.get("x_post_ids") or {}).get(key) or "").strip()
         if not original_post_id.isdigit():
             raise ValueError("original X post id is missing")
 
-        row = _x_archive_post_row(day, jcd, rno, archive_ref)
+        row = _x_result_prediction_row(day, jcd, rno, archive_ref, state)
         result = _load_official_result(day, jcd, rno)
         if result.get("status") != "settled":
             return {
@@ -588,10 +678,15 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
 
-        if path in {"/api/x-sync", "/api/x-result"}:
+        if path in {"/api/x-sync", "/api/x-result", "/api/x-exhibition"}:
             try:
                 payload = body_json(self)
-                fn = sync_archived_prediction_to_x if path == "/api/x-sync" else sync_archived_result_to_x
+                if path == "/api/x-sync":
+                    fn = sync_archived_prediction_to_x
+                elif path == "/api/x-exhibition":
+                    fn = sync_archived_exhibition_to_x
+                else:
+                    fn = sync_archived_result_to_x
                 result = fn(
                     payload.get("day"),
                     payload.get("jcd"),
