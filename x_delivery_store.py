@@ -111,18 +111,46 @@ def publish_archive(day: str, local: str) -> str:
     return commit
 
 
+def load_update_archive(day: str) -> str:
+    _ensure_branch()
+    raw, _ = _read(f"data/x_post_delivery/{day}_updates.jsonl")
+    return raw
+
+
+def publish_update_archive(day: str, local: str) -> str:
+    """Publish one exhibition revision per race to the durable outbox branch."""
+    def merge(old):
+        rows, seen = [], set()
+        for line in (old + "\n" + local).splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            key = (row.get("day"), str(row.get("jcd")).zfill(2), int(row.get("rno") or 0))
+            if key not in seen:
+                seen.add(key)
+                rows.append(json.dumps(row, ensure_ascii=False, sort_keys=True))
+        return "\n".join(rows) + "\n"
+    _, commit = _update(f"data/x_post_delivery/{day}_updates.jsonl", merge)
+    return commit
+
+
 def merge_state(remote: dict, local: dict) -> dict:
     result = {**remote, **local}
-    for field in ("sent_races", "x_posted_races", "x_result_races", "x_featured_races"):
+    for field in ("sent_races", "x_posted_races", "x_result_races", "x_featured_races", "x_exhibition_update_races"):
         result[field] = sorted(set(remote.get(field) or []) | set(local.get(field) or []))
     result["x_post_ids"] = {**(remote.get("x_post_ids") or {}), **(local.get("x_post_ids") or {})}
     result["x_result_post_ids"] = {**(remote.get("x_result_post_ids") or {}), **(local.get("x_result_post_ids") or {})}
     result["x_featured_modes"] = {**(remote.get("x_featured_modes") or {}), **(local.get("x_featured_modes") or {})}
+    result["x_exhibition_update_ids"] = {**(remote.get("x_exhibition_update_ids") or {}), **(local.get("x_exhibition_update_ids") or {})}
     # A confirmed receipt always wins over an interrupted attempt.
     attempts = {**(remote.get("x_attempts") or {}), **(local.get("x_attempts") or {})}
     for key in result["x_posted_races"]:
         attempts.pop(key, None)
     result["x_attempts"] = attempts
+    exhibition_attempts = {**(remote.get("x_exhibition_attempts") or {}), **(local.get("x_exhibition_attempts") or {})}
+    for key in result["x_exhibition_update_races"]:
+        exhibition_attempts.pop(key, None)
+    result["x_exhibition_attempts"] = exhibition_attempts
     result_attempts = {**(remote.get("x_result_attempts") or {}), **(local.get("x_result_attempts") or {})}
     for key in result["x_result_races"]:
         result_attempts.pop(key, None)
