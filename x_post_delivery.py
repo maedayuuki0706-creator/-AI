@@ -736,7 +736,6 @@ if __name__ == "__main__":
     parser.add_argument("--smoke-test", action="store_true")
     parser.add_argument("--sync-render", action="store_true")
     parser.add_argument("--sync-results", action="store_true")
-    parser.add_argument("--sync-results", action="store_true")
     parser.add_argument("--check-render", action="store_true")
     parser.add_argument("--resend-race", action="store_true")
     parser.add_argument("--day")
@@ -762,8 +761,5 @@ if __name__ == "__main__":
         count = sync_archived_via_render(args.day)
         results = sync_results_via_render(args.day)
         print(f"X Render sync complete: posted={count} results={results}", flush=True)
-    elif args.sync_results:
-        results = sync_results_via_render(args.day)
-        print(f"X result sync complete: results={results}", flush=True)
     elif args.smoke_test:
         smoke_test()
