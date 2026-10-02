@@ -615,8 +615,14 @@ def _result_due(row: dict) -> bool:
 def sync_results_via_render(day: str | None = None) -> int:
     """Publish settled X prediction results as replies to the original post."""
     day = str(day or datetime.now(JST).strftime("%Y%m%d"))
+    if not outbox.configured():
+        return 0
+
     posts_path = STATE_DIR / f"{day}_posts.jsonl"
-    if not posts_path.exists() or not outbox.configured():
+    local_archive = posts_path.read_text(encoding="utf-8") if posts_path.exists() else ""
+    remote_archive = outbox.load_archive(day)
+    raw_archive = "\n".join(part for part in (remote_archive.strip(), local_archive.strip()) if part).strip()
+    if not raw_archive:
         return 0
 
     state = outbox.merge_state(outbox.load_state(day), _load(day))
@@ -627,7 +633,6 @@ def sync_results_via_render(day: str | None = None) -> int:
         return 0
 
     rows = {}
-    raw_archive = posts_path.read_text(encoding="utf-8")
     for line in raw_archive.splitlines():
         try:
             row = json.loads(line)
@@ -645,7 +650,8 @@ def sync_results_via_render(day: str | None = None) -> int:
     if not rows:
         return 0
 
-    outbox.publish_archive(day, raw_archive)
+    if local_archive.strip():
+        outbox.publish_archive(day, local_archive)
     sent_count = 0
     for key, row in rows.items():
         previous = (state.get("x_result_attempts") or {}).get(key) or {}
@@ -727,6 +733,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke-test", action="store_true")
     parser.add_argument("--sync-render", action="store_true")
+    parser.add_argument("--sync-results", action="store_true")
     parser.add_argument("--check-render", action="store_true")
     parser.add_argument("--resend-race", action="store_true")
     parser.add_argument("--day")
@@ -745,6 +752,9 @@ if __name__ == "__main__":
             "workflow_run": os.getenv("GITHUB_RUN_ID", ""),
         }, sort_keys=True) + "\n")
         print("X durable outbox write access: ready")
+    elif args.sync_results:
+        results = sync_results_via_render(args.day)
+        print(f"X result sync complete: results={results}", flush=True)
     elif args.sync_render:
         count = sync_archived_via_render(args.day)
         results = sync_results_via_render(args.day)
