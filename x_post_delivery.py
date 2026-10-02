@@ -418,30 +418,54 @@ def send_selected_mid(record: dict, payload: dict) -> bool:
 
 
 
-def send_featured_record(record: dict, picks, *, source: str, note: str = "") -> bool:
-    """Publish one high-value non-1-head main selection to X."""
+def send_featured_record(
+    record: dict,
+    picks=None,
+    *,
+    source: str,
+    note: str = "",
+    main_picks=None,
+    cover_picks=None,
+) -> bool:
+    """Publish one featured X race as 10 main + up to 8 alternate-head covers."""
     if source not in {"AI重なり本線", "配当期待本線"}:
         raise ValueError("invalid featured X source")
-    raw_picks = _unique_picks(picks)
+
+    raw = _unique_picks(picks)
+    main = _unique_picks(main_picks)
+    cover = _unique_picks(cover_picks)
+    if not main:
+        main = raw[:10]
+    if not cover:
+        main_set = set(main)
+        cover = [pick for pick in raw if pick not in main_set][:8]
+    cover = [pick for pick in cover if pick not in set(main)][:8]
+    main = main[:10]
+    raw_picks = _unique_picks(main + cover)
     if not raw_picks:
         return False
+
     venue = record.get("venue") or str(record.get("jcd") or "")
     rno = int(record.get("rno") or 0)
     deadline = str(record.get("deadline") or "--:--")
-    title = "🤝 AI重なり・本線" if source == "AI重なり本線" else "🔥 配当期待・本線"
-    compact = _compact_picks(raw_picks)
+    title = "🤝 AI重なり予想" if source == "AI重なり本線" else "🔥 配当期待予想"
+
     lines = [
-        f"🚤注目本線｜{venue} {rno}R",
-        f"⏰締切 {deadline}",
-        "",
+        f"🚤{venue} {rno}R｜締切 {deadline}",
         title,
-        "🎯 1号艇以外の頭狙い",
-        *compact,
+        f"🎯 本線 {len(main)}点",
+        *_compact_picks(main),
     ]
+    if cover:
+        lines += [
+            f"🛡️ 抑え・逆転候補 {len(cover)}点",
+            *_compact_picks(cover),
+        ]
     note = str(note or "").strip()
     if note:
-        lines += ["", f"📊 {note}"]
-    lines += ["", "🔔 次の無料予想も配信します", "ぜひフォローお願いします！"]
+        lines += [f"📊 {note}"]
+    lines += ["🔔 結果も自動投稿"]
+
     post = _fit_post(lines)
     enriched = dict(record)
     enriched["x_picks"] = raw_picks
