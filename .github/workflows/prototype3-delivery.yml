@@ -19,8 +19,12 @@ permissions:
   contents: write
 
 concurrency:
+  # IMPORTANT: hit receipts are persisted only at the end of a run. If queued
+  # scheduled/push runs overlap, both can send the same hit before either receipt
+  # reaches main. Cancel stale queued/running work so only one notifier owns the
+  # delivery window at a time.
   group: prototype3-discord-delivery
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deliver:
