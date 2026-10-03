@@ -42,11 +42,7 @@ permissions:
 # Keep one watcher alive long enough to bridge GitHub schedule delays.
 # New scheduled runs may queue; they must never cancel the active notifier.
 concurrency:
-  # A notifier run lasts ~23 minutes while cron fires every 5 minutes. Keeping
-  # queued runs allows stale checkouts to re-send hit alerts before delivery
-  # receipts are pushed. One active owner is safer; the next cron restarts it.
-  group: boat-ai-discord-notify-main
-  cancel-in-progress: true
+  # Serialize notifier runs. Do not cancel the active 23-minute watcher; GitHub\n  # keeps at most one pending run for this concurrency group.\n  group: boat-ai-discord-notify-main\n  cancel-in-progress: false
 
 jobs:
   notify:
