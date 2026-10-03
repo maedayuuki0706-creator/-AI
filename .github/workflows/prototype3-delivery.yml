@@ -63,7 +63,7 @@ jobs:
         if: always()
         env:
           TZ: Asia/Tokyo
-          DISCORD_HIT_WEBHOOK_URL: ${{ secrets.DISCORD_HIT_WEBHOOK_URL }}
+          DISCORD_HIT_WEBHOOK_URL: ""
         run: python -u yuuki_hit_alerts.py
       - name: Persist 新人予想家 ゆうき delivery receipts and PT scoreboard
         if: always()
