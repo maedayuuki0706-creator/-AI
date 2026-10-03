@@ -11,7 +11,8 @@ START = int(sys.argv[1]) if len(sys.argv) > 1 else 3388
 END = int(sys.argv[2]) if len(sys.argv) > 2 else 4150
 OUT = Path(f"data/racers_{START}_{END}.csv")
 BASE = "https://www.boatrace.jp/owpc/pc/data/racersearch"
-ATLAS = "https://abeken1026395.github.io/pallas-mercato-7k9"\nPALLAS_FORM = f"{ATLAS}/data/racerFormIndex.json"
+ATLAS = "https://abeken1026395.github.io/pallas-mercato-7k9"
+PALLAS_FORM = f"{ATLAS}/data/racerFormIndex.json"
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; BoatAI-RacerDB/2.0)"}
 BASE_FIELDS = ["登録番号","選手名","級別","支部","登録期"]
 for metric in ("進入率","3連対率","平均ST","スタート順"):
