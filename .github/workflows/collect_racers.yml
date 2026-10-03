@@ -10,27 +10,32 @@ on:
         description: End racer number
         required: true
         default: "4150"
-  push:
-    paths:
-      - ".github/workflows/collect_racers.yml"
 permissions:
   contents: write
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install requests beautifulsoup4
-      - name: Collect
+      - name: Collect with checkpoints
         run: python tools/racer_collector.py ${{ github.event.inputs.start || '3388' }} ${{ github.event.inputs.end || '4150' }}
-      - name: Commit CSV
+      - name: Upload current CSV even if collection fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: racer-checkpoint-${{ github.run_id }}
+          path: data/racers_*.csv
+          if-no-files-found: warn
+      - name: Commit completed/current CSV
+        if: always()
         run: |
           git config user.name "boat-ai-bot"
           git config user.email "actions@users.noreply.github.com"
           git add data/racers_*.csv
-          git diff --cached --quiet || git commit -m "Update racer database"
+          git diff --cached --quiet || git commit -m "Update racer database checkpoint"
           git push
