@@ -11,7 +11,7 @@ START = int(sys.argv[1]) if len(sys.argv) > 1 else 3388
 END = int(sys.argv[2]) if len(sys.argv) > 2 else 4150
 OUT = Path(f"data/racers_{START}_{END}.csv")
 BASE = "https://www.boatrace.jp/owpc/pc/data/racersearch"
-ATLAS = "https://abeken1026395.github.io/pallas-mercato-7k9"
+ATLAS = "https://abeken1026395.github.io/pallas-mercato-7k9"\nPALLAS_FORM = f"{ATLAS}/data/racerFormIndex.json"
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; BoatAI-RacerDB/2.0)"}
 BASE_FIELDS = ["登録番号","選手名","級別","支部","登録期"]
 for metric in ("進入率","3連対率","平均ST","スタート順"):
@@ -82,49 +82,30 @@ def find_player(obj, toban, name):
                     return hit
     return None
 
-ATLAS_JSON_CANDIDATES = [
-    f"{ATLAS}/data/players.json",
-    f"{ATLAS}/players/data.json",
-    f"{ATLAS}/assets/players.json",
-]
+_pallas_cache = None
+
+def load_pallas():
+    global _pallas_cache
+    if _pallas_cache is not None:
+        return _pallas_cache
+    r = fetch(PALLAS_FORM)
+    if not r:
+        _pallas_cache = {}
+        return _pallas_cache
+    try:
+        obj = r.json()
+        _pallas_cache = obj.get("racers", {}) if isinstance(obj, dict) else {}
+    except ValueError:
+        _pallas_cache = {}
+    return _pallas_cache
 
 def atlas_fields(toban, name):
-    for url in ATLAS_JSON_CANDIDATES:
-        r = fetch(url)
-        if not r:
-            continue
-        try:
-            obj = r.json()
-        except ValueError:
-            continue
-        player = find_player(obj, toban, name)
-        if player is not None:
-            out = {}
-            flatten("", player, out)
-            return out
-    # Safe HTML fallback. No invented field names.
-    for url in (f"{ATLAS}/players/{toban}/", f"{ATLAS}/players/?toban={toban}"):
-        r = fetch(url)
-        if not r:
-            continue
-        soup = BeautifulSoup(r.content, "html.parser")
-        body = clean(soup.get_text(" "))
-        if str(toban) not in body and name.replace(" ","") not in body.replace(" ",""):
-            continue
-        out = {}
-        for tr in soup.find_all("tr"):
-            cells = [clean(x.get_text()) for x in tr.find_all(["th","td"])]
-            if len(cells) == 2 and cells[0] and cells[1]:
-                out["図鑑_" + cells[0]] = cells[1]
-        for dt in soup.find_all("dt"):
-            dd = dt.find_next_sibling("dd")
-            if dd:
-                k, v = clean(dt.get_text()), clean(dd.get_text())
-                if k and v:
-                    out["図鑑_" + k] = v
-        if out:
-            return out
-    return {}
+    player = load_pallas().get(str(toban), {})
+    if not isinstance(player, dict) or not player:
+        return {}
+    out = {}
+    flatten("", player, out)
+    return out
 
 def collect_racer(toban):
     rp = fetch(f"{BASE}/profile?toban={toban}")
@@ -135,9 +116,8 @@ def collect_racer(toban):
     # Prefer official structured racer-name elements. Reject UI words such as 設定.
     name = ""
     selectors = [
-        ".is-fs18.is-bold",
         ".memberData_name",
-        "[class*='name']",
+        ".is-fs18.is-bold",
     ]
     for selector in selectors:
         for el in soup.select(selector):
