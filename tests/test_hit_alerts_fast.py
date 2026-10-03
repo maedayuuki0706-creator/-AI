@@ -33,7 +33,9 @@ class FastHitAlertsTests(unittest.TestCase):
         for item in patches:
             item.start()
             self.addCleanup(item.stop)
-        self.now = datetime(2026, 10, 3, 19, tzinfo=alerts.base.JST)
+        # Keep the report cutoff after any same-day journal timestamp. _record() uses the real JST clock.
+        # A 19:00 cutoff made this test start failing later in the evening even though delivery was healthy.
+        self.now = datetime(2026, 10, 3, 23, 59, tzinfo=alerts.base.JST)
 
     def run_pass(self):
         return fast.check_and_send('20261003', self.now)
