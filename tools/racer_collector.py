@@ -131,27 +131,39 @@ def collect_racer(toban):
     if not rp or "該当する選手が見つかりません" in rp.text:
         return None
     soup = BeautifulSoup(rp.content, "html.parser")
-    # Current official site exposes the racer name in the page heading.
-    # Keep fallbacks so minor markup changes do not turn every racer into SKIP.
+
+    # Prefer official structured racer-name elements. Reject UI words such as 設定.
     name = ""
-    heading = soup.find(["h1", "h2"], string=lambda x: x and "（" in clean(x))
-    if heading:
-        name = re.sub(r"（.*?）", "", clean(heading.get_text())).strip()
-    if not name:
-        name_el = soup.find("p", class_="memberData_name")
-        if name_el:
-            name = clean(name_el.get_text())
+    selectors = [
+        ".is-fs18.is-bold",
+        ".memberData_name",
+        "[class*='name']",
+    ]
+    for selector in selectors:
+        for el in soup.select(selector):
+            candidate = clean(el.get_text())
+            candidate = re.sub(r"（.*?）", "", candidate).strip()
+            if candidate and candidate not in {"設定","検索","選手検索","メニュー"} and 2 <= len(candidate) <= 20:
+                if re.search(r"[一-龥々ヶぁ-んァ-ヶ]", candidate):
+                    name = candidate
+                    break
+        if name:
+            break
+
+    # Text fallback: find Japanese name close to the registration-number block.
     if not name:
         text = clean(soup.get_text(" "))
-        marker = f"登録番号 {toban}"
-        pos = text.find(marker)
-        if pos >= 0:
-            prefix = text[:pos]
-            candidates = re.findall(r"([一-龥々ヶァ-ヶー]+(?: [一-龥々ヶァ-ヶー]+)?)", prefix)
+        marker_pos = text.find(str(toban))
+        if marker_pos >= 0:
+            around = text[max(0, marker_pos-150):marker_pos]
+            candidates = re.findall(r"[一-龥々ヶぁ-んァ-ヶ]{1,8}\s+[一-龥々ヶぁ-んァ-ヶ]{1,8}", around)
+            banned = {"選手 検索","登録 番号","級別 支部"}
+            candidates = [x for x in candidates if x not in banned and "設定" not in x]
             if candidates:
                 name = candidates[-1]
     if not name:
         return None
+
     row = {
         "登録番号": str(toban),
         "選手名": name,
