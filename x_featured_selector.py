@@ -1,4 +1,4 @@
-"""Select up to two high-value non-1-head races per day for X.
+"""Select up to ten high-value non-1-head races per day for X.
 
 The selector uses only pre-race prototype predictions already committed to the
 repository. It never consults race results when deciding what to post.
@@ -17,7 +17,7 @@ import x_post_delivery as xpost
 PT12_DIR = Path("data/prototype12_delivery/predictions")
 PT3_DIR = Path("data/prototype3_delivery/predictions")
 FEATURE_SOURCES = {"AI重なり本線", "配当期待本線"}
-MAX_DAILY_POSTS = 2
+MAX_DAILY_POSTS = 10
 MIN_LEAD_SECONDS = 11 * 60
 MAX_LEAD_SECONDS = 40 * 60
 MIN_VALUE_ODDS = 25.0
