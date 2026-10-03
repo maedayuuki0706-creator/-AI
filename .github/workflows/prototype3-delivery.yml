@@ -60,13 +60,13 @@ jobs:
         env:
           TZ: Asia/Tokyo
         run: python -u prototype_scoreboard.py
-      - name: Notify 速報くん of confirmed ゆうき hits
+      - name: Verify Sokuhou independent delivery is enabled
         if: always()
         env:
           TZ: Asia/Tokyo
           DISCORD_HIT_WEBHOOK_URL: ${{ secrets.DISCORD_HIT_WEBHOOK_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python -u yuuki_hit_alerts.py
+        run: python -c 'import sokuhou_delivery; print("Sokuhou paused" if sokuhou_delivery.paused() else "Sokuhou Confirmed Hit Delivery handles confirmed Yuuki results")'
       - name: Audit Sokuhou receipts
         if: always()
         env:

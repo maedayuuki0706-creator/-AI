@@ -1,0 +1,54 @@
+name: Sokuhou Confirmed Hit Delivery
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'sokuhou_runner.py'
+      - 'sokuhou_delivery.py'
+      - 'sokuhou_health.py'
+      - 'sokuhou_policy.json'
+      - 'hit_alerts.py'
+      - 'hit_alerts_fast.py'
+      - 'yuuki_hit_alerts.py'
+      - 'persist_runtime_data.py'
+      - '.github/workflows/sokuhou-delivery.yml'
+permissions:
+  contents: write
+concurrency:
+  group: sokuhou-confirmed-hit-delivery
+  cancel-in-progress: false
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify durable delivery guards without posting
+        run: |
+          python -m unittest discover -s tests -p 'test_sokuhou*.py' -v
+          python -m unittest discover -s tests -p 'test_hit_alerts*.py' -v
+          python -m unittest discover -s tests -p 'test_persist_runtime_data.py' -v
+          python -m unittest test_yuuki_hit_alerts -v
+      - name: Deliver and audit confirmed hits
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCORD_HIT_WEBHOOK_URL: ${{ secrets.DISCORD_HIT_WEBHOOK_URL }}
+        run: python -u sokuhou_runner.py
+      - name: Preserve recovery journals
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sokuhou-recovery-${{ github.run_id }}
+          retention-days: 7
+          path: |
+            data/hit_alert_deliveries.jsonl
+            data/prototype3_delivery/hit_alerts/
+            data/sokuhou_recovery/

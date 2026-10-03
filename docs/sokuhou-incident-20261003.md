@@ -15,6 +15,7 @@
 4. タイムアウト・5xx・応答欠落は `uncertain`、送信途中の中断は `sending` のまま保留する。自動再送しない。明確な429拒否のみ待機付きで最大3回まで試す。4xx拒否は `failed` にする。
 5. 再開時刻より前に締め切ったレースは通知しない。メイン・中穴・穴の的中結果は `suppressed` として成績集計に含める。ゆうきも古い的中を再送しない。
 6. 保存障害や保留をActions失敗として表示する。Discordの応答取得後、保存だけ失敗した場合は `data/sokuhou_recovery/` に応答IDを残す。メインworkflow失敗時は復旧用artifactを7日間保持する。
+7. `Sokuhou Confirmed Hit Delivery` を独立workflowとして5分cronで起動する。長い予想watcherの完了を待たず、mainに保存された予想とPT3成績から確認する。予想・PT3 workflowからの直接送信は独立workflowへ移管する。移行中の古い実行が残っても共通claimで重複を防ぐ。GitHub cronには起動遅延があり、厳密な5分以内の配信保証ではない。
 
 ## 運用
 

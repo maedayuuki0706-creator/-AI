@@ -185,7 +185,8 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
             print(f'::error::X outbox pass failed: {type(exc).__name__}', flush=True)
             result = 1
         try:
-            hit_alerts_fast.check_and_send()
+            if os.getenv('SOKUHOU_EXTERNAL_RUNNER') != '1':
+                hit_alerts_fast.check_and_send()
         except Exception as exc:
             print(f'Hit alert pass failed: {type(exc).__name__}', flush=True)
             delivery_failure = 1
