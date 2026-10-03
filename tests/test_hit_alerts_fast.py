@@ -58,6 +58,7 @@ class FastHitAlertsTests(unittest.TestCase):
         self.assertEqual(self.run_pass(), 0)
         self.sender.assert_not_called()
         self.assertEqual(json.loads(self.journal.read_text())['status'], 'suppressed')
+        self.assertEqual(alerts._venue_hit_count('20261003', '大村', 'normal'), 1)
         from interim_report import tally
         result = tally(self.now, [json.loads(self.journal.read_text())])
         self.assertEqual(result['24']['normal']['hits'], 1)

@@ -68,7 +68,7 @@ def _venue_hit_count(day: str, venue: str, stream: str) -> int:
     """Count already delivered hits for this venue/category today."""
     seen = set()
     for row in _read_jsonl(DELIVERY_PATH):
-        if row.get("day") != day or row.get("status") != "sent":
+        if row.get("day") != day or row.get("status") not in {"sent", "suppressed"}:
             continue
         if str(row.get("venue") or "") != str(venue or ""):
             continue

@@ -64,7 +64,7 @@ jobs:
         if: always()
         env:
           TZ: Asia/Tokyo
-          DISCORD_HIT_WEBHOOK_URL: ""
+          DISCORD_HIT_WEBHOOK_URL: ${{ secrets.DISCORD_HIT_WEBHOOK_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python -u yuuki_hit_alerts.py
       - name: Audit Sokuhou receipts

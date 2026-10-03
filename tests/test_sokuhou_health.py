@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import json
+import os
 import unittest
 from unittest.mock import patch
 
@@ -9,6 +10,7 @@ import sokuhou_health as health
 class SokuhouHealthTests(unittest.TestCase):
     def audit(self, row):
         with patch.object(health.delivery, 'paused', return_value=False), \
+             patch.dict(os.environ, {'GITHUB_STEP_SUMMARY':''}), \
              patch.object(health.delivery.STORE, 'ensure'), \
              patch.object(health, 'git', side_effect=[b'',b'head',b'data/sokuhou_receipts/20261003/normal_24_10.json\n']), \
              patch.object(health, 'content', return_value=json.dumps(row).encode()), \
