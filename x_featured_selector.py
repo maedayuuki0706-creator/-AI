@@ -1,4 +1,4 @@
-"""Select up to ten high-value non-1-head races per day for X.
+"""Select up to ten curated races per day for X with protective alternate-head covers.
 
 The selector uses only pre-race prototype predictions already committed to the
 repository. It never consults race results when deciding what to post.
@@ -20,8 +20,6 @@ FEATURE_SOURCES = {"AI重なり本線", "配当期待本線"}
 MAX_DAILY_POSTS = 10
 MIN_LEAD_SECONDS = 11 * 60
 MAX_LEAD_SECONDS = 40 * 60
-MIN_VALUE_ODDS = 25.0
-MAX_VALUE_ODDS = 180.0
 MAIN_POINTS = 10
 COVER_POINTS = 8
 MIN_ALT_HEAD_PROB = 0.01
@@ -133,7 +131,9 @@ def _value_rows(model: dict, focus_heads: set[str] | None = None) -> list[tuple[
         odds = float(row.get("odds") or 0)
         ev = float(row.get("ev") or 0)
         prob = float(row.get("prob") or 0)
-        if MIN_VALUE_ODDS <= odds <= MAX_VALUE_ODDS and ev >= 0.90 and prob >= 0.008:
+        # Odds are descriptive only.  X eligibility is driven by the models:
+        # keep plausible alternate heads even when the market is not 25x+.
+        if ev >= 0.70 and prob >= 0.008:
             out.append((combo, {"odds": odds, "ev": ev, "prob": prob}))
     out.sort(key=lambda item: (item[1]["prob"] * item[1]["ev"], item[1]["ev"], item[1]["odds"]), reverse=True)
     return out
@@ -302,7 +302,8 @@ def _overlap_candidate(race: dict) -> dict | None:
         odds = max(float(row.get("odds") or 0) for row in rows)
         ev = max(float(row.get("ev") or 0) for row in rows)
         prob = max(float(row.get("prob") or 0) for row in rows)
-        if MIN_VALUE_ODDS <= odds <= MAX_VALUE_ODDS and ev >= 0.90 and prob >= 0.008:
+        # Cross-AI agreement is the signal; do not reject it because of odds.
+        if ev >= 0.70 and prob >= 0.008:
             shared.append((combo, len(owners), odds, ev, prob))
 
     top_heads = []
