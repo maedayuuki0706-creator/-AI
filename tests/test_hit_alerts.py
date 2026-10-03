@@ -50,7 +50,8 @@ class HitAlertTests(unittest.TestCase):
             ],
         }
         text = hit_alerts._opportunity_message(row, "5-1-3", 2450)
-        self.assertIn("中穴AI 的中速報", text)
+        self.assertIn("【中穴】的中速報", text)
+        self.assertIn("的中：**中穴AI**", text)
         self.assertIn("期待度 **78/100**", text)
         self.assertIn("予想時オッズ：**24.5倍**", text)
         self.assertIn("買い目：**12点**", text)
@@ -68,7 +69,8 @@ class HitAlertTests(unittest.TestCase):
             ],
         }
         text = hit_alerts._opportunity_message(row, "5-3-2", 12560)
-        self.assertIn("穴AI 万舟的中速報", text)
+        self.assertIn("【穴】万舟的中速報", text)
+        self.assertIn("的中：**穴AI**", text)
         self.assertIn("12,560円", text)
 
     def test_stream_keys_do_not_collide(self):

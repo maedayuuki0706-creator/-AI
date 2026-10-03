@@ -25,6 +25,7 @@ import sokuhou_character
 import stake_tracking
 import water_affinity
 import x_post_delivery
+import persist_runtime_data
 
 bridge_learning.install(app)
 # Install before selection scoring so same-day venue form can be logged and may
@@ -171,6 +172,7 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
     duration = max(0, min(int(watch_seconds), 1080))
     end = clock() + duration
     result = 0
+    delivery_failure = 0
     while is_open():
         try:
             result = attempt()
@@ -186,17 +188,25 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
             hit_alerts_fast.check_and_send()
         except Exception as exc:
             print(f'Hit alert pass failed: {type(exc).__name__}', flush=True)
+            delivery_failure = 1
         try:
             interim_report.send_due()
         except Exception as exc:
             print(f'Interim report pass failed: {type(exc).__name__}', flush=True)
+        if os.getenv("GITHUB_ACTIONS") == "true":
+            try:
+                persist_runtime_data.persist(exclude=("data/x_post_delivery/",))
+            except Exception as exc:
+                # Stop this watcher before more sends can rely on lost journals.
+                print(f'::error::Runtime checkpoint failed: {type(exc).__name__}', flush=True)
+                return 1
         remaining = end - clock()
         if duration == 0 or remaining <= 0:
             break
         # Recheck every 30 seconds. This is important for midnight races where
         # complete exhibition data can appear only a few minutes before deadline.
         pause(min(30, max(1, remaining)))
-    return result
+    return max(result, delivery_failure)
 
 
 def resend_prediction_summary(day: str = "20260913") -> int:

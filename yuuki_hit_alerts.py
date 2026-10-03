@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import urllib.request
 from zoneinfo import ZoneInfo
+import sokuhou_delivery
 
 JST = ZoneInfo("Asia/Tokyo")
 P3_ROOT = Path("data/prototype3_delivery")
@@ -38,28 +39,15 @@ def message(row: dict, score: dict, payout: int, selected: bool) -> str:
     )
 
 
-def send_discord(content: str) -> None:
-    url = os.getenv("DISCORD_HIT_WEBHOOK_URL", "").strip()
-    if not url:
-        raise RuntimeError("DISCORD_HIT_WEBHOOK_URL is missing")
-    payload = json.dumps({
-        "username": "速報くん",
-        "content": "@everyone\n" + content,
-        "allowed_mentions": {"parse": ["everyone"]},
-    }, ensure_ascii=False).encode("utf-8")
-    request = urllib.request.Request(url, data=payload, headers={
-        "Content-Type": "application/json",
-        "User-Agent": "Boat-AI-Navi/3.2 (+yuuki-hit-alerts)",
-    }, method="POST")
-    with urllib.request.urlopen(request, timeout=20) as response:
-        if response.status not in (200, 204):
-            raise RuntimeError(f"Discord HTTP {response.status}")
+def send_discord(content: str) -> dict:
+    return sokuhou_delivery.send_confirmed(content)
 
 
-def run(day: str, *, sender=send_discord) -> int:
-    if day < START_DAY:
+def run(day: str, *, sender=send_discord, store=None) -> int:
+    if day < START_DAY or sokuhou_delivery.paused():
         return 0
     count = 0
+    failures = 0
     folder = SCORE_ROOT / day / "results"
     for path in sorted(folder.glob("*.json")):
         row = read_json(path)
@@ -88,8 +76,20 @@ def run(day: str, *, sender=send_discord) -> int:
         selected_receipt = read_json(P3_ROOT / "selected_deliveries" / f"{key}.json")
         selected = isinstance(selected_receipt, dict) and selected_receipt.get("key") == key
         try:
-            sender(message(row, score, payout, selected))
+            if not sokuhou_delivery.eligible(row):
+                continue
+            durable_key = f"yuuki:{day}:{str(row['jcd']).zfill(2)}:{int(row['rno'])}"
+            receipt = sokuhou_delivery.deliver(
+                durable_key, message(row, score, payout, selected),
+                {"key": key, "day": day, "selected": selected,
+                 "winning_picks": winners, "payout_per_100": payout}, sender=sender, store=store,
+            )
+            if receipt.get("status") != "sent":
+                failures += 1
+                print(f"::error::Yuuki Sokuhou held {key}: {receipt.get('status')}", flush=True)
+                continue
         except Exception as exc:
+            failures += 1
             print(f"yuuki hit alert retry pending {key}: {type(exc).__name__}", flush=True)
             continue
         alert_receipt.parent.mkdir(parents=True, exist_ok=True)
@@ -97,11 +97,13 @@ def run(day: str, *, sender=send_discord) -> int:
         temporary.write_text(json.dumps({
             "key": key, "day": day, "status": "sent", "selected": selected,
             "winning_picks": winners, "payout_per_100": payout,
-            "sent_at": datetime.now(JST).isoformat(),
+            "sent_at": receipt["sent_at"], "message_id": receipt["message_id"],
         }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         temporary.replace(alert_receipt)
         count += 1
         print(f"yuuki hit alert sent {key} selected={selected}", flush=True)
+    if failures:
+        raise RuntimeError(f"{failures} Yuuki Sokuhou alerts need receipt review")
     return count
 
 

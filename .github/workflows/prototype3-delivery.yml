@@ -7,6 +7,9 @@ on:
     paths:
       - 'prototype3_delivery.py'
       - 'yuuki_hit_alerts.py'
+      - 'sokuhou_delivery.py'
+      - 'sokuhou_health.py'
+      - 'sokuhou_policy.json'
       - 'test_yuuki_hit_alerts.py'
       - 'four_way_prototype.py'
       - 'prototype_scoreboard.py'
@@ -19,10 +22,7 @@ permissions:
   contents: write
 
 concurrency:
-  # IMPORTANT: hit receipts are persisted only at the end of a run. If queued
-  # scheduled/push runs overlap, both can send the same hit before either receipt
-  # reaches main. Cancel stale queued/running work so only one notifier owns the
-  # delivery window at a time.
+  # Preserve the active delivery; durable Sokuhou claims survive interruption.
   group: prototype3-discord-delivery
   cancel-in-progress: false
 
@@ -45,6 +45,7 @@ jobs:
           python -m py_compile prototype3_delivery.py four_way_prototype.py prototype_scoreboard.py daily_report.py
           python -m unittest discover -s tests -p 'test_prototype_scoreboard.py' -v
           python -m unittest test_yuuki_hit_alerts.py -v
+          python -m unittest discover -s tests -p 'test_sokuhou*.py' -v
           test -n "$PT3_DISCORD_WEBHOOK_URL$PROTO3_DISCORD_WEBHOOK_URL"
       - name: Deliver 新人予想家 ゆうき
         env:
@@ -64,7 +65,20 @@ jobs:
         env:
           TZ: Asia/Tokyo
           DISCORD_HIT_WEBHOOK_URL: ""
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python -u yuuki_hit_alerts.py
+      - name: Audit Sokuhou receipts
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python sokuhou_health.py
+      - name: Preserve confirmed message IDs when receipt saving fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yuuki-sokuhou-recovery-${{ github.run_id }}
+          path: data/sokuhou_recovery/
+          retention-days: 7
       - name: Persist 新人予想家 ゆうき delivery receipts and PT scoreboard
         if: always()
         run: |

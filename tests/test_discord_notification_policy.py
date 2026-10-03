@@ -28,11 +28,13 @@ class DiscordNotificationPolicyTests(unittest.TestCase):
         self.http = http.start()
         self.addCleanup(http.stop)
         self.http.return_value.__enter__.return_value.status = 204
+        self.http.return_value.__enter__.return_value.read.return_value = b'{"id":"12345"}'
 
     def check_delivery(self, env_name, content, *, notify):
         self.http.assert_called_once()
         request = self.http.call_args.args[0]
-        self.assertEqual(request.full_url, self.webhooks[env_name])
+        suffix = "?wait=true" if env_name == "DISCORD_HIT_WEBHOOK_URL" else ""
+        self.assertEqual(request.full_url, self.webhooks[env_name] + suffix)
         payload = json.loads(request.data)
         self.assertEqual(payload["content"], "@everyone\n" + content if notify else content)
         self.assertEqual(payload["allowed_mentions"], {"parse": ["everyone"] if notify else []})

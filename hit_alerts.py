@@ -13,6 +13,7 @@ from pathlib import Path
 
 import daily_report as report
 import direct_discord_notify as base
+import sokuhou_delivery
 
 DELIVERY_PATH = Path("data/hit_alert_deliveries.jsonl")
 OPPORTUNITY_PATH = Path("data/opportunity_alert_deliveries.jsonl")
@@ -91,19 +92,8 @@ def _current_venue_tally(row: dict, stream: str) -> int:
     ) + 1
 
 
-def _send_hit_channel(content: str) -> None:
-    hit_url = os.getenv("DISCORD_HIT_WEBHOOK_URL", "").strip()
-    if not hit_url:
-        raise RuntimeError("DISCORD_HIT_WEBHOOK_URL is missing")
-    original = os.environ.get("DISCORD_WEBHOOK_URL")
-    os.environ["DISCORD_WEBHOOK_URL"] = hit_url
-    try:
-        base.send_discord(content, notify_everyone=True)
-    finally:
-        if original is None:
-            os.environ.pop("DISCORD_WEBHOOK_URL", None)
-        else:
-            os.environ["DISCORD_WEBHOOK_URL"] = original
+def _send_hit_channel(content: str) -> dict:
+    return sokuhou_delivery.send_confirmed(content)
 
 
 def _hit_section(row: dict, winner: str) -> str:
@@ -274,107 +264,6 @@ def _load_official(day: str, jcd: str, rno: int) -> dict | None:
 
 
 def check_and_send(day: str | None = None, now: datetime | None = None) -> int:
-    now = (now or datetime.now(base.JST)).astimezone(base.JST)
-    day = day or now.strftime("%Y%m%d")
-    sent = _sent_keys(day)
-    delivered = 0
-
-    # Normal AI hit alerts.
-    if base.LOG_PATH.exists():
-        predictions = report.read_jsonl(base.LOG_PATH)
-        chosen, _ = report.latest_predictions(predictions, day)
-
-        for key, row in sorted(chosen.items()):
-            delivery_key = _stream_key(row, "normal")
-            if delivery_key in sent:
-                continue
-            try:
-                close = datetime.strptime(day + " " + row["deadline"], "%Y%m%d %H:%M").replace(tzinfo=base.JST)
-            except (KeyError, TypeError, ValueError):
-                continue
-            if now <= close:
-                continue
-
-            jcd = str(row.get("jcd")).zfill(2)
-            rno = int(row.get("rno") or 0)
-            result = _load_official(day, jcd, rno)
-            if result is None:
-                continue
-
-            picks = set(report.disclosed_picks(row))
-            matches = [(combo, int(yen)) for combo, yen in (result.get("payouts") or {}).items() if combo in picks]
-            if not matches:
-                continue
-
-            winner, payout = max(matches, key=lambda item: item[1])
-            try:
-                _send_hit_channel(_message(row, winner, payout, result))
-            except Exception as exc:
-                print(f"hit alert failed {jcd} {rno}R: {type(exc).__name__}", flush=True)
-                continue
-
-            _append_jsonl(DELIVERY_PATH, {
-                "day": day,
-                "key": delivery_key,
-                "stream": "normal",
-                "jcd": jcd,
-                "rno": rno,
-                "venue": row.get("venue"),
-                "winning_combo": winner,
-                "payout_per_100": payout,
-                "prediction_sent_at": row.get("sent_at"),
-                "sent_at": datetime.now(base.JST).isoformat(),
-                "status": "sent",
-            })
-            sent.add(delivery_key)
-            delivered += 1
-            print(f"hit alert sent normal {jcd} {rno}R {winner} {payout}", flush=True)
-
-    # Independent 中穴AI / 穴AI hit alerts. Each stream is judged separately,
-    # so one race can legitimately produce normal + 中穴 + 穴 hit reports.
-    for (stream, jcd, rno), row in sorted(_latest_opportunities(day).items()):
-        delivery_key = _stream_key(row, stream)
-        if delivery_key in sent:
-            continue
-        try:
-            close = datetime.strptime(day + " " + row["deadline"], "%Y%m%d %H:%M").replace(tzinfo=base.JST)
-        except (KeyError, TypeError, ValueError):
-            continue
-        if now <= close:
-            continue
-
-        picks = _opportunity_picks(row)
-        if not picks:
-            continue
-        result = _load_official(day, jcd, rno)
-        if result is None:
-            continue
-        matches = [(combo, int(yen)) for combo, yen in (result.get("payouts") or {}).items() if combo in picks]
-        if not matches:
-            continue
-
-        winner, payout = max(matches, key=lambda item: item[1])
-        try:
-            _send_hit_channel(_opportunity_message(row, winner, payout))
-        except Exception as exc:
-            print(f"hit alert failed {stream} {jcd} {rno}R: {type(exc).__name__}", flush=True)
-            continue
-
-        _append_jsonl(DELIVERY_PATH, {
-            "day": day,
-            "key": delivery_key,
-            "stream": stream,
-            "jcd": jcd,
-            "rno": rno,
-            "venue": row.get("venue"),
-            "winning_combo": winner,
-            "payout_per_100": payout,
-            "prediction_sent_at": row.get("sent_at"),
-            "sent_at": datetime.now(base.JST).isoformat(),
-            "status": "sent",
-        })
-        sent.add(delivery_key)
-        delivered += 1
-        print(f"hit alert sent {stream} {jcd} {rno}R {winner} {payout}", flush=True)
-
-    return delivered
+    # Keep legacy callers behind the same durable receipt and pause policy.
+    from hit_alerts_fast import check_and_send as guarded_check
+    return guarded_check(day=day, now=now)

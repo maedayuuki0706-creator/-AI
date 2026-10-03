@@ -26,6 +26,8 @@ def run_continuous(total_seconds: int) -> int:
     while remaining > 0 and runner.race_hours():
         chunk = min(1080, remaining)
         result = max(result, int(runner.run(chunk) or 0))
+        if result:
+            break
         remaining -= chunk
     return result
 

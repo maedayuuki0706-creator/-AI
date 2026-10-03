@@ -68,7 +68,7 @@ def tally(as_of, journal, predictions=(), opportunities=()):
         key = identity(row, row.get('stream') or 'normal')
         if (row.get('day') != day or key is None or seen_at is None
                 or seen_at.strftime('%Y%m%d') != day or seen_at > as_of
-                or row.get('status') not in {'sent', 'miss'}):
+                or row.get('status') not in {'sent', 'miss', 'suppressed'}):
             continue
         previous = settled.get(key)
         if previous is None or seen_at < timestamp(previous['sent_at']):
@@ -97,7 +97,7 @@ def tally(as_of, journal, predictions=(), opportunities=()):
     for (stream, jcd, _), row in settled.items():
         count = counts[jcd][stream]
         count['judged'] += 1
-        if row['status'] == 'sent':
+        if row['status'] in {'sent', 'suppressed'}:
             count['hits'] += 1
             if int(row.get('payout_per_100') or 0) >= 10000:
                 count['man'] += 1

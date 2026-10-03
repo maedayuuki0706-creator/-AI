@@ -1,0 +1,50 @@
+name: Sokuhou Delivery Regression Tests
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sokuhou*.py'
+      - 'sokuhou_policy.json'
+      - 'hit_alerts*.py'
+      - 'yuuki_hit_alerts.py'
+      - 'persist_runtime_data.py'
+      - 'notification_runner.py'
+      - 'delivery_guard_runner.py'
+      - 'test_yuuki_hit_alerts.py'
+      - 'tests/test_sokuhou*.py'
+      - 'tests/test_hit_alerts*.py'
+      - 'tests/test_persist_runtime_data.py'
+      - '.github/workflows/discord_notify.yml'
+      - '.github/workflows/prototype3-delivery.yml'
+      - '.github/workflows/sokuhou-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate YAML structure
+        run: |
+          python -m pip install PyYAML==6.0.2
+          python - <<'PY'
+          import yaml
+          from pathlib import Path
+          for name in ('discord_notify.yml', 'prototype3-delivery.yml', 'sokuhou-tests.yml'):
+              workflow = yaml.safe_load((Path('.github/workflows') / name).read_text())
+              assert workflow['jobs']
+              if name != 'sokuhou-tests.yml':
+                  assert workflow['concurrency']['group']
+                  assert workflow['concurrency']['cancel-in-progress'] is False
+          PY
+      - name: Verify crash, duplicate, receipt-loss and concurrent-save cases
+        run: |
+          python -m unittest discover -s tests -p 'test_sokuhou*.py' -v
+          python -m unittest discover -s tests -p 'test_hit_alerts*.py' -v
+          python -m unittest discover -s tests -p 'test_persist_runtime_data.py' -v
+          python -m unittest test_yuuki_hit_alerts -v

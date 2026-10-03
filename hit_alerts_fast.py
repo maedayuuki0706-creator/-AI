@@ -13,13 +13,14 @@ from datetime import datetime
 import daily_report as report
 import direct_discord_notify as base
 import hit_alerts as alerts
+import sokuhou_delivery
 
 
 def _processed_keys(day: str) -> set[str]:
     return {
         str(row.get("key"))
         for row in alerts._read_jsonl(alerts.DELIVERY_PATH)
-        if row.get("day") == day and row.get("status") in {"sent", "miss"}
+        if row.get("day") == day and row.get("status") in {"sent", "miss", "suppressed"}
     }
 
 
@@ -31,7 +32,7 @@ def _closed(day: str, row: dict, now: datetime) -> bool:
     return now > close
 
 
-def _record(row: dict, stream: str, status: str, *, winner=None, payout=None) -> None:
+def _record(row: dict, stream: str, status: str, *, winner=None, payout=None, receipt=None) -> None:
     item = {
         "day": str(row.get("day") or ""),
         "key": alerts._stream_key(row, stream),
@@ -47,6 +48,9 @@ def _record(row: dict, stream: str, status: str, *, winner=None, payout=None) ->
         item["winning_combo"] = winner
     if payout is not None:
         item["payout_per_100"] = int(payout)
+    if receipt:
+        item["message_id"] = receipt["message_id"]
+        item["sent_at"] = receipt["sent_at"]
     alerts._append_jsonl(alerts.DELIVERY_PATH, item)
 
 
@@ -77,6 +81,8 @@ def _opportunity_candidates(day: str, now: datetime, processed: set[str]) -> lis
 
 def check_and_send(day: str | None = None, now: datetime | None = None) -> int:
     """Settle unprocessed races once; hits notify, misses are silently journaled."""
+    if sokuhou_delivery.paused():
+        return 0
     now = (now or datetime.now(base.JST)).astimezone(base.JST)
     day = day or now.strftime("%Y%m%d")
     processed = _processed_keys(day)
@@ -102,6 +108,7 @@ def check_and_send(day: str | None = None, now: datetime | None = None) -> int:
                 results[race] = None
 
     delivered = 0
+    failures = 0
     for race, rows in by_race.items():
         result = results.get(race)
         if result is None:
@@ -123,18 +130,35 @@ def check_and_send(day: str | None = None, now: datetime | None = None) -> int:
 
             winner, payout = max(matches, key=lambda item: item[1])
             try:
+                if not sokuhou_delivery.eligible(row):
+                    _record(row, stream, "suppressed", winner=winner, payout=payout)
+                    processed.add(delivery_key)
+                    continue
                 if stream == "normal":
                     message = alerts._message(row, winner, payout, result)
                 else:
                     message = alerts._opportunity_message(row, winner, payout)
-                alerts._send_hit_channel(message)
+                durable_key = f"normal:{delivery_key}" if stream == "normal" else delivery_key
+                receipt = sokuhou_delivery.deliver(
+                    durable_key, message,
+                    {"day": day, "stream": stream, "jcd": race[0], "rno": race[1],
+                     "winning_combo": winner, "payout_per_100": payout},
+                    sender=alerts._send_hit_channel,
+                )
+                if receipt.get("status") != "sent":
+                    failures += 1
+                    print(f"::error::Sokuhou held {durable_key}: {receipt.get('status')}", flush=True)
+                    continue
             except Exception as exc:
+                failures += 1
                 print(f"hit alert failed {stream} {race[0]} {race[1]}R: {type(exc).__name__}", flush=True)
                 continue
 
-            _record(row, stream, "sent", winner=winner, payout=payout)
+            _record(row, stream, "sent", winner=winner, payout=payout, receipt=receipt)
             processed.add(delivery_key)
             delivered += 1
             print(f"hit alert sent {stream} {race[0]} {race[1]}R {winner} {payout}", flush=True)
 
+    if failures:
+        raise RuntimeError(f"{failures} Sokuhou alerts need retry or receipt review")
     return delivered
