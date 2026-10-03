@@ -131,12 +131,30 @@ def collect_racer(toban):
     if not rp or "該当する選手が見つかりません" in rp.text:
         return None
     soup = BeautifulSoup(rp.content, "html.parser")
-    name_el = soup.find("p", class_="memberData_name")
-    if not name_el:
+    # Current official site exposes the racer name in the page heading.
+    # Keep fallbacks so minor markup changes do not turn every racer into SKIP.
+    name = ""
+    heading = soup.find(["h1", "h2"], string=lambda x: x and "（" in clean(x))
+    if heading:
+        name = re.sub(r"（.*?）", "", clean(heading.get_text())).strip()
+    if not name:
+        name_el = soup.find("p", class_="memberData_name")
+        if name_el:
+            name = clean(name_el.get_text())
+    if not name:
+        text = clean(soup.get_text(" "))
+        marker = f"登録番号 {toban}"
+        pos = text.find(marker)
+        if pos >= 0:
+            prefix = text[:pos]
+            candidates = re.findall(r"([一-龥々ヶァ-ヶー]+(?: [一-龥々ヶァ-ヶー]+)?)", prefix)
+            if candidates:
+                name = candidates[-1]
+    if not name:
         return None
     row = {
         "登録番号": str(toban),
-        "選手名": clean(name_el.get_text()),
+        "選手名": name,
         "級別": labeled(soup, "級別"),
         "支部": labeled(soup, "支部"),
         "登録期": labeled(soup, "登録期"),
