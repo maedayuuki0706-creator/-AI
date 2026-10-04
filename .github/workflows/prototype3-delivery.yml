@@ -29,7 +29,7 @@ concurrency:
 jobs:
   deliver:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,7 +53,7 @@ jobs:
           PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL }}
           PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
           PT3_SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
-          PROTOTYPE3_WATCH_SECONDS: '210'
+          PROTOTYPE3_WATCH_SECONDS: '180'
         run: python -u prototype3_delivery.py
       - name: Score delivered PT1-3 results
         if: always()
