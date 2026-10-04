@@ -1,0 +1,66 @@
+name: Discord Delivery V2 Production Dispatcher
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '2-57/5 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'delivery_v2/**'
+      - '.github/workflows/discord-delivery-v2-production.yml'
+
+permissions:
+  contents: write
+concurrency:
+  group: discord-delivery-v2-production
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify delivery guards without posting
+        run: python -m unittest discover -s tests -p 'test_delivery_v2*.py' -v
+      - name: Confirm production transport and restart deduplication
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL || secrets.PROTO3_DISCORD_WEBHOOK_URL }}
+          DISCORD_DELIVERY_V2_CANARY_PHASE: 'production-20261004'
+        run: python -m delivery_v2.canary
+      - name: Discover current races and catch up before deadlines
+        env:
+          TZ: Asia/Tokyo
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Enable after the existing Yuuki workflow uses the same durable guard.
+          DISCORD_DELIVERY_V2_STREAMS: ''
+          PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL }}
+          PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
+          PT3_SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
+          DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
+        run: python -u -m delivery_v2.dispatcher --budget-seconds 150
+      - name: Refresh delivered-only PT standings
+        if: always()
+        run: python -u prototype_scoreboard.py
+      - name: Save legacy reporting mirrors
+        if: always()
+        continue-on-error: true
+        run: python persist_runtime_data.py data/prototype3_delivery/ data/prototype_scoreboard/
+      - name: Preserve acknowledgements and watchdog evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: delivery-v2-production-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            data/delivery_v2_recovery/
+            data/delivery_v2_receipts/
+            data/prototype3_delivery/
+            data/prototype_scoreboard/
+          retention-days: 14

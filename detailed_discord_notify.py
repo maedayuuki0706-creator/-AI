@@ -440,13 +440,20 @@ def log_prediction_with_virtual(record):
     try:
         if _is_selected_record(record):
             try:
-                message_id = _send_selected_discord(_selected_message(record))
+                from delivery_v2.integration import enabled, send_prediction
+                if enabled('selected'):
+                    confirmed = send_prediction('selected', record, _selected_message(record), _send_selected_discord)
+                    message_id = confirmed['message_id']
+                    selected_record = confirmed['record']
+                else:
+                    message_id = _send_selected_discord(_selected_message(record))
+                    selected_record = record
                 import json
                 from pathlib import Path
                 path = Path('data/selected_prediction_deliveries.jsonl')
                 path.parent.mkdir(parents=True, exist_ok=True)
                 with path.open('a', encoding='utf-8') as handle:
-                    handle.write(json.dumps({**record, 'stream': 'selected', 'message_id': message_id}, ensure_ascii=False) + '\n')
+                    handle.write(json.dumps({**selected_record, 'stream': 'selected', 'message_id': message_id}, ensure_ascii=False) + '\n')
                     handle.flush()
                     os.fsync(handle.fileno())
             except Exception as exc:

@@ -612,8 +612,7 @@ def install(app):
                         flush=True,
                     )
             try:
-                message_id = _send(target_env, message)
-                _append_log({
+                delivery_record = {
                     "day": record.get("day"),
                     "jcd": record.get("jcd"),
                     "venue": record.get("venue"),
@@ -621,7 +620,6 @@ def install(app):
                     "deadline": record.get("deadline"),
                     "sent_at": sent_at,
                     "stream": "mid_odds" if label == "mid" else "longshot",
-                    "message_id": message_id,
                     "selected": bool(selected_mid),
                     "delivery_env": target_env,
                     "score": payload["score"],
@@ -631,7 +629,16 @@ def install(app):
                     "point_count": len(payload["picks"]),
                     "mode": payload["mode"],
                     "score_version": payload["score_version"],
-                })
+                }
+                from delivery_v2.integration import enabled, send_prediction
+                stream = 'mid_odds_selected' if selected_mid else delivery_record['stream']
+                if enabled(stream):
+                    confirmed = send_prediction(stream, delivery_record, message, lambda content: _send(target_env, content))
+                    delivery_record = {**confirmed['record'], 'sent_at': confirmed['sent_at']}
+                    message_id = confirmed['message_id']
+                else:
+                    message_id = _send(target_env, message)
+                _append_log({**delivery_record, 'message_id':message_id})
             except Exception as exc:
                 print(
                     f"opportunity alert failed {label} {record.get('jcd')} {record.get('rno')}R: "

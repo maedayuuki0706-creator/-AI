@@ -9,6 +9,7 @@ on:
     paths:
       - 'prototype3_delivery.py'
       - 'discord_ack.py'
+      - 'delivery_v2/**'
       - 'yuuki_hit_alerts.py'
       - 'sokuhou_delivery.py'
       - 'sokuhou_health.py'
@@ -49,10 +50,14 @@ jobs:
           python -m unittest discover -s tests -p 'test_prototype_scoreboard.py' -v
           python -m unittest test_yuuki_hit_alerts.py -v
           python -m unittest discover -s tests -p 'test_sokuhou*.py' -v
+          python -m unittest discover -s tests -p 'test_delivery_v2*.py' -v
           test -n "$PT3_DISCORD_WEBHOOK_URL$PROTO3_DISCORD_WEBHOOK_URL"
       - name: Deliver 新人予想家 ゆうき
         env:
           TZ: Asia/Tokyo
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCORD_DELIVERY_V2_STREAMS: 'yuuki,yuuki_selected'
+          DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
           PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL }}
           PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
           PT3_SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
@@ -87,4 +92,5 @@ jobs:
             data/prototype3_delivery/
             data/prototype_scoreboard/
             data/sokuhou_recovery/
+            data/delivery_v2_recovery/
           retention-days: 7
