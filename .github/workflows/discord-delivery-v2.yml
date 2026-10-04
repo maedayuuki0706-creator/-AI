@@ -5,8 +5,14 @@ on:
     branches: [discord-delivery-v2]
     paths:
       - 'delivery_v2/**'
-      - 'tests/test_delivery_v2.py'
+      - 'tests/test_delivery_v2*.py'
       - '.github/workflows/discord-delivery-v2.yml'
+
+permissions:
+  contents: write
+concurrency:
+  group: discord-delivery-v2-validation
+  cancel-in-progress: false
 
 jobs:
   validate:
@@ -18,4 +24,28 @@ jobs:
         with:
           python-version: '3.12'
       - name: Validate V2 delivery layer without posting
-        run: python -m unittest tests.test_delivery_v2 tests.test_delivery_v2_receipts tests.test_delivery_v2_watchdog -v
+        run: python -m unittest discover -s tests -p 'test_delivery_v2*.py' -v
+
+  canary:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Send one silent probe and verify durable deduplication
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL || secrets.PROTO3_DISCORD_WEBHOOK_URL }}
+        run: python -m delivery_v2.canary
+      - name: Preserve acknowledgement recovery records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: delivery-v2-canary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            data/delivery_v2_recovery/
+            data/delivery_v2_receipts/
+          retention-days: 7
