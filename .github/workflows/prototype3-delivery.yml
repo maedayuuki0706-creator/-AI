@@ -80,9 +80,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python sokuhou_health.py
-      - name: Persist 新人予想家 ゆうき delivery receipts and PT scoreboard
+      - name: Persist 新人予想家 ゆうき predictions and delivery receipts
         if: always()
-        run: python persist_runtime_data.py data/prototype3_delivery/ data/prototype_scoreboard/
+        run: python persist_runtime_data.py data/prototype3_delivery/
+      - name: Persist derived PT scoreboard
+        if: always()
+        continue-on-error: true
+        run: python persist_runtime_data.py data/prototype_scoreboard/
       - name: Preserve prediction and delivery recovery records
         if: always()
         uses: actions/upload-artifact@v4

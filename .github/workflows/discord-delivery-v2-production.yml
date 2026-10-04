@@ -28,12 +28,18 @@ jobs:
           python-version: '3.12'
       - name: Verify delivery guards without posting
         run: python -m unittest discover -s tests -p 'test_delivery_v2*.py' -v
+      - name: Confirm production transport and restart deduplication
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL || secrets.PROTO3_DISCORD_WEBHOOK_URL }}
+          DISCORD_DELIVERY_V2_CANARY_PHASE: 'production-20261004'
+        run: python -m delivery_v2.canary
       - name: Discover current races and catch up before deadlines
         env:
           TZ: Asia/Tokyo
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Enable after the existing Yuuki workflow uses the same durable guard.
-          DISCORD_DELIVERY_V2_STREAMS: ''
+          DISCORD_DELIVERY_V2_STREAMS: 'yuuki,yuuki_selected'
           PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL }}
           PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
           PT3_SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
@@ -45,7 +51,8 @@ jobs:
       - name: Save legacy reporting mirrors
         if: always()
         continue-on-error: true
-        run: python persist_runtime_data.py data/prototype3_delivery/ data/prototype_scoreboard/
+        # The existing Yuuki workflow owns mutable scoreboard publication.
+        run: python persist_runtime_data.py data/prototype3_delivery/
       - name: Preserve acknowledgements and watchdog evidence
         if: always()
         uses: actions/upload-artifact@v4
