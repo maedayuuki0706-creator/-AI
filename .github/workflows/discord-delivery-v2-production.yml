@@ -40,6 +40,8 @@ jobs:
           TZ: Asia/Tokyo
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DISCORD_DELIVERY_V2_STREAMS: 'yuuki,yuuki_selected'
+          # Persist rollout coverage across midnight, including a late first wake-up.
+          DISCORD_DELIVERY_V2_ACTIVE_SINCE: '2026-10-04T20:53:00+09:00'
           PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL }}
           PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
           PT3_SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}

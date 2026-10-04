@@ -191,11 +191,14 @@ def verify_yuuki(day, durable, *, store=None, previous=()):
     return checked
 
 
-def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yuuki', 'yuuki_selected'), budget_seconds=150):
+def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yuuki', 'yuuki_selected'), budget_seconds=150, activation_at=None):
     clock = clock or (lambda: datetime.now(JST))
     now = clock()
     if now.tzinfo is None:
         raise ValueError('Dispatcher requires an aware current time')
+    activation_at = activation_at or datetime.fromisoformat(os.getenv('DISCORD_DELIVERY_V2_ACTIVE_SINCE', now.isoformat()))
+    if activation_at.tzinfo is None:
+        raise ValueError('Stream activation requires an aware timestamp')
     day = now.astimezone(JST).strftime('%Y%m%d')
     store = store or default_store()
     ERRORS.clear()
@@ -222,7 +225,7 @@ def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yu
         previous=(previous or {}).get('production_verification', ()))
     active_since = dict((previous or {}).get('active_since', {}))
     for stream in active:
-        active_since.setdefault(stream, now.isoformat())
+        active_since.setdefault(stream, activation_at.isoformat())
     active_missed = [row for row in rows if row['stream'] in active and row['status']=='missed'
                     and datetime.fromisoformat(row['deadline']) >= datetime.fromisoformat(active_since[row['stream']])]
     for row in active_missed:
