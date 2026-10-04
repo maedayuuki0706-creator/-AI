@@ -169,6 +169,21 @@ def parse_beforeinfo(raw: str) -> dict:
         if not lane or len(cells) < 6 or "kg" not in textify(cells[3]):
             continue
         item = {}
+        weight = re.fullmatch(r"(\\d+(?:\\.\\d+)?)kg", textify(cells[3]))
+        if weight:
+            item["weight_kg"] = float(weight[1])
+        if len(cells) > 12:
+            adjustment = textify(cells[12]).strip()
+            if re.fullmatch(r"\\d+(?:\\.\\d+)?", adjustment):
+                item["adjustment_weight_kg"] = float(adjustment)
+        if len(cells) > 6:
+            propeller = textify(cells[6]).strip()
+            if propeller and propeller not in ("-", "－", "―", "—"):
+                item["propeller_exchange"] = propeller
+        if len(cells) > 7:
+            parts = textify(cells[7]).strip()
+            if parts:
+                item["parts_exchange"] = re.sub(r"\\s+", " ", parts)
         for key, idx, lo, hi in (("exhibition_time",4,5,10),("tilt",5,-1,3)):
             try:
                 value = float(textify(cells[idx]))
