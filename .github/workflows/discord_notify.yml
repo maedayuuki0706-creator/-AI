@@ -57,7 +57,7 @@ concurrency:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -104,7 +104,7 @@ jobs:
           X_POST_DISCORD_WEBHOOK_URL: ${{ secrets.X_POST_DISCORD_WEBHOOK_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Scheduled launches can be hours late; every start must keep polling.
-          NOTIFY_WATCH_SECONDS: '14400'
+          NOTIFY_WATCH_SECONDS: '480'
           X_ASYNC_DELIVERY: "1"
         run: python delivery_guard_runner.py
 
