@@ -350,15 +350,12 @@ def beforeinfo_available(day: str, jcd: str, rno: int) -> bool:
         return False
 
 
-def send_discord(content: str, *, notify_everyone: bool = False) -> None:
+def send_discord(content: str, *, notify_everyone: bool = False) -> str:
     url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
     if not url:
         raise RuntimeError("DISCORD_WEBHOOK_URL is missing")
-    payload = json.dumps(message_payload(content, notify_everyone=notify_everyone), ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(url, data=payload, headers={"Content-Type":"application/json","User-Agent":UA}, method="POST")
-    with urllib.request.urlopen(req, timeout=20) as r:
-        if r.status not in (200, 204):
-            raise RuntimeError(f"Discord HTTP {r.status}")
+    from discord_ack import post
+    return post(url, message_payload(content, notify_everyone=notify_everyone))
 
 
 def load_deliveries() -> set[tuple]:
@@ -592,11 +589,11 @@ def run_once(now: datetime | None=None, *, force_test=False,dry_run=False) -> in
                 message=make_analysis_message(day,jcd,rno,deadline,phase,analysis,rows,required)
                 if dry_run:
                     print(message+'\n');continue
-                send_discord(message)
+                message_id = send_discord(message)
                 combos=[p['combination'] for p in rows]
                 summary=formation_summary(combos[:3],combos[3:])
                 log_prediction({'day':day,'jcd':jcd,'venue':VENUES[jcd],'rno':rno,'deadline':deadline,
-                    'phase':phase,'sent_at':current.isoformat(),'source':'独自AI・前日参考補正','model_version':analysis['model_version'],
+                    'phase':phase,'sent_at':current.isoformat(),'message_id':str(message_id),'source':'独自AI・前日参考補正','model_version':analysis['model_version'],
                     'grade':analysis['grade'],'exhibition':analysis['preview']['exhibition_count']==6,
                     'main':combos[:3],'cover':combos[3:],'all_picks':combos,'heads':analysis['heads'],
                     'preview':{

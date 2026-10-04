@@ -33,7 +33,7 @@ class DiscordNotificationPolicyTests(unittest.TestCase):
     def check_delivery(self, env_name, content, *, notify):
         self.http.assert_called_once()
         request = self.http.call_args.args[0]
-        suffix = "?wait=true" if env_name == "DISCORD_HIT_WEBHOOK_URL" else ""
+        suffix = "?wait=true" if not getattr(self, "legacy_report", False) else ""
         self.assertEqual(request.full_url, self.webhooks[env_name] + suffix)
         payload = json.loads(request.data)
         self.assertEqual(payload["content"], "@everyone\n" + content if notify else content)
@@ -71,6 +71,7 @@ class DiscordNotificationPolicyTests(unittest.TestCase):
         self.check_delivery("DISCORD_WEBHOOK_URL", "次のメイン予想", notify=False)
 
     def test_mid_channel_daily_report_is_also_silent(self):
+        self.legacy_report = True
         with patch.object(mid_reports.time, "sleep"):
             mid_reports.post_discord("中穴の日報")
         self.check_delivery("DISCORD_WEBHOOK_MID_ODDS", "中穴の日報", notify=False)

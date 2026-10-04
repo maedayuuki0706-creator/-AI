@@ -522,19 +522,8 @@ def _send(env_name, content):
     url = os.getenv(env_name, "").strip()
     if not url:
         raise RuntimeError(f"{env_name} is missing")
-    payload = json.dumps(
-        message_payload(content, notify_everyone=env_name == "DISCORD_WEBHOOK_MID_ODDS_SELECTED"),
-        ensure_ascii=False,
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        url,
-        data=payload,
-        headers={"Content-Type": "application/json", "User-Agent": "Boat-AI-Navi/opportunity-v1"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        if response.status not in (200, 204):
-            raise RuntimeError(f"Discord HTTP {response.status}")
+    from discord_ack import post
+    return post(url, message_payload(content, notify_everyone=env_name == "DISCORD_WEBHOOK_MID_ODDS_SELECTED"))
 
 
 def _append_log(record):
@@ -623,7 +612,7 @@ def install(app):
                         flush=True,
                     )
             try:
-                _send(target_env, message)
+                message_id = _send(target_env, message)
                 _append_log({
                     "day": record.get("day"),
                     "jcd": record.get("jcd"),
@@ -632,6 +621,7 @@ def install(app):
                     "deadline": record.get("deadline"),
                     "sent_at": sent_at,
                     "stream": "mid_odds" if label == "mid" else "longshot",
+                    "message_id": message_id,
                     "selected": bool(selected_mid),
                     "delivery_env": target_env,
                     "score": payload["score"],

@@ -12,6 +12,7 @@ on:
       - ".github/workflows/discord_notify.yml"
       - "detailed_discord_notify.py"
       - "direct_discord_notify.py"
+      - "discord_ack.py"
       - "morning_all_races_discord.py"
       - "virtual_betting.py"
       - "notification_policy.json"
@@ -75,6 +76,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_sokuhou*.py' -v
           python -m unittest discover -s tests -p 'test_hit_alerts*.py' -v
           python -m unittest discover -s tests -p 'test_persist_runtime_data.py' -v
+          python -m unittest discover -s tests -p 'test_discord_ack.py' -v
+          python -m unittest discover -s tests -p 'test_discord_notification_policy.py' -v
 
       - name: Check X live delivery backend
         continue-on-error: true

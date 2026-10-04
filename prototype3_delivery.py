@@ -41,16 +41,11 @@ def read(path):
 
 
 def post_webhook(url, payload):
-    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=body,
-        headers={"Content-Type": "application/json", "User-Agent": base.UA},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=10) as response:
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"Discord HTTP {response.status}")
+    from discord_ack import post
+    from discord_notification_policy import message_payload
+    selected = '厳選' in payload.get('username', '') or payload.get('content', '').startswith('@everyone')
+    payload = {**payload, **message_payload(payload['content'], notify_everyone=selected)}
+    return post(url, payload, timeout=10)
 
 
 def _head_values(heads):
@@ -374,9 +369,10 @@ def deliver(record):
         # If 厳選 uses the same channel, send one upgraded message instead of duplicating.
         if not receipt.exists():
             content = selected_message(record) if is_selected and selected_url == url else message(record)
-            post_webhook(url, {"username": "新人予想家 ゆうき", "content": content})
+            message_id = post_webhook(url, {"username": "新人予想家 ゆうき｜厳選" if is_selected and selected_url == url else "新人予想家 ゆうき", "content": content})
             trial.write_json(receipt, {
                 "key": key,
+                "message_id": message_id,
                 "delivered_at": now_jst().isoformat(),
                 "prediction_digest": record["digest"],
                 "selected": is_selected,
@@ -384,6 +380,7 @@ def deliver(record):
             if is_selected and selected_url == url:
                 trial.write_json(selected_receipt, {
                     "key": key,
+                    "message_id": message_id,
                     "delivered_at": now_jst().isoformat(),
                     "prediction_digest": record["digest"],
                     "selection_score": (record.get("selection") or {}).get("score"),
@@ -391,9 +388,10 @@ def deliver(record):
             print(f"prototype3 delivery confirmed {key} selected={is_selected}", flush=True)
 
         if is_selected and selected_url != url and not selected_receipt.exists():
-            post_webhook(selected_url, {"username": "新人予想家 ゆうき｜厳選", "content": selected_message(record)})
+            message_id = post_webhook(selected_url, {"username": "新人予想家 ゆうき｜厳選", "content": selected_message(record)})
             trial.write_json(selected_receipt, {
                 "key": key,
+                "message_id": message_id,
                 "delivered_at": now_jst().isoformat(),
                 "prediction_digest": record["digest"],
                 "selection_score": (record.get("selection") or {}).get("score"),

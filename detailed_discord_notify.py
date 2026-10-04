@@ -372,7 +372,7 @@ def _send_selected_discord(content):
     original = os.environ.get("DISCORD_WEBHOOK_URL")
     os.environ["DISCORD_WEBHOOK_URL"] = selected_url
     try:
-        base.send_discord(content, notify_everyone=True)
+        return base.send_discord(content, notify_everyone=True)
     finally:
         if original is None:
             os.environ.pop("DISCORD_WEBHOOK_URL", None)
@@ -440,7 +440,15 @@ def log_prediction_with_virtual(record):
     try:
         if _is_selected_record(record):
             try:
-                _send_selected_discord(_selected_message(record))
+                message_id = _send_selected_discord(_selected_message(record))
+                import json
+                from pathlib import Path
+                path = Path('data/selected_prediction_deliveries.jsonl')
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open('a', encoding='utf-8') as handle:
+                    handle.write(json.dumps({**record, 'stream': 'selected', 'message_id': message_id}, ensure_ascii=False) + '\n')
+                    handle.flush()
+                    os.fsync(handle.fileno())
             except Exception as exc:
                 print(f"selected Discord alert failed {record.get('jcd')} {record.get('rno')}R: {type(exc).__name__}")
             try:
