@@ -72,3 +72,8 @@ past-deadline exclusion, simultaneous claims, loss of both legacy prediction and
 receipt files, failed persistence after acknowledgement, uncertain sends, bounded
 429 retries, and persisted missed records. Green Actions alone are insufficient:
 production recovery requires actual numeric message IDs and durable receipts.
+
+Unit tests keep both receipt and acknowledgement recovery files in temporary
+directories. Numeric IDs returned by mocked senders are fixtures, never production
+proof. Early validation artifacts may contain the historical `hello` fixture with
+ID `987654321`; it must not be used to reconstruct any actual Discord delivery.
