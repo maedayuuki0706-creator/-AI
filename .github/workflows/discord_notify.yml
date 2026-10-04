@@ -142,6 +142,7 @@ jobs:
 
       - name: Persist newly delivered predictions
         if: always()
+        continue-on-error: true
         run: python persist_runtime_data.py data/ --exclude data/x_post_delivery/
 
       - name: Sync archived selected predictions to X via Render
