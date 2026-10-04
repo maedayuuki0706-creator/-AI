@@ -20,7 +20,16 @@ class FastHitAlertsTests(unittest.TestCase):
                     'deadline':'18:00','sent_at':'2026-10-03T17:50:00+09:00','main':['1-2-3']}
         self.sender = Mock(return_value={'id':'111'})
         self.store = MemoryStore()
+        # Freeze both journal and durable-receipt clocks on the fixture day.
+        # A fixed report cutoff alone starts failing when the real date advances.
+        self.now = datetime(2026, 10, 3, 19, 0, tzinfo=alerts.base.JST)
+        clock = Mock(wraps=datetime)
+        clock.now.side_effect = lambda tz=None: (
+            self.now.astimezone(tz) if tz is not None else self.now.replace(tzinfo=None)
+        )
         patches = [patch.object(alerts, 'DELIVERY_PATH', self.journal),
+                   patch.object(fast, 'datetime', clock),
+                   patch.object(delivery, 'datetime', clock),
                    patch.object(delivery, 'print', create=True),
                    patch.object(fast, 'print', create=True),
                    patch.object(fast, '_normal_candidates', return_value=[('normal', self.row)]),
@@ -33,9 +42,6 @@ class FastHitAlertsTests(unittest.TestCase):
         for item in patches:
             item.start()
             self.addCleanup(item.stop)
-        # Keep the report cutoff after any same-day journal timestamp. _record() uses the real JST clock.
-        # A 19:00 cutoff made this test start failing later in the evening even though delivery was healthy.
-        self.now = datetime(2026, 10, 3, 23, 59, tzinfo=alerts.base.JST)
 
     def run_pass(self):
         return fast.check_and_send('20261003', self.now)
