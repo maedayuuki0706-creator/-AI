@@ -41,16 +41,19 @@ def read(path):
 
 
 def post_webhook(url, payload):
-    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=body,
-        headers={"Content-Type": "application/json", "User-Agent": base.UA},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=10) as response:
-        if not 200 <= response.status < 300:
-            raise RuntimeError(f"Discord HTTP {response.status}")
+    from discord_ack import post
+    from discord_notification_policy import message_payload
+    selected = '厳選' in payload.get('username', '') or payload.get('content', '').startswith('@everyone')
+    payload = {**payload, **message_payload(payload['content'], notify_everyone=selected)}
+    return post(url, payload, timeout=10)
+
+
+def post_prediction(record, stream, url, payload):
+    from delivery_v2.integration import enabled, send_prediction
+    if not enabled(stream):
+        return {'message_id': post_webhook(url, payload), 'sent_at': now_jst().isoformat(), 'record': record}
+    return send_prediction(stream, record, payload['content'],
+        lambda content: post_webhook(url, {**payload, 'content': content}))
 
 
 def _head_values(heads):
@@ -371,31 +374,44 @@ def deliver(record):
     is_selected = bool((record.get("selection") or {}).get("selected"))
 
     try:
+        from delivery_v2.integration import adopt_legacy, enabled
+        for stream, path in (("yuuki", receipt), ("yuuki_selected", selected_receipt)):
+            if enabled(stream) and path.exists():
+                adopt_legacy(stream, record, read(path))
         # If 厳選 uses the same channel, send one upgraded message instead of duplicating.
         if not receipt.exists():
             content = selected_message(record) if is_selected and selected_url == url else message(record)
-            post_webhook(url, {"username": "新人予想家 ゆうき", "content": content})
+            confirmed = post_prediction(record, "yuuki", url, {"username": "新人予想家 ゆうき｜厳選" if is_selected and selected_url == url else "新人予想家 ゆうき", "content": content})
+            message_id = confirmed["message_id"]
+            record = confirmed["record"]
+            trial.write_json(prediction_path(key), record)
+            is_selected = bool((record.get("selection") or {}).get("selected"))
             trial.write_json(receipt, {
                 "key": key,
-                "delivered_at": now_jst().isoformat(),
-                "prediction_digest": record["digest"],
+                "message_id": message_id,
+                "delivered_at": confirmed["sent_at"],
+                "prediction_digest": confirmed["record"]["digest"],
                 "selected": is_selected,
             })
             if is_selected and selected_url == url:
                 trial.write_json(selected_receipt, {
                     "key": key,
-                    "delivered_at": now_jst().isoformat(),
-                    "prediction_digest": record["digest"],
+                    "message_id": message_id,
+                    "delivered_at": confirmed["sent_at"],
+                    "prediction_digest": confirmed["record"]["digest"],
                     "selection_score": (record.get("selection") or {}).get("score"),
                 })
             print(f"prototype3 delivery confirmed {key} selected={is_selected}", flush=True)
 
         if is_selected and selected_url != url and not selected_receipt.exists():
-            post_webhook(selected_url, {"username": "新人予想家 ゆうき｜厳選", "content": selected_message(record)})
+            confirmed = post_prediction(record, "yuuki_selected", selected_url, {"username": "新人予想家 ゆうき｜厳選", "content": selected_message(record)})
+            message_id = confirmed["message_id"]
+            trial.write_json(prediction_path(key), confirmed["record"])
             trial.write_json(selected_receipt, {
                 "key": key,
-                "delivered_at": now_jst().isoformat(),
-                "prediction_digest": record["digest"],
+                "message_id": message_id,
+                "delivered_at": confirmed["sent_at"],
+                "prediction_digest": confirmed["record"]["digest"],
                 "selection_score": (record.get("selection") or {}).get("score"),
             })
             print(f"yuuki selected delivery confirmed {key}", flush=True)
@@ -516,3 +532,7 @@ def run(watch_seconds=210):
 
 if __name__ == "__main__":
     run(int(os.getenv("PROTOTYPE3_WATCH_SECONDS", "210")))
+    from delivery_v2.integration import ERRORS
+    if ERRORS:
+        print(f'::error::Unresolved Discord V2 deliveries: {len(ERRORS)}', flush=True)
+        raise SystemExit(1)

@@ -41,6 +41,8 @@ def main():
     results = json.loads(RESULT_PATH.read_text(encoding="utf-8"))
     latest = {}
     for row in read_jsonl(LOG_PATH):
+        if row.get('status') == 'sniper_skip':
+            continue
         if str(row.get("day") or "") != DAY:
             continue
         stream = str(row.get("stream") or "")

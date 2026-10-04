@@ -1,4 +1,6 @@
 name: Boat AI Discord Notify
+# emergency-kick 2026-10-04T16:00+09:00
+# schedule-kick 2026-10-04T13:36+09:00
 # continuous race-day watcher: bridge delayed GitHub schedule launches
 
 on:
@@ -11,6 +13,7 @@ on:
       - ".github/workflows/discord_notify.yml"
       - "detailed_discord_notify.py"
       - "direct_discord_notify.py"
+      - "discord_ack.py"
       - "morning_all_races_discord.py"
       - "virtual_betting.py"
       - "notification_policy.json"
@@ -74,6 +77,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_sokuhou*.py' -v
           python -m unittest discover -s tests -p 'test_hit_alerts*.py' -v
           python -m unittest discover -s tests -p 'test_persist_runtime_data.py' -v
+          python -m unittest discover -s tests -p 'test_discord_ack.py' -v
+          python -m unittest discover -s tests -p 'test_discord_notification_policy.py' -v
 
       - name: Check X live delivery backend
         continue-on-error: true
@@ -89,6 +94,11 @@ jobs:
       - name: Refresh near-miss learning state
         if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Refresh near-miss learning state') }}
         run: python daily_learning.py
+
+      - name: Restore exact prediction journals recovered from failed runs
+        run: |
+          python recover_delivery_journals.py
+          python persist_runtime_data.py data/prediction_log.jsonl data/opportunity_alert_deliveries.jsonl data/race_status_log.jsonl
 
       - name: Deliver predictions and race status notices
         if: ${{ !(github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary') || startsWith(github.event.head_commit.message, 'Backfill missed Suminoe') || startsWith(github.event.head_commit.message, 'Backfill missed night 12R') || startsWith(github.event.head_commit.message, 'Send 20260916 mid-odds daily reports'))) }}
@@ -140,7 +150,13 @@ jobs:
           REPORT_DAY: "20260916"
         run: python send_opportunity_daily_discord.py
 
+      - name: Refresh delivered-only AI and venue standings
+        if: always()
+        continue-on-error: true
+        run: python live_status.py
+
       - name: Persist newly delivered predictions
+        id: persist_runtime
         if: always()
         continue-on-error: true
         run: python persist_runtime_data.py data/ --exclude data/x_post_delivery/
@@ -155,17 +171,19 @@ jobs:
         if: always()
         run: python persist_runtime_data.py data/x_post_delivery/
 
-      - name: Preserve runtime journals when a run fails
-        if: failure()
+      - name: Preserve runtime journals after every delivery pass
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: notification-recovery-${{ github.run_id }}
+          name: notification-recovery-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 7
           path: |
             data/*log.jsonl
             data/*deliveries.jsonl
             data/x_post_delivery/
             data/sokuhou_recovery/
+            data/exhibition_log/
+            data/discord_prediction_receipts/
 
       - name: Audit Sokuhou receipts
         if: always()

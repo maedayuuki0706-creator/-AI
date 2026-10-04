@@ -138,12 +138,22 @@ def send(day: str, hour: int) -> dict:
     return {"sent": True, **receipt, "totals": snapshot["totals"]}
 
 
+def send_due(now=None):
+    now = (now or datetime.now(JST)).astimezone(JST)
+    day = now.strftime('%Y%m%d')
+    return [send(day, hour) for hour in (13, 15, 17) if hour <= now.hour]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--day")
+    parser.add_argument("--due", action="store_true")
     parser.add_argument("--hour", type=int, choices=(13, 15, 17))
     parser.add_argument("--request", type=Path)
     args = parser.parse_args()
+    if args.due:
+        print(json.dumps(send_due(), ensure_ascii=False))
+        return
 
     if args.request:
         req = read(args.request)

@@ -13,6 +13,15 @@ import subprocess
 import tempfile
 
 
+class PartialCheckpointError(RuntimeError):
+    """Critical journals were saved, but independent conflicts need recovery."""
+
+    def __init__(self, paths, saved):
+        self.paths = tuple(paths)
+        self.saved = saved
+        super().__init__(f"Saved {saved} files; unresolved runtime conflicts: {', '.join(paths)}")
+
+
 def git(*args, data=None, env=None, check=True):
     return subprocess.run(["git", *args], input=data, stdout=subprocess.PIPE,
                           stderr=subprocess.PIPE, check=check, env=env).stdout
@@ -75,21 +84,34 @@ def persist(paths=("data/",), *, exclude=(), attempts=5):
                    "GIT_AUTHOR_EMAIL": "actions@users.noreply.github.com", "GIT_COMMITTER_EMAIL": "actions@users.noreply.github.com"}
             git("read-tree", head, env=env)
             count = 0
+            conflicts = []
             for path, (base, local) in snapshot.items():
                 remote = content(head, path)
-                value = merge(path, base, remote, local)
+                try:
+                    value = merge(path, base, remote, local)
+                except (RuntimeError, ValueError):
+                    # A derived CSV or mutable research snapshot must never
+                    # prevent unrelated delivery journals from being saved.
+                    # Leave both versions intact and surface the conflict after
+                    # publishing all files that can be merged safely.
+                    conflicts.append(path)
+                    continue
                 if value == remote:
                     continue
                 blob = git("hash-object", "-w", "--stdin", data=value).decode().strip()
                 git("update-index", "--add", "--cacheinfo", f"100644,{blob},{path}", env=env)
                 count += 1
             if not count:
+                if conflicts:
+                    raise PartialCheckpointError(conflicts, 0)
                 return 0
             tree = git("write-tree", env=env).decode().strip()
             commit = git("commit-tree", tree, "-p", head, data=b"Checkpoint notification runtime data\n", env=env).decode().strip()
             push = subprocess.run(["git", "push", "origin", f"{commit}:refs/heads/main"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if push.returncode == 0:
                 print(f"Runtime checkpoint saved: {count} files", flush=True)
+                if conflicts:
+                    raise PartialCheckpointError(conflicts, count)
                 return count
             # An unrelated writer may advance main between fetch and push.
             # Retry from its new head, never force-push or resolve by deletion.

@@ -76,6 +76,26 @@ class GitHubStore:
                 return None, None
             raise
 
+    def list_day(self, day):
+        """A consistent branch snapshot; no API request for each absent race."""
+        receipts.identity('main', day, '01', 1)
+        self.ensure()
+        tree = _request(f'/git/trees/{BRANCH}?recursive=1')
+        if tree.get('truncated'):
+            raise RuntimeError('State tree is truncated; delivery audit is incomplete')
+        prefix = f'data/delivery_v2_receipts/{day}/'
+        result = {}
+        for entry in tree.get('tree', []):
+            path = entry['path']
+            if entry['type'] != 'blob' or not path.startswith(prefix) or not path.endswith('.json'):
+                continue
+            value = _request('/git/blobs/' + entry['sha'])
+            row = json.loads(base64.b64decode(value['content']))
+            if not isinstance(row, dict) or self.path(row.get('key', '')) != path:
+                raise ValueError('Invalid receipt in state snapshot')
+            result[row['key']] = row
+        return result
+
     def write(self, key, value, sha):
         self.ensure()
         payload = {'message': f'Discord V2 {key} {value["status"]}', 'branch': BRANCH,
@@ -105,6 +125,16 @@ class FileStore:
         row = receipts.read(*parts(key))
         digest = hashlib.sha256(json.dumps(row, sort_keys=True).encode()).hexdigest() if row else None
         return row, digest
+
+    def list_day(self, day):
+        receipts.identity('main', day, '01', 1)
+        result = {}
+        for path in (receipts.ROOT / day).glob('*/*.json'):
+            row = json.loads(path.read_text(encoding='utf-8'))
+            if not isinstance(row, dict) or receipts.path_for(*parts(row.get('key', ''))) != path:
+                raise ValueError('Invalid receipt in state snapshot')
+            result[row['key']] = row
+        return result
 
     def write(self, key, value, sha):
         import fcntl

@@ -63,10 +63,15 @@ def tally(as_of, journal, predictions=(), opportunities=()):
     as_of = as_of.astimezone(base.JST)
     day = as_of.strftime('%Y%m%d')
     settled, eligible, venues = {}, set(), set()
+    skipped = {identity(row, row.get('stream')) for row in opportunities
+               if row.get('day') == day and row.get('status') == 'sniper_skip'}
+    actually_sent = {identity(row, row.get('stream')) for row in opportunities
+                     if row.get('day') == day and row.get('status') != 'sniper_skip'}
+    skipped -= actually_sent
     for row in journal:
         seen_at = timestamp(row.get('sent_at'))
         key = identity(row, row.get('stream') or 'normal')
-        if (row.get('day') != day or key is None or seen_at is None
+        if (key in skipped or row.get('day') != day or key is None or seen_at is None
                 or seen_at.strftime('%Y%m%d') != day or seen_at > as_of
                 or row.get('status') not in {'sent', 'miss', 'suppressed'}):
             continue
@@ -77,6 +82,8 @@ def tally(as_of, journal, predictions=(), opportunities=()):
 
     for rows, default_stream in ((predictions, 'normal'), (opportunities, None)):
         for row in rows:
+            if row.get('status') == 'sniper_skip':
+                continue
             key = identity(row, default_stream or row.get('stream'))
             sent_at = timestamp(row.get('sent_at'))
             try:

@@ -522,19 +522,8 @@ def _send(env_name, content):
     url = os.getenv(env_name, "").strip()
     if not url:
         raise RuntimeError(f"{env_name} is missing")
-    payload = json.dumps(
-        message_payload(content, notify_everyone=env_name == "DISCORD_WEBHOOK_MID_ODDS_SELECTED"),
-        ensure_ascii=False,
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        url,
-        data=payload,
-        headers={"Content-Type": "application/json", "User-Agent": "Boat-AI-Navi/opportunity-v1"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        if response.status not in (200, 204):
-            raise RuntimeError(f"Discord HTTP {response.status}")
+    from discord_ack import post
+    return post(url, message_payload(content, notify_everyone=env_name == "DISCORD_WEBHOOK_MID_ODDS_SELECTED"))
 
 
 def _append_log(record):
@@ -623,8 +612,7 @@ def install(app):
                         flush=True,
                     )
             try:
-                _send(target_env, message)
-                _append_log({
+                delivery_record = {
                     "day": record.get("day"),
                     "jcd": record.get("jcd"),
                     "venue": record.get("venue"),
@@ -641,7 +629,16 @@ def install(app):
                     "point_count": len(payload["picks"]),
                     "mode": payload["mode"],
                     "score_version": payload["score_version"],
-                })
+                }
+                from delivery_v2.integration import enabled, send_prediction
+                stream = 'mid_odds_selected' if selected_mid else delivery_record['stream']
+                if enabled(stream):
+                    confirmed = send_prediction(stream, delivery_record, message, lambda content: _send(target_env, content))
+                    delivery_record = {**confirmed['record'], 'sent_at': confirmed['sent_at']}
+                    message_id = confirmed['message_id']
+                else:
+                    message_id = _send(target_env, message)
+                _append_log({**delivery_record, 'message_id':message_id})
             except Exception as exc:
                 print(
                     f"opportunity alert failed {label} {record.get('jcd')} {record.get('rno')}R: "
