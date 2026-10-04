@@ -231,6 +231,8 @@ def _opportunity_message(row: dict, winner: str, payout: int) -> str:
 def _latest_opportunities(day: str) -> dict[tuple[str, str, int], dict]:
     chosen: dict[tuple[str, str, int], dict] = {}
     for row in _read_jsonl(OPPORTUNITY_PATH):
+        if row.get('status') == 'sniper_skip':
+            continue
         if row.get("day") != day:
             continue
         stream = str(row.get("stream") or "")

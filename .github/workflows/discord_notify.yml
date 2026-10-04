@@ -94,6 +94,11 @@ jobs:
         if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Refresh near-miss learning state') }}
         run: python daily_learning.py
 
+      - name: Restore exact prediction journals recovered from failed runs
+        run: |
+          python recover_delivery_journals.py
+          python persist_runtime_data.py data/prediction_log.jsonl data/opportunity_alert_deliveries.jsonl data/race_status_log.jsonl
+
       - name: Deliver predictions and race status notices
         if: ${{ !(github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'Send 20260914 prediction summary') || startsWith(github.event.head_commit.message, 'Backfill missed Suminoe') || startsWith(github.event.head_commit.message, 'Backfill missed night 12R') || startsWith(github.event.head_commit.message, 'Send 20260916 mid-odds daily reports'))) }}
         env:
@@ -143,6 +148,11 @@ jobs:
           DISCORD_WEBHOOK_MID_ODDS: ${{ secrets.DISCORD_WEBHOOK_MID_ODDS }}
           REPORT_DAY: "20260916"
         run: python send_opportunity_daily_discord.py
+
+      - name: Refresh delivered-only AI and venue standings
+        if: always()
+        continue-on-error: true
+        run: python live_status.py
 
       - name: Persist newly delivered predictions
         id: persist_runtime

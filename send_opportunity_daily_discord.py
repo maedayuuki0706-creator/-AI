@@ -82,6 +82,8 @@ def combo_parts(combo):
 def latest_rows():
     latest = {}
     for row in read_jsonl(LOG_PATH):
+        if row.get('status') == 'sniper_skip':
+            continue
         if str(row.get("day") or "") != DAY:
             continue
         stream = str(row.get("stream") or "")
