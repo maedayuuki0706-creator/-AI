@@ -72,6 +72,12 @@ past-deadline exclusion, simultaneous claims, loss of both legacy prediction and
 receipt files, failed persistence after acknowledgement, uncertain sends, bounded
 429 retries, and persisted missed records. Green Actions alone are insufficient:
 production recovery requires actual numeric message IDs and durable receipts.
+For actual Yuuki production receipts the dispatcher also compares the report's
+prediction, digest and message ID with the durable original, checks the closing
+time, and calls the guard again with a sender that cannot POST. The checkpoint's
+`production_verification` records `restart_duplicate_guard_verified` only after
+the same actual message ID is returned as already sent. Canary and imported
+legacy receipts are excluded from this production proof.
 
 Unit tests keep both receipt and acknowledgement recovery files in temporary
 directories. Numeric IDs returned by mocked senders are fixtures, never production

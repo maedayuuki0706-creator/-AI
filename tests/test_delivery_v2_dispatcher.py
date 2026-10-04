@@ -27,7 +27,9 @@ class DispatcherTests(unittest.TestCase):
             receipts.atomic_write(yuuki.prediction_path(record['key']),record)
             receipts.atomic_write(yuuki.receipt_path(record['key']),{'message_id':'987654321','prediction_digest':'original'})
             proof = {result['key']:result}
-            self.assertEqual(dispatcher.verify_yuuki('20261004',proof)[0]['message_id'],'987654321')
+            verified = dispatcher.verify_yuuki('20261004',proof,store=FileStore())[0]
+            self.assertEqual(verified['message_id'],'987654321')
+            self.assertTrue(verified['restart_duplicate_guard_verified'])
             receipts.atomic_write(yuuki.prediction_path(record['key']),{**record,'digest':'different'})
             with self.assertRaises(ValueError):
                 dispatcher.verify_yuuki('20261004',proof)
