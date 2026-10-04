@@ -26,6 +26,7 @@ import stake_tracking
 import water_affinity
 import x_post_delivery
 import persist_runtime_data
+import exhibition_log
 
 bridge_learning.install(app)
 # Install before selection scoring so same-day venue form can be logged and may
@@ -54,6 +55,15 @@ SMOKE_MARKER = Path("data/channel_smoke_test_20260915.json")
 OPPORTUNITY_SMOKE_MARKER = Path("data/opportunity_channel_smoke_test_20260916.json")
 _LIVE_DISCOVER_VENUES = app.base.discover_venues
 _FULL_ANALYZE_OFFICIAL = app.base.analyze_official
+
+
+def _full_live_analysis(day: str, jcd: str, rno: int):
+    analysis = _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
+    try:
+        exhibition_log.record_analysis(day, jcd, rno, analysis)
+    except Exception as exc:
+        print(f'Exhibition log capture failed: {jcd} {rno}R {type(exc).__name__}', flush=True)
+    return analysis
 
 
 def race_hours():
@@ -110,18 +120,18 @@ def fast_live_analysis(day: str, jcd: str, rno: int):
     try:
         racelist_raw = app.base.fetch(app.base.official_url("racelist", day, jcd, rno))
         if app.base.withdrawal_lanes(racelist_raw):
-            return _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
+            return _full_live_analysis(day, jcd, rno)
         boats = app.base.parse_racelist_boats(day, jcd, rno)
         if len(boats) != 6:
-            return _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
+            return _full_live_analysis(day, jcd, rno)
         preview = app.base.parse_beforeinfo(app.base.fetch(app.base.official_url("beforeinfo", day, jcd, rno)))
         if preview.get("exhibition_count", 0) < 6:
             for boat in boats:
                 boat.update(preview.get("boats", {}).get(boat["lane"], {}))
             return {"inputs": boats, "preview": preview, "delivery_wait_reasons": []}
     except Exception:
-        return _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
-    return _FULL_ANALYZE_OFFICIAL(day, jcd, rno)
+        return _full_live_analysis(day, jcd, rno)
+    return _full_live_analysis(day, jcd, rno)
 
 
 def final_only_due_phase(policy, now, jcd, deadline, delivered, rno):
@@ -194,6 +204,12 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
             interim_report.send_due()
         except Exception as exc:
             print(f'Interim report pass failed: {type(exc).__name__}', flush=True)
+        try:
+            updated = exhibition_log.refresh_pending_results()
+            if updated:
+                print(f'Exhibition result logs updated: {updated}', flush=True)
+        except Exception as exc:
+            print(f'Exhibition result refresh failed: {type(exc).__name__}', flush=True)
         if os.getenv("GITHUB_ACTIONS") == "true":
             try:
                 persist_runtime_data.persist(exclude=("data/x_post_delivery/",))
