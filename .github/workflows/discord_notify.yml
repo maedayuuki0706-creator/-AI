@@ -142,6 +142,7 @@ jobs:
         run: python send_opportunity_daily_discord.py
 
       - name: Persist newly delivered predictions
+        id: persist_runtime
         if: always()
         continue-on-error: true
         run: python persist_runtime_data.py data/ --exclude data/x_post_delivery/
@@ -156,17 +157,19 @@ jobs:
         if: always()
         run: python persist_runtime_data.py data/x_post_delivery/
 
-      - name: Preserve runtime journals when a run fails
-        if: failure()
+      - name: Preserve runtime journals after every delivery pass
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: notification-recovery-${{ github.run_id }}
+          name: notification-recovery-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 7
           path: |
             data/*log.jsonl
             data/*deliveries.jsonl
             data/x_post_delivery/
             data/sokuhou_recovery/
+            data/exhibition_log/
+            data/discord_prediction_receipts/
 
       - name: Audit Sokuhou receipts
         if: always()
