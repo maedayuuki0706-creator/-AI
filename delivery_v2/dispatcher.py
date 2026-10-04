@@ -146,9 +146,11 @@ def main_engine(day, schedules, store, *, clock):
         legacy.runner.x_post_delivery.flush_pending()
 
 
-def verify_yuuki(day, durable):
+def verify_yuuki(day, durable, *, store=None, previous=()):
     """Report exact production proof separately from probes and imported history."""
     import prototype3_delivery as yuuki
+    from delivery_v2.guard import deliver_once
+    prior = {row['key']:row for row in previous}
     checked = []
     for row in durable.values():
         if row.get('stream') not in {'yuuki','yuuki_selected'} or row.get('status') != 'sent':
@@ -172,8 +174,20 @@ def verify_yuuki(day, durable):
             valid_content.append(yuuki.selected_message(record))
         if row.get('content') not in valid_content:
             raise ValueError('Yuuki payload differs from existing prediction formatter')
+        old = prior.get(row['key'], {})
+        replay_verified = (old.get('message_id') == row['message_id'] and old.get('digest') == record['digest']
+                           and bool(old.get('restart_duplicate_guard_verified')))
+        if not replay_verified and store is not None:
+            def forbidden(_):
+                raise AssertionError('Verified prediction attempted another Discord POST')
+            replay = deliver_once(row['stream'], day, row['jcd'], row['rno'], row['content'], forbidden,
+                row['phase'], store=store, record=record, expires_at=close)
+            if replay['status'] != 'already_sent' or replay['message_id'] != row['message_id']:
+                raise ValueError('Production receipt replay did not prevent duplicate delivery')
+            replay_verified = True
         checked.append({'key':row['key'],'message_id':row['message_id'],'digest':record['digest'],
-                        'sent_at':row['sent_at'],'deadline':close.isoformat(), 'verified':True})
+                        'sent_at':row['sent_at'],'deadline':close.isoformat(), 'verified':True,
+                        'restart_duplicate_guard_verified':replay_verified})
     return checked
 
 
@@ -204,7 +218,8 @@ def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yu
     expected = generate_expected(day, schedules, records=conditional)
     rows = audit(expected, now=clock(), durable=durable, legacy=legacy)
     counts = dict(Counter(row['status'] for row in rows))
-    verification = verify_yuuki(day, durable)
+    verification = verify_yuuki(day, durable, store=store,
+        previous=(previous or {}).get('production_verification', ()))
     active_since = dict((previous or {}).get('active_since', {}))
     for stream in active:
         active_since.setdefault(stream, now.isoformat())
