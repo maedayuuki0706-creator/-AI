@@ -35,6 +35,9 @@ GitHub cron remains a wake-up signal without a timing guarantee. A race whose
 entire eligible window elapses while no process runs cannot be recovered as a
 prediction. It is recorded as missed. An independent wake-up source is required
 to protect against hours-long absence of all scheduled runs.
+The live workflow records its original activation timestamp, so a late first
+wake-up after midnight still reports missed active races instead of resetting
+coverage to the new day's first successful launch.
 
 ## Recovery and retries
 
