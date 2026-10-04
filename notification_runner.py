@@ -214,9 +214,9 @@ def run(watch_seconds=0, *, attempt=app.main, clock=time.monotonic, pause=time.s
             try:
                 persist_runtime_data.persist(exclude=("data/x_post_delivery/",))
             except Exception as exc:
-                # Stop this watcher before more sends can rely on lost journals.
-                print(f'::error::Runtime checkpoint failed: {type(exc).__name__}', flush=True)
-                return 1
+                # Runtime checkpoint contention must not stop live Discord delivery.
+                # The workflow's final persistence step retries the snapshot later.
+                print(f'::warning::Runtime checkpoint deferred: {type(exc).__name__}', flush=True)
         remaining = end - clock()
         if duration == 0 or remaining <= 0:
             break
