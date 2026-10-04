@@ -14,6 +14,32 @@ JST = ZoneInfo('Asia/Tokyo')
 
 
 class DispatcherTests(unittest.TestCase):
+    def test_actual_receipt_verification_rejects_a_different_report_prediction(self):
+        import prototype3_delivery as yuuki
+        now = datetime(2026,10,4,18,12,tzinfo=JST)
+        record = dict(day='20261004',jcd='01',rno=1,deadline='18:15',venue='桐生',
+                      key='20261004_01_01',digest='original',selection={'selected':False},
+                      model={'main_picks':['1-2-3'],'cover_picks':[],'point_count':1})
+        with tempfile.TemporaryDirectory() as temp, patch.object(receipts,'ROOT',Path(temp)/'state'), \
+             patch.object(yuuki,'ROOT',Path(temp)/'legacy'), patch.object(guard,'RECOVERY',Path(temp)/'recovery'):
+            result = guard.deliver_once('yuuki','20261004','01',1,yuuki.message(record),lambda _: '987654321',
+                store=FileStore(),record=record,expires_at=now+timedelta(minutes=3),clock=lambda:now)
+            receipts.atomic_write(yuuki.prediction_path(record['key']),record)
+            receipts.atomic_write(yuuki.receipt_path(record['key']),{'message_id':'987654321','prediction_digest':'original'})
+            proof = {result['key']:result}
+            self.assertEqual(dispatcher.verify_yuuki('20261004',proof)[0]['message_id'],'987654321')
+            receipts.atomic_write(yuuki.prediction_path(record['key']),{**record,'digest':'different'})
+            with self.assertRaises(ValueError):
+                dispatcher.verify_yuuki('20261004',proof)
+
+    def test_cached_schedule_survives_transient_official_index_failure(self):
+        import direct_discord_notify as base
+        with patch.object(base,'discover_venues',side_effect=TimeoutError), \
+             patch.object(base,'deadlines',return_value=['18:15']):
+            schedules, errors = dispatcher.discover('20261004', {'01':['18:15']})
+            self.assertEqual(schedules, {'01':['18:15']})
+            self.assertEqual(errors,[{'jcd':'index','error_type':'TimeoutError'}])
+
     def test_delayed_1812_wake_sends_all_due_unexpired_and_never_past_deadline(self):
         now = datetime(2026,10,4,18,12,tzinfo=JST)
         with tempfile.TemporaryDirectory() as temp, patch.object(receipts,'ROOT',Path(temp)/'state'), \

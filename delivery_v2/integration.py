@@ -11,6 +11,14 @@ from delivery_v2 import receipts
 ERRORS = {}
 
 
+def stalled(result):
+    if result.get('status') != 'sending':
+        return True
+    from datetime import timezone
+    claimed = datetime.fromisoformat(result['claimed_at'])
+    return (datetime.now(timezone.utc)-claimed).total_seconds() >= 90
+
+
 def enabled(stream):
     return stream in {s.strip() for s in os.getenv('DISCORD_DELIVERY_V2_STREAMS', '').split(',')}
 
@@ -24,7 +32,7 @@ def send_prediction(stream, record, content, sender, *, store=None):
         result = deliver_once(*args, content, sender, record.get('phase') or 'final', store=store, record=record, expires_at=close)
         if result['status'] not in {'sent', 'already_sent'}:
             ERRORS[key] = result['status']
-            if result['status'] in {'failed','uncertain','sending'}:
+            if result['status'] in {'failed','uncertain','sending'} and stalled(result):
                 notify_failure(stream, record, result, store)
             raise RuntimeError(f'Discord delivery remains {result["status"]}')
         ERRORS.pop(key, None)
@@ -60,10 +68,11 @@ def notify_failure(stream, record, result, store):
     url = os.getenv('DISCORD_DELIVERY_ALERT_WEBHOOK_URL', '').strip() or os.getenv('DISCORD_REPORT_WEBHOOK_URL', '').strip()
     if not url:
         return
+    detail = '締切を過ぎたため予想は送信しません。' if result['status']=='missed' else '送信状態を確認できるまで自動再送を保留しています。'
     content = (f'⚠️ 配信システムの確認が必要です\n{stream}｜{record["day"]} '
                f'{record.get("venue",record["jcd"])} {record["rno"]}R\n'
                f'状態: {result["status"]}／試行: {result.get("attempt",0)}回\n'
-               '送信状態を確認できるまで自動再送を保留しています。')
+               + detail)
     try:
         deliver_once('ops_'+stream, record['day'], record['jcd'], record['rno'], content,
             lambda text: post_confirmed(url, text, username='配信監視'), phase='alert', store=store,

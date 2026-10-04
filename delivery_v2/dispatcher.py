@@ -12,7 +12,7 @@ import time
 from zoneinfo import ZoneInfo
 
 from delivery_v2 import receipts
-from delivery_v2.integration import ERRORS, adopt_legacy, notify_failure
+from delivery_v2.integration import ERRORS, adopt_legacy, notify_failure, stalled
 from delivery_v2.store import Conflict, default_store
 from delivery_v2.watchdog import audit, generate_expected
 
@@ -67,10 +67,16 @@ def discover(day, previous=None):
     base.fetch.cache_clear()
     # A saved schedule prevents a transient index failure forgetting a known venue.
     previous = previous or {}
-    venues = set(base.discover_venues(day)) | set(previous)
+    errors = []
+    try:
+        venues = set(base.discover_venues(day)) | set(previous)
+    except Exception as exc:
+        if not previous:
+            raise
+        errors.append({'jcd':'index', 'error_type':type(exc).__name__})
+        venues = set(previous)
     if not venues:
         return {}, []
-    errors = []
     def one(jcd):
         try:
             times = base.deadlines(day, jcd)
@@ -140,6 +146,37 @@ def main_engine(day, schedules, store, *, clock):
         legacy.runner.x_post_delivery.flush_pending()
 
 
+def verify_yuuki(day, durable):
+    """Report exact production proof separately from probes and imported history."""
+    import prototype3_delivery as yuuki
+    checked = []
+    for row in durable.values():
+        if row.get('stream') not in {'yuuki','yuuki_selected'} or row.get('status') != 'sent':
+            continue
+        if row.get('source') == 'legacy_receipt':
+            continue
+        record = row['record']
+        close = datetime.strptime(day+' '+record['deadline'], '%Y%m%d %H:%M').replace(tzinfo=JST)
+        if not str(row.get('message_id','')).isdigit() or datetime.fromisoformat(row['sent_at']) >= close:
+            raise ValueError('Production acknowledgement invalid or after deadline')
+        path = yuuki.receipt_path(record['key']) if row['stream']=='yuuki' else yuuki.selected_receipt_path(record['key'])
+        if not path.exists() or not yuuki.prediction_path(record['key']).exists():
+            continue
+        mirror = yuuki.read(path)
+        if str(mirror.get('message_id')) != row['message_id'] or mirror.get('prediction_digest') != record['digest']:
+            raise ValueError('Yuuki report receipt differs from durable receipt')
+        if yuuki.read(yuuki.prediction_path(record['key'])) != record:
+            raise ValueError('Yuuki report prediction differs from delivered record')
+        valid_content = [yuuki.selected_message(record)] if row['stream']=='yuuki_selected' else [yuuki.message(record)]
+        if row['stream']=='yuuki' and (record.get('selection') or {}).get('selected'):
+            valid_content.append(yuuki.selected_message(record))
+        if row.get('content') not in valid_content:
+            raise ValueError('Yuuki payload differs from existing prediction formatter')
+        checked.append({'key':row['key'],'message_id':row['message_id'],'digest':record['digest'],
+                        'sent_at':row['sent_at'],'deadline':close.isoformat(), 'verified':True})
+    return checked
+
+
 def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yuuki', 'yuuki_selected'), budget_seconds=150):
     clock = clock or (lambda: datetime.now(JST))
     now = clock()
@@ -167,17 +204,29 @@ def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yu
     expected = generate_expected(day, schedules, records=conditional)
     rows = audit(expected, now=clock(), durable=durable, legacy=legacy)
     counts = dict(Counter(row['status'] for row in rows))
+    verification = verify_yuuki(day, durable)
+    active_since = dict((previous or {}).get('active_since', {}))
+    for stream in active:
+        active_since.setdefault(stream, now.isoformat())
+    active_missed = [row for row in rows if row['stream'] in active and row['status']=='missed'
+                    and datetime.fromisoformat(row['deadline']) >= datetime.fromisoformat(active_since[row['stream']])]
+    for row in active_missed:
+        notify_failure(row['stream'], row, row, store)
     for row in rows:
         if row['stream'] in active and row['status'] in {'failed','uncertain','sending'}:
-            notify_failure(row['stream'], {'day':day,'jcd':row['jcd'],'rno':row['rno']},
-                           {**row, 'key':row['key']}, store)
-    report = {'key':checkpoint_key, 'status':'checked' if not errors and not ERRORS else 'degraded',
+            state = durable.get(row['key'], row)
+            if stalled(state):
+                notify_failure(row['stream'], {'day':day,'jcd':row['jcd'],'rno':row['rno']}, state, store)
+    report = {'key':checkpoint_key, 'status':'checked' if not errors and not ERRORS and not active_missed else 'degraded',
               'day':day, 'stream':'dispatcher', 'jcd':'01', 'rno':1, 'phase':'check',
               'started_at':now.isoformat(), 'checked_at':clock().isoformat(),
               'previous_successful_check':(previous or {}).get('last_successful_check'),
               'last_successful_check':clock().isoformat() if not errors and not ERRORS else (previous or {}).get('last_successful_check'),
               'active_streams':list(active), 'schedules':schedules, 'counts':counts,
               'schedule_errors':errors, 'delivery_errors':dict(ERRORS), 'deliveries':rows}
+    report['production_verification'] = verification
+    report['active_since'] = active_since
+    report['active_missed'] = active_missed
     receipts.atomic_write(SUMMARY, report)
     # Cursor is diagnostic. Eligibility always scans every current unexpired race.
     try:

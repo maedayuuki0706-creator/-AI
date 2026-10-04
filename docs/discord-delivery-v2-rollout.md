@@ -15,6 +15,10 @@ Deployment begins with the new dispatcher in audit mode. Enable
 `DISCORD_DELIVERY_V2_STREAMS: 'yuuki,yuuki_selected'` only after branch validation,
 canary acknowledgement and the existing Yuuki workflow's shared guard are verified.
 The existing workflow's watcher is retained during this first overlap.
+The deployed dispatcher now overlaps Yuuki production after its new silent
+canary returned message ID `1556270803773948022` with a durable state receipt.
+No next-race proof was available after the final 2026-10-04 closing time, 20:45 JST.
+Main and other streams remain on their current production paths.
 
 ## Catch-up and missed races
 
@@ -38,6 +42,10 @@ An acknowledged prediction and its exact original record are committed to the
 state branch before the legacy report mirror is marked delivered. Local mirror
 loss restores that same record and message ID without another POST. Recovery
 artifacts also preserve acknowledgements if a subsequent state write fails.
+The new dispatcher does not publish mutable scoreboard snapshots to main;
+the existing Yuuki workflow remains their publisher. Critical prediction and
+delivery mirrors persist separately from derived scoreboards, whose conflicts
+remain available in recovery artifacts without failing prediction delivery.
 
 Only a definite HTTP 429 schedules another attempt, up to three attempts with
 the immutable original content and Discord's retry-after delay. Timeouts or an
