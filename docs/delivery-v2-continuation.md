@@ -22,6 +22,14 @@ the actual wake-up origin. A continuation is `workflow_dispatch`, not evidence
 that the GitHub cron fired. Native numeric message IDs and matching records are
 still required for production verification.
 
+State audits read files at a pinned public commit and verify every Git blob hash.
+Only confirmed numeric-ID receipts are cached; claims and retries still use fresh
+authenticated reads and compare-and-swap. This keeps the growing daily receipt
+audit from consuming one authenticated REST request per receipt on every run.
+Legacy Yuuki owns mutable status files on main. V2 keeps pending-data diagnostics
+in its durable checkpoint and artifacts, while still saving exact predictions
+and reporting receipts to main.
+
 Set the repository variable `DISCORD_DELIVERY_V2_CONTINUATION_ENABLED` to `0`
 to stop only the added continuation. Existing cron and workflows remain intact.
 The next manual, push or schedule run can bootstrap continuation again when the

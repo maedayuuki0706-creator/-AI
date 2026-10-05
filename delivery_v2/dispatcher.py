@@ -236,6 +236,9 @@ def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yu
     errors = []
     if schedules is None:
         schedules, errors = discover(day, (previous or {}).get('schedules'))
+    # Prime only immutable acknowledgement reads. Mutable claim reads remain
+    # fresh inside the delivery guard; the post-generation audit takes a new snapshot.
+    store.list_day(day)
     generation = {}
     if engine is not None:
         engine(day, schedules, store, clock=clock)

@@ -65,8 +65,9 @@ jobs:
       - name: Save legacy reporting mirrors
         if: always()
         continue-on-error: true
-        # The existing Yuuki workflow owns mutable scoreboard publication.
-        run: python persist_runtime_data.py data/prototype3_delivery/
+        # Legacy Yuuki owns mutable status publication; V2 diagnostics are in
+        # the durable checkpoint and artifacts. Both retain immutable reports.
+        run: python persist_runtime_data.py data/prototype3_delivery/ --exclude data/prototype3_delivery/status/
       - name: Preserve acknowledgements and watchdog evidence
         if: always()
         uses: actions/upload-artifact@v4

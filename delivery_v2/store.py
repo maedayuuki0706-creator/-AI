@@ -1,17 +1,21 @@
 """Compare-and-swap receipts on discord-delivery-state, never on main."""
 from __future__ import annotations
 import base64
+from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 import hashlib
 import json
 import os
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import quote
 
 from delivery_v2 import receipts
 
 BRANCH = 'discord-delivery-state'
 API = 'https://api.github.com/repos/maedayuuki0706-creator/-AI'
+RAW = 'https://raw.githubusercontent.com/maedayuuki0706-creator/-AI'
 
 
 class Conflict(RuntimeError):
@@ -40,6 +44,14 @@ def parts(key):
 class GitHubStore:
     def __init__(self):
         self.ready = False
+        self.confirmed = {}
+        self.blobs = {}
+
+    def remember(self, key, row, sha):
+        # Only an acknowledged send is immutable. Claims, retries and absence
+        # must always be read afresh before compare-and-swap.
+        if row.get('status') == 'sent' and str(row.get('message_id', '')).isdigit():
+            self.confirmed[key] = deepcopy(row), sha
 
     def ensure(self):
         if self.ready:
@@ -64,12 +76,15 @@ class GitHubStore:
         return f'data/delivery_v2_receipts/{day}/{stream}/{jcd}_{rno:02d}_{phase}.json'
 
     def read(self, key):
+        if key in self.confirmed:
+            return deepcopy(self.confirmed[key])
         self.ensure()
         try:
             value = _request(f'/contents/{self.path(key)}?ref={BRANCH}')
             row = json.loads(base64.b64decode(value['content']))
             if not isinstance(row, dict) or row.get('key') != key:
                 raise ValueError('Invalid durable receipt identity')
+            self.remember(key, row, value['sha'])
             return row, value['sha']
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
@@ -77,27 +92,49 @@ class GitHubStore:
             raise
 
     def list_day(self, day):
-        """A consistent branch snapshot; no API request for each absent race."""
+        """Pinned, hash-checked snapshot without one REST call per receipt."""
         receipts.identity('main', day, '01', 1)
         self.ensure()
-        tree = _request(f'/git/trees/{BRANCH}?recursive=1')
+        head = _request(f'/git/ref/heads/{BRANCH}')['object']['sha']
+        tree = _request(f'/git/trees/{head}?recursive=1')
         if tree.get('truncated'):
             raise RuntimeError('State tree is truncated; delivery audit is incomplete')
         prefix = f'data/delivery_v2_receipts/{day}/'
-        result = {}
-        for entry in tree.get('tree', []):
+        def load(entry):
             path = entry['path']
-            if entry['type'] != 'blob' or not path.startswith(prefix) or not path.endswith('.json'):
-                continue
-            value = _request('/git/blobs/' + entry['sha'])
-            row = json.loads(base64.b64decode(value['content']))
+            sha = entry['sha']
+            if sha not in self.blobs:
+                # This public repository's raw commit files require no token.
+                # A pinned SHA and Git blob hash prevent stale CDN content from
+                # becoming permission to resend. Authenticated reads remain
+                # the fallback if a newly published raw file is unavailable.
+                try:
+                    url = RAW + '/' + head + '/' + quote(path, safe='/')
+                    with urllib.request.urlopen(url, timeout=20) as response:
+                        data = response.read()
+                except urllib.error.HTTPError as exc:
+                    if exc.code != 404:
+                        raise
+                    data = base64.b64decode(_request('/git/blobs/' + sha)['content'])
+                except urllib.error.URLError:
+                    data = base64.b64decode(_request('/git/blobs/' + sha)['content'])
+                digest = hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+                if digest != sha:
+                    raise ValueError('State snapshot blob hash mismatch')
+                self.blobs[sha] = data
+            row = json.loads(self.blobs[sha])
             if not isinstance(row, dict) or self.path(row.get('key', '')) != path:
                 raise ValueError('Invalid receipt in state snapshot')
-            result[row['key']] = row
-        return result
+            self.remember(row['key'], row, sha)
+            return row['key'], row
+        entries = [entry for entry in tree.get('tree', []) if entry['type'] == 'blob'
+                   and entry['path'].startswith(prefix) and entry['path'].endswith('.json')]
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            return dict(pool.map(load, entries))
 
     def write(self, key, value, sha):
         self.ensure()
+        self.confirmed.pop(key, None)
         payload = {'message': f'Discord V2 {key} {value["status"]}', 'branch': BRANCH,
                    'content': base64.b64encode((json.dumps(value, ensure_ascii=False, sort_keys=True) + '\n').encode()).decode()}
         if sha:
@@ -105,7 +142,9 @@ class GitHubStore:
         for attempt in range(4):
             try:
                 result = _request(f'/contents/{self.path(key)}', payload, method='PUT')
-                return result['content']['sha']
+                saved_sha = result['content']['sha']
+                self.remember(key, value, saved_sha)
+                return saved_sha
             except urllib.error.HTTPError as exc:
                 if exc.code not in (409, 422):
                     raise
