@@ -10,9 +10,11 @@ Endpoints:
   /health
   /venues.csv?date=YYYYMMDD
   /race.csv?date=YYYYMMDD&jcd=20&rno=8
+  /venue.csv?date=YYYYMMDD&jcd=20
   /today.csv?date=YYYYMMDD
   /today.json?date=YYYYMMDD
   /result.csv?date=YYYYMMDD&jcd=20&rno=8
+  /venue_results.csv?date=YYYYMMDD&jcd=20
   /today_results.csv?date=YYYYMMDD
   /today_results.json?date=YYYYMMDD
 """
@@ -363,12 +365,27 @@ def result_rows(day: str, jcd: str, rno: int) -> list[list]:
             start.get("course", lane),
             start.get("st", ""),
             result["method"] if finish == 1 else "",
-            result.get("trifecta", ""),
+            ("\u200b" + result.get("trifecta", "")) if result.get("trifecta") else "",
             result.get("trifecta_payout", ""),
-            result.get("exacta", ""),
+            ("\u200b" + result.get("exacta", "")) if result.get("exacta") else "",
             result.get("exacta_payout", ""),
             "確定",
         ])
+    return rows
+
+
+def venue_result_rows(day: str, jcd: str) -> list[list]:
+    if jcd not in discover_venues(day):
+        return []
+    rows: list[list] = []
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futures = [ex.submit(result_rows, day, jcd, rno) for rno in range(1, 13)]
+        for future in as_completed(futures):
+            try:
+                rows.extend(future.result())
+            except Exception:
+                continue
+    rows.sort(key=lambda r: (int(r[2]), int(r[3])))
     return rows
 
 
@@ -390,6 +407,21 @@ def today_result_rows(day: str) -> list[list]:
         rows.sort(key=lambda r: (order.get(r[1], 99), int(r[2]), int(r[3])))
         return rows
     return _cached(f"today-results:{day}", build)
+
+
+def venue_rows(day: str, jcd: str) -> list[list]:
+    if jcd not in discover_venues(day):
+        return []
+    rows: list[list] = []
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futures = [ex.submit(race_rows, day, jcd, rno) for rno in range(1, 13)]
+        for future in as_completed(futures):
+            try:
+                rows.extend(future.result())
+            except Exception:
+                continue
+    rows.sort(key=lambda r: (int(r[2]), int(r[4])))
+    return rows
 
 
 def today_rows(day: str) -> list[list]:
@@ -488,6 +520,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, to_csv(result_rows(day, jcd, rno), header=RESULT_HEADER), "text/csv; charset=utf-8")
                 return
 
+            if parsed.path == "/venue_results.csv":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                if jcd not in VENUES:
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                self._send(200, to_csv(venue_result_rows(day, jcd), header=RESULT_HEADER), "text/csv; charset=utf-8")
+                return
+
             if parsed.path == "/today_results.csv":
                 self._send(200, to_csv(today_result_rows(day), header=RESULT_HEADER), "text/csv; charset=utf-8")
                 return
@@ -495,6 +538,17 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/today_results.json":
                 payload = [dict(zip(RESULT_HEADER, row)) for row in today_result_rows(day)]
                 self._send(200, json.dumps(payload, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+                return
+
+            if parsed.path == "/venue.csv":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                if jcd not in VENUES:
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                self._send(200, to_csv(venue_rows(day, jcd)), "text/csv; charset=utf-8")
                 return
 
             if parsed.path == "/today.csv":
