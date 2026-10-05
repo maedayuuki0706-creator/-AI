@@ -422,6 +422,11 @@ def main():
     report = build_report(day, predictions, results, card)
     write_json(REPORT_DIR / f'{day}.json', report)
     (REPORT_DIR / f'{day}.md').write_text('\n\n'.join(report_messages(report)) + '\n', encoding='utf-8')
+    if args.send and not chosen and int(report.get('expected_races') or 0) > 0:
+        raise RuntimeError(
+            f"Refusing to send empty daily report for active race day {day}: "
+            f"expected_races={report.get('expected_races')}"
+        )
     sent = send_report(report) if args.send else 0
     print(f"daily report {day}: predictions={len(chosen)} pending={report['totals']['pending_races']} sent_messages={sent}")
     return 0
