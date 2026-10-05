@@ -23,10 +23,11 @@ import bridge_learning
 import detailed_discord_notify as cards
 import mid_value_selection
 import opportunity_alerts
+import pt2_sheet_db
 from market_structure import analyze_market_structure
 
 JST = ZoneInfo('Asia/Tokyo')
-VERSION = 'pt3-control-pt1-scent-box-pt2-compress-v1'
+VERSION = 'pt3-control-pt1-scent-box-pt2-sheet-db-v2'
 POINTS = 10
 UNIT_YEN = 100
 STREAMS = ('existing', 'hiyori', 'prototype1', 'prototype2', 'prototype3')
@@ -271,6 +272,7 @@ def _prototype2_compress(hiyori, existing, odds, native_hiyori, native_existing)
             'consensus_points': len([p for p in picks if p in existing_set]),
             'native_existing_points': len(native_existing),
         },
+        'database': deepcopy(existing.get('sheet_database')) if existing.get('sheet_database') else None,
         'bridge': None,
     }
 
@@ -285,6 +287,7 @@ def build_bundle(request, hiyori, source, now=None):
     if not captured <= fetched <= now or captured.strftime('%Y%m%d') != day:
         raise ValueError('Source timestamps do not precede prediction creation')
     base = request['official']
+    pt2_base = pt2_sheet_db.enhance_analysis(base, jcd)
     if base.get('preview', {}).get('exhibition_count') != 6:
         raise ValueError('All six exhibition records are required')
     if not any(f.get('used') for f in hiyori.get('features', [])):
@@ -311,6 +314,8 @@ def build_bundle(request, hiyori, source, now=None):
         if stream == 'existing':
             selected = bridge_learning._reallocate(copied, selected)
         native[stream] = [r['combination'] for r in selected]
+    pt2_selected = cards.displayed_picks_variable(deepcopy(pt2_base), True)
+    native['prototype2_existing_db'] = [r['combination'] for r in pt2_selected]
     models = {}
     for stream in ('existing', 'hiyori'):
         a, b = WEIGHTS[stream]
@@ -320,7 +325,7 @@ def build_bundle(request, hiyori, source, now=None):
     models['prototype1'] = _prototype1_attack(
         hiyori, base, odds, native['hiyori'], native['existing'])
     models['prototype2'] = _prototype2_compress(
-        hiyori, base, odds, native['hiyori'], native['existing'])
+        hiyori, pt2_base, odds, native['hiyori'], native['prototype2_existing_db'])
     models['prototype3'] = _prototype3_card(hiyori, odds, native['hiyori'])
     record = {'version': VERSION, 'mode': 'prospective_shadow', 'key': key,
               'day': day, 'jcd': jcd, 'rno': rno, 'venue': base['venue'],
@@ -331,7 +336,7 @@ def build_bundle(request, hiyori, source, now=None):
               'source_models': {'existing': base.get('model_version'), 'hiyori': hiyori.get('model_version')},
               'source_url': source.get('source_url'), 'features': deepcopy(hiyori['features']),
               'models': models, 'native_candidate_picks': native,
-              'comparison_note': 'PT1 combines existing/Hiyori/exhibition/first-mark shape into a three-boat BOX, cover formation and up to three value longshots; PT2 and PT3 retain their own policies.'}
+              'comparison_note': 'PT1 keeps its existing policy; PT2 uses the Google Sheets database snapshot to refine the existing-model consensus before compression; PT3 is unchanged.'}
     record['digest'] = sha256(json.dumps(record, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     return record
 
