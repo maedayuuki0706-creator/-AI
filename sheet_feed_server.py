@@ -15,6 +15,7 @@ Endpoints:
   /today.json?date=YYYYMMDD
   /result.csv?date=YYYYMMDD&jcd=20&rno=8
   /venue_results.csv?date=YYYYMMDD&jcd=20
+  /section_results.csv?jcd=20&start=YYYYMMDD&end=YYYYMMDD
   /today_results.csv?date=YYYYMMDD
   /today_results.json?date=YYYYMMDD
 """
@@ -237,11 +238,12 @@ def race_rows(day: str, jcd: str, rno: int, deadline_override: str | None = None
 
 def _start_value(value: str):
     value = textify(value).replace(" ", "")
-    if re.fullmatch(r"(?:0)?\.\d+", value):
-        return float(value)
-    m = re.fullmatch(r"F(?:0)?\.(\d+)", value)
+    m = re.search(r"F(?:0)?\.(\d+)", value)
     if m:
         return -float("0." + m.group(1))
+    m = re.search(r"(?<![A-Za-z0-9])(?:0)?\.(\d+)", value)
+    if m:
+        return float("0." + m.group(1))
     return ""
 
 
@@ -370,6 +372,43 @@ def venue_result_rows(day: str, jcd: str) -> list[list]:
             except Exception:
                 continue
     rows.sort(key=lambda r: (int(r[2]), int(r[3])))
+    return rows
+
+
+def section_result_rows(start_day: str, end_day: str, jcd: str) -> list[list]:
+    """Return all finalized result rows for one venue across a meeting date range."""
+    from datetime import date, timedelta
+
+    if jcd not in VENUES:
+        return []
+    try:
+        start = datetime.strptime(start_day, "%Y%m%d").date()
+        end = datetime.strptime(end_day, "%Y%m%d").date()
+    except ValueError:
+        return []
+    today = datetime.now(JST).date()
+    end = min(end, today)
+    if end < start or (end - start).days > 10:
+        return []
+
+    days = []
+    d = start
+    while d <= end:
+        days.append(d.strftime("%Y%m%d"))
+        d += timedelta(days=1)
+
+    rows: list[list] = []
+    with ThreadPoolExecutor(max_workers=min(24, max(12, len(days) * 6))) as ex:
+        futures = []
+        for day in days:
+            for rno in range(1, 13):
+                futures.append(ex.submit(result_rows, day, jcd, rno))
+        for future in as_completed(futures):
+            try:
+                rows.extend(future.result())
+            except Exception:
+                continue
+    rows.sort(key=lambda r: (str(r[0]), int(r[2]), int(r[3])))
     return rows
 
 
@@ -515,6 +554,19 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, b"bad request", "text/plain; charset=utf-8")
                     return
                 self._send(200, to_csv(venue_result_rows(day, jcd), header=RESULT_HEADER), "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/section_results.csv":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                start = (qs.get("start") or [""])[0]
+                end = (qs.get("end") or [""])[0]
+                if jcd not in VENUES or not re.fullmatch(r"20\d{6}", start) or not re.fullmatch(r"20\d{6}", end):
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                self._send(200, to_csv(section_result_rows(start, end, jcd), header=RESULT_HEADER), "text/csv; charset=utf-8")
                 return
 
             if parsed.path == "/today_results.csv":
