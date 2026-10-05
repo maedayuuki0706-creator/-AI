@@ -223,21 +223,19 @@ def _prototype2_compress(hiyori, existing, odds, native_hiyori, native_existing)
     hiyori_rank = {combo: i for i, combo in enumerate(native_hiyori)}
     p3_rank = {combo: i for i, combo in enumerate(p3_picks)}
 
-    # High-conviction races should need fewer tickets. Uncertain races retain
-    # more coverage, but never exceed ten points.
-    target = {'A': 7, 'B': 8, 'C': 10}.get(p3.get('grade'), 8)
-    target = min(target, len(p3_picks))
-
+    # PT2 no longer uses a fixed 7/8/10-point cap. Keep every candidate
+    # surfaced by PT3, the Hiyori protected core, and the DB-enhanced existing
+    # model so valuable DB-backed combinations are not discarded by compression.
     consensus = [p for p in p3_picks if p in existing_set]
     protected = list(dict.fromkeys(native_hiyori[:4]))
-    pool = list(dict.fromkeys(consensus + protected + p3_picks))
+    pool = list(dict.fromkeys(consensus + protected + p3_picks + list(native_existing)))
     pool.sort(key=lambda p: (
-        0 if p in consensus else 1,
+        0 if p in consensus else 1 if p in existing_set else 2,
         hiyori_rank.get(p, 999),
         p3_rank.get(p, 999),
         p,
     ))
-    picks = pool[:target]
+    picks = pool
 
     # Keep the split visible in Discord: consensus is "main", remaining PT3
     # support is the compressed cover.
@@ -254,7 +252,7 @@ def _prototype2_compress(hiyori, existing, odds, native_hiyori, native_existing)
     return {
         'label': LABELS['prototype2'],
         'weights': {'pt3': 1.0, 'existing_consensus': 1.0},
-        'selection_policy': 'pt3-existing-consensus-compress-grade-7-8-10',
+        'selection_policy': 'pt3-db-consensus-no-fixed-point-cap',
         'main_picks': main,
         'cover_picks': cover,
         'picks': picks,
@@ -268,9 +266,10 @@ def _prototype2_compress(hiyori, existing, odds, native_hiyori, native_existing)
         'odds_complete': odds_complete,
         'trifecta': analysis['trifecta'],
         'structure': {
-            'target_points': target,
+            'fixed_point_cap': None,
             'consensus_points': len([p for p in picks if p in existing_set]),
             'native_existing_points': len(native_existing),
+            'pt3_points': len(p3_picks),
         },
         'database': deepcopy(existing.get('sheet_database')) if existing.get('sheet_database') else None,
         'bridge': None,
