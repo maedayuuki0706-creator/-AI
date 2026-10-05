@@ -118,7 +118,8 @@ def pct(v):
 def main_selected_payload(day):
     path = MAIN_SELECTED_DIR / f"{day}.json"
     if not path.exists():
-        raise FileNotFoundError(path)
+        print(f"main selected daily report skipped {day}: missing {path}", flush=True)
+        return None
     report = json.loads(path.read_text(encoding="utf-8"))
     stats = report.get("selected") or {}
     races = list(stats.get("races") or [])
@@ -196,16 +197,19 @@ def send(day):
     }
     sent = 0
     # Main selected stream is the ordinary メイン厳選くん, not the longshot sniper.
+    # It is optional here: a missing upstream metrics file must not kill the
+    # otherwise valid daily report or the 中穴厳選 summary.
     main_body = main_selected_payload(day)
-    main_digest = hashlib.sha256(json.dumps(main_body, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
-    main_key = (day, "main_selected", main_digest, destination)
-    if main_key not in delivered:
-        message = post_confirmed(main_body)
-        append_jsonl(DELIVERY_PATH, {
-            "day": day, "stream": "main_selected", "digest": main_digest, "destination": destination,
-            "message_id": message["id"], "sent_at": datetime.now(base.JST).isoformat(),
-        })
-        sent += 1
+    if main_body is not None:
+        main_digest = hashlib.sha256(json.dumps(main_body, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        main_key = (day, "main_selected", main_digest, destination)
+        if main_key not in delivered:
+            message = post_confirmed(main_body)
+            append_jsonl(DELIVERY_PATH, {
+                "day": day, "stream": "main_selected", "digest": main_digest, "destination": destination,
+                "message_id": message["id"], "sent_at": datetime.now(base.JST).isoformat(),
+            })
+            sent += 1
 
     # Keep 中穴厳選くん as the second standalone summary.
     for stream in ("mid_odds",):
