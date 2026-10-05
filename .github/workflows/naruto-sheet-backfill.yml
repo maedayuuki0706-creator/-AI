@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Collect Naruto official results
-        run: python tools/naruto_sheet_backfill.py
+        run: PYTHONPATH=. python tools/naruto_sheet_backfill.py
       - name: Upload Naruto backfill
         uses: actions/upload-artifact@v4
         with:
