@@ -9,7 +9,7 @@ on:
       - '.github/workflows/naruto-sheet-backfill.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   collect:
@@ -22,6 +22,15 @@ jobs:
           python-version: '3.12'
       - name: Collect Naruto official results
         run: PYTHONPATH=. python tools/naruto_sheet_backfill.py
+      - name: Persist Naruto backfill on isolated branch
+        run: |
+          mkdir -p data/sheet_backfill
+          cp naruto_backfill_20260927_20261002.json data/sheet_backfill/naruto_backfill_20260927_20261002.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/sheet_backfill/naruto_backfill_20260927_20261002.json
+          git commit -m "Persist Naruto sheet backfill data" || exit 0
+          git push origin HEAD:naruto-sheet-backfill-20261005
       - name: Upload Naruto backfill
         uses: actions/upload-artifact@v4
         with:
