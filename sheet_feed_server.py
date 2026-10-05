@@ -12,6 +12,9 @@ Endpoints:
   /race.csv?date=YYYYMMDD&jcd=20&rno=8
   /today.csv?date=YYYYMMDD
   /today.json?date=YYYYMMDD
+  /result.csv?date=YYYYMMDD&jcd=20&rno=8
+  /today_results.csv?date=YYYYMMDD
+  /today_results.json?date=YYYYMMDD
 """
 
 from __future__ import annotations
@@ -46,6 +49,10 @@ VENUE_CODES = {v: k for k, v in VENUES.items()}
 CSV_HEADER = [
     "日付","場","R","締切","枠","登録番号","級別","展開材料",
     "F数","当地勝率","全国勝率","平均ST","L数","全国2連率","全国3連率",
+]
+RESULT_HEADER = [
+    "日付","場","R","枠","登録番号","選手名","着順","進入","実ST","決まり手",
+    "3連単","3連単払戻","2連単","2連単払戻","確定",
 ]
 
 _cache_lock = threading.Lock()
@@ -222,6 +229,169 @@ def race_rows(day: str, jcd: str, rno: int) -> list[list]:
     return rows
 
 
+
+def _start_value(value: str):
+    value = textify(value).replace(" ", "")
+    if re.fullmatch(r"(?:0)?\.\d+", value):
+        return float(value)
+    m = re.fullmatch(r"F(?:0)?\.(\d+)", value)
+    if m:
+        return -float("0." + m.group(1))
+    return ""
+
+
+def parse_result(day: str, jcd: str, rno: int) -> dict:
+    """Parse an official result page without importing prediction/delivery code."""
+    def build():
+        raw = fetch(official_url("raceresult", day, jcd, rno))
+        text = textify(raw)
+        card = parse_racelist_boats(day, jcd, rno)
+        card_by_lane = {b["lane"]: b for b in card}
+
+        finish_by_lane: dict[int, int] = {}
+        racer_by_lane: dict[int, str] = {}
+        name_by_lane: dict[int, str] = {}
+
+        # The first result table has one tbody/row per finisher. Require an
+        # explicit finish number in the first cell to avoid matching other tables.
+        for body in re.findall(r"<tbody\b[^>]*>(.*?)</tbody>", raw, re.I | re.S):
+            cells = re.findall(r"<td\b[^>]*>(.*?)</td>", body, re.I | re.S)
+            if len(cells) < 3:
+                continue
+            first = textify(cells[0])
+            if not re.fullmatch(r"[1-6]", first):
+                continue
+            lane_match = re.search(r"is-boatColor([1-6])", body)
+            body_text = textify(body)
+            reg = re.search(r"\b(\d{4})\b", body_text)
+            if not lane_match or not reg:
+                continue
+            lane = int(lane_match[1])
+            finish_by_lane[lane] = int(first)
+            racer_by_lane[lane] = reg[1]
+            if lane in card_by_lane:
+                name_by_lane[lane] = card_by_lane[lane].get("name", "")
+
+        # Fallback: the result table can omit the boat-color class in some layouts.
+        if len(finish_by_lane) < 3 and card:
+            for body in re.findall(r"<tbody\b[^>]*>(.*?)</tbody>", raw, re.I | re.S):
+                cells = re.findall(r"<td\b[^>]*>(.*?)</td>", body, re.I | re.S)
+                if len(cells) < 3:
+                    continue
+                first = textify(cells[0])
+                body_text = textify(body)
+                reg = re.search(r"\b(\d{4})\b", body_text)
+                if not re.fullmatch(r"[1-6]", first) or not reg:
+                    continue
+                for lane, boat in card_by_lane.items():
+                    if boat["racer_id"] == reg[1]:
+                        finish_by_lane[lane] = int(first)
+                        racer_by_lane[lane] = reg[1]
+                        name_by_lane[lane] = boat.get("name", "")
+                        break
+
+        if len(finish_by_lane) < 3:
+            return {}
+
+        # Official start diagram appears in course order; number is boat/lane.
+        start_by_lane: dict[int, dict] = {}
+        starts = re.findall(
+            r"table1_boatImage1Number[^>]*>\s*([1-6])\s*</span>.*?"
+            r"table1_boatImage1Time[^>]*>(.*?)</span>",
+            raw, re.I | re.S
+        )
+        if starts:
+            for course, (lane_s, value) in enumerate(starts[:6], 1):
+                lane = int(lane_s)
+                start_by_lane[lane] = {"course": course, "st": _start_value(value)}
+
+        methods = re.findall(r"決まり手\s*\n([^\n]+)", text)
+        allowed = {"逃げ","差し","まくり","まくり差し","抜き","恵まれ"}
+        method = next((m.strip() for m in methods if m.strip() in allowed), "")
+
+        tri = ""
+        tri_pay = ""
+        m = re.search(
+            r"3連単\s*\n\s*([1-6]\s*-\s*[1-6]\s*-\s*[1-6])\s*\n\s*[¥￥]?\s*([\d,]+)",
+            text
+        )
+        if m:
+            tri = re.sub(r"\s+", "", m[1])
+            tri_pay = int(m[2].replace(",", ""))
+
+        duo = ""
+        duo_pay = ""
+        m = re.search(
+            r"2連単\s*\n\s*([1-6]\s*-\s*[1-6])\s*\n\s*[¥￥]?\s*([\d,]+)",
+            text
+        )
+        if m:
+            duo = re.sub(r"\s+", "", m[1])
+            duo_pay = int(m[2].replace(",", ""))
+
+        return {
+            "finish_by_lane": finish_by_lane,
+            "racer_by_lane": racer_by_lane,
+            "name_by_lane": name_by_lane,
+            "start_by_lane": start_by_lane,
+            "method": method,
+            "trifecta": tri,
+            "trifecta_payout": tri_pay,
+            "exacta": duo,
+            "exacta_payout": duo_pay,
+            "final": len(finish_by_lane) >= 3,
+        }
+    return _cached(f"result:{day}:{jcd}:{rno}", build)
+
+
+def result_rows(day: str, jcd: str, rno: int) -> list[list]:
+    result = parse_result(day, jcd, rno)
+    if not result or not result.get("final"):
+        return []
+    rows = []
+    for lane in sorted(result["finish_by_lane"]):
+        start = result["start_by_lane"].get(lane, {})
+        finish = result["finish_by_lane"][lane]
+        rows.append([
+            day,
+            VENUES[jcd],
+            rno,
+            lane,
+            result["racer_by_lane"].get(lane, ""),
+            result["name_by_lane"].get(lane, ""),
+            finish,
+            start.get("course", lane),
+            start.get("st", ""),
+            result["method"] if finish == 1 else "",
+            result.get("trifecta", ""),
+            result.get("trifecta_payout", ""),
+            result.get("exacta", ""),
+            result.get("exacta_payout", ""),
+            "確定",
+        ])
+    return rows
+
+
+def today_result_rows(day: str) -> list[list]:
+    def build():
+        venues = discover_venues(day)
+        rows: list[list] = []
+        work = []
+        with ThreadPoolExecutor(max_workers=min(18, max(4, len(venues) * 2))) as ex:
+            for jcd in venues:
+                for rno in range(1, 13):
+                    work.append(ex.submit(result_rows, day, jcd, rno))
+            for future in as_completed(work):
+                try:
+                    rows.extend(future.result())
+                except Exception:
+                    continue
+        order = {name: int(code) for code, name in VENUES.items()}
+        rows.sort(key=lambda r: (order.get(r[1], 99), int(r[2]), int(r[3])))
+        return rows
+    return _cached(f"today-results:{day}", build)
+
+
 def today_rows(day: str) -> list[list]:
     def build():
         venues = discover_venues(day)
@@ -242,11 +412,11 @@ def today_rows(day: str) -> list[list]:
     return _cached(f"today:{day}", build)
 
 
-def to_csv(rows: list[list], include_header: bool = True) -> bytes:
+def to_csv(rows: list[list], include_header: bool = True, header: list[str] | None = None) -> bytes:
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator="\n")
     if include_header:
-        writer.writerow(CSV_HEADER)
+        writer.writerow(header or CSV_HEADER)
     writer.writerows(rows)
     return ("\ufeff" + buf.getvalue()).encode("utf-8")
 
@@ -301,6 +471,30 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, b"bad request", "text/plain; charset=utf-8")
                     return
                 self._send(200, to_csv(race_rows(day, jcd, rno)), "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/result.csv":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                try:
+                    rno = int((qs.get("rno") or ["0"])[0])
+                except ValueError:
+                    rno = 0
+                if jcd not in VENUES or not 1 <= rno <= 12:
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                self._send(200, to_csv(result_rows(day, jcd, rno), header=RESULT_HEADER), "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/today_results.csv":
+                self._send(200, to_csv(today_result_rows(day), header=RESULT_HEADER), "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/today_results.json":
+                payload = [dict(zip(RESULT_HEADER, row)) for row in today_result_rows(day)]
+                self._send(200, json.dumps(payload, ensure_ascii=False).encode(), "application/json; charset=utf-8")
                 return
 
             if parsed.path == "/today.csv":
