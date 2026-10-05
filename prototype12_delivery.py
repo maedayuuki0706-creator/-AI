@@ -100,10 +100,10 @@ def model_message(record, stream):
     db = model.get("database") or {}
     db_state = "ON" if db.get("enabled") else "fallback"
     return (
-        f"🧪 **プロトタイプ2｜PT3×DB補正メイン圧縮**\n"
+        f"🧪 **プロトタイプ2｜PT3×DB補正・固定点数上限なし**\n"
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
         f"🗃️ DB {db_state}｜選手 {db.get('player_matches', 0)}/6｜モーター {db.get('motor_matches', 0)}/6｜場データ {'ON' if db.get('venue_match') else 'OFF'}\n"
-        f"⚖️ PT3をDB補正済み既存メインとの一致度で7〜10点へ圧縮\n"
+        f"⚖️ 固定点数上限なし｜PT3＋DB補正済み候補を保持\n"
         f"◎ **本線 {len(model.get('main_picks') or [])}点**\n"
         f"`{main}`\n"
         f"○ **迎え {len(model.get('cover_picks') or [])}点**\n"
