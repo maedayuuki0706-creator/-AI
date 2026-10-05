@@ -1,6 +1,12 @@
 name: Discord Delivery V2 Production Dispatcher
 on:
   workflow_dispatch:
+    inputs:
+      wake_reason:
+        description: 'Production wake-up origin'
+        required: false
+        default: 'manual'
+        type: string
   schedule:
     - cron: '2-57/5 * * * *'
   push:
@@ -11,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 concurrency:
   group: discord-delivery-v2-production
   cancel-in-progress: false
@@ -27,9 +34,13 @@ jobs:
         with:
           python-version: '3.12'
       - name: Verify delivery guards without posting
+        id: guards
         run: python -m unittest discover -s tests -p 'test_delivery_v2*.py' -v
+      - name: Mark production wake-up time
+        run: echo "DELIVERY_V2_RUN_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" >> "$GITHUB_ENV"
       - name: Confirm production transport and restart deduplication
-        if: github.event_name == 'push'
+        # A normal code push must not add an unsolicited Discord probe.
+        if: github.event_name == 'workflow_dispatch' && inputs.wake_reason == 'canary'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL || secrets.PROTO3_DISCORD_WEBHOOK_URL }}
@@ -40,13 +51,14 @@ jobs:
           TZ: Asia/Tokyo
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DISCORD_DELIVERY_V2_STREAMS: 'yuuki,yuuki_selected'
+          DISCORD_DELIVERY_V2_WAKE_REASON: ${{ inputs.wake_reason || github.event_name }}
           # Persist rollout coverage across midnight, including a late first wake-up.
           DISCORD_DELIVERY_V2_ACTIVE_SINCE: '2026-10-04T20:53:00+09:00'
           PT3_DISCORD_WEBHOOK_URL: ${{ secrets.PT3_DISCORD_WEBHOOK_URL }}
           PROTO3_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO3_DISCORD_WEBHOOK_URL }}
           PT3_SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
           DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
-        run: python -u -m delivery_v2.dispatcher --budget-seconds 150
+        run: python -u -m delivery_v2.dispatcher --budget-seconds 150 --recheck-seconds 20
       - name: Refresh delivered-only PT standings
         if: always()
         run: python -u prototype_scoreboard.py
@@ -66,3 +78,9 @@ jobs:
             data/prototype3_delivery/
             data/prototype_scoreboard/
           retention-days: 14
+      - name: Continue production and wake inactive legacy deliveries
+        if: always() && !cancelled() && steps.guards.conclusion == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCORD_DELIVERY_V2_CONTINUATION_ENABLED: ${{ vars.DISCORD_DELIVERY_V2_CONTINUATION_ENABLED || '1' }}
+        run: python -u -m delivery_v2.wakeup

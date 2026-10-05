@@ -91,26 +91,21 @@ def discover(day, previous=None):
     return schedules, errors
 
 
-def yuuki_engine(day, schedules, store, *, clock, budget_seconds=150):
+def yuuki_engine(day, schedules, store, *, clock, budget_seconds=150, recheck_seconds=0,
+                 monotonic=time.monotonic, sleep=time.sleep):
     """Use the unchanged Yuuki builder/formatter and shared transport guard."""
     import direct_discord_notify as base
     import prototype3_delivery as yuuki
-    started = time.monotonic()
-    tasks = []
-    for jcd, times in schedules.items():
-        for rno, deadline in enumerate(times, 1):
-            close = datetime.strptime(day+' '+deadline, '%Y%m%d %H:%M').replace(tzinfo=JST)
-            if 0 < (close-clock()).total_seconds() <= 30*60:
-                tasks.append((day, jcd, rno, deadline))
-    # Earlier deadlines first; do not spend the entire pass generating future races.
-    for args in sorted(tasks, key=lambda args: args[3]):
-        if time.monotonic()-started >= budget_seconds:
-            print('::warning::Dispatcher generation budget reached; next wake-up will catch up', flush=True)
-            break
+    started = monotonic()
+    done, waiting, passes = set(), {}, 0
+
+    def process(args):
         _, jcd, rno, deadline = args
         key = yuuki.key_for(day, jcd, rno)
+        if monotonic()-started >= budget_seconds:
+            return key, 'budget_exhausted'
         if not yuuki.trial.before_deadline(day, deadline, clock()):
-            continue
+            return key, None
         # Repair reporting files from the exact durable prediction after main push loss.
         saved, _ = store.read(receipts.identity('yuuki', day, jcd, rno))
         if saved and saved.get('record') and saved['status'] == 'sent':
@@ -122,8 +117,42 @@ def yuuki_engine(day, schedules, store, *, clock, budget_seconds=150):
             for stream, path in [('yuuki', yuuki.receipt_path(key)), ('yuuki_selected', yuuki.selected_receipt_path(key))]:
                 if path.exists():
                     adopt_legacy(stream, record, yuuki.read(path), store=store)
-        base.fetch.cache_clear()
         yuuki.process_race(*args)
+        status_path = yuuki.ROOT / 'status' / (key+'.json')
+        state = yuuki.read(status_path).get('state') if status_path.exists() else None
+        return key, state
+
+    while monotonic()-started < budget_seconds:
+        tasks = []
+        for jcd, times in schedules.items():
+            for rno, deadline in enumerate(times, 1):
+                key = yuuki.key_for(day, jcd, rno)
+                close = datetime.strptime(day+' '+deadline, '%Y%m%d %H:%M').replace(tzinfo=JST)
+                if key not in done and 0 < (close-clock()).total_seconds() <= 30*60:
+                    tasks.append((day, jcd, rno, deadline))
+        if not tasks:
+            break
+        # Check new exhibition data on each bounded pass, with earlier deadlines first.
+        base.fetch.cache_clear()
+        ordered = sorted(tasks, key=lambda args: args[3])
+        if recheck_seconds > 0:
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                results = list(pool.map(process, ordered))
+        else:
+            results = [process(args) for args in ordered]
+        passes += 1
+        waiting = {}
+        for key, state in results:
+            if state in {'waiting_for_exhibition', 'official_unavailable',
+                         'hiyori_feature_unavailable', 'data_error', 'budget_exhausted'}:
+                waiting[key] = state
+            else:
+                done.add(key)
+        remaining = budget_seconds-(monotonic()-started)
+        if recheck_seconds <= 0 or not waiting or remaining <= 0:
+            break
+        sleep(min(recheck_seconds, remaining))
+    return {'passes': passes, 'waiting': waiting}
 
 
 def main_engine(day, schedules, store, *, clock):
@@ -191,7 +220,7 @@ def verify_yuuki(day, durable, *, store=None, previous=()):
     return checked
 
 
-def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yuuki', 'yuuki_selected'), budget_seconds=150, activation_at=None):
+def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yuuki', 'yuuki_selected'), budget_seconds=150, recheck_seconds=0, activation_at=None):
     clock = clock or (lambda: datetime.now(JST))
     now = clock()
     if now.tzinfo is None:
@@ -207,10 +236,12 @@ def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yu
     errors = []
     if schedules is None:
         schedules, errors = discover(day, (previous or {}).get('schedules'))
+    generation = {}
     if engine is not None:
         engine(day, schedules, store, clock=clock)
     elif 'yuuki' in active:
-        yuuki_engine(day, schedules, store, clock=clock, budget_seconds=budget_seconds)
+        generation = yuuki_engine(day, schedules, store, clock=clock,
+                                  budget_seconds=budget_seconds, recheck_seconds=recheck_seconds)
     if engine is None and 'main' in active:
         main_engine(day, schedules, store, clock=clock)
     legacy, conditional = legacy_state(day)
@@ -243,6 +274,10 @@ def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yu
               'active_streams':list(active), 'schedules':schedules, 'counts':counts,
               'schedule_errors':errors, 'delivery_errors':dict(ERRORS), 'deliveries':rows}
     report['production_verification'] = verification
+    report['generation'] = generation
+    report['trigger_event'] = os.getenv('GITHUB_EVENT_NAME', '')
+    report['workflow_run_id'] = os.getenv('GITHUB_RUN_ID', '')
+    report['wake_reason'] = os.getenv('DISCORD_DELIVERY_V2_WAKE_REASON', '')
     report['active_since'] = active_since
     report['active_missed'] = active_missed
     receipts.atomic_write(SUMMARY, report)
@@ -264,6 +299,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--streams', default=os.getenv('DISCORD_DELIVERY_V2_STREAMS', 'yuuki,yuuki_selected'))
     parser.add_argument('--budget-seconds', type=int, default=150)
+    parser.add_argument('--recheck-seconds', type=int, default=20)
     args = parser.parse_args()
     active = tuple(x.strip() for x in args.streams.split(',') if x.strip())
     allowed = {'yuuki','yuuki_selected','main','selected','mid_odds','mid_odds_selected','longshot'}
@@ -271,7 +307,8 @@ def main():
         parser.error('Unsupported stream set; selected Yuuki requires Yuuki')
     os.environ['DISCORD_DELIVERY_V2_STREAMS'] = ','.join(active)
     try:
-        report = run_once(active=active, budget_seconds=args.budget_seconds)
+        report = run_once(active=active, budget_seconds=args.budget_seconds,
+                          recheck_seconds=args.recheck_seconds)
         return 0 if report['status'] == 'checked' else 1
     except Exception as exc:
         print(f'::error::Production dispatcher failed ({type(exc).__name__})', flush=True)

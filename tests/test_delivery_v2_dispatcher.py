@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-from delivery_v2 import dispatcher, guard, receipts
+from delivery_v2 import dispatcher, guard, receipts, integration
 from delivery_v2.catchup import Pending, run_once as catch_up
 from delivery_v2.store import FileStore
 from delivery_v2.watchdog import audit, generate_expected
@@ -14,6 +14,63 @@ JST = ZoneInfo('Asia/Tokyo')
 
 
 class DispatcherTests(unittest.TestCase):
+    def test_exhibition_arriving_on_second_pass_sends_exactly_once(self):
+        import prototype3_delivery as yuuki
+        now = datetime(2026,10,4,18,12,tzinfo=JST)
+        elapsed = [0.0]
+        clock = lambda: now+timedelta(seconds=elapsed[0])
+        def sleep(seconds):
+            elapsed[0] += seconds
+        record = dict(day='20261004',jcd='01',rno=1,deadline='18:15',venue='桐生',
+                      key='20261004_01_01',digest='unchanged-prediction',selection={'selected':False},
+                      model={'main_picks':['1-2-3'],'cover_picks':[],'point_count':1})
+        real_deliver = guard.deliver_once
+        with tempfile.TemporaryDirectory() as temp, patch.object(receipts,'ROOT',Path(temp)/'state'), \
+             patch.object(yuuki,'ROOT',Path(temp)/'legacy'), patch.object(guard,'RECOVERY',Path(temp)/'recovery'), \
+             patch.object(yuuki,'now_jst',side_effect=clock), \
+             patch.dict('os.environ',{'DISCORD_DELIVERY_V2_STREAMS':'yuuki', 'PT3_DISCORD_WEBHOOK_URL':'test-only'}), \
+             patch.object(integration,'default_store',side_effect=FileStore), \
+             patch.object(integration,'deliver_once',side_effect=lambda *a,**kw:real_deliver(*a,**kw,clock=clock)), \
+             patch.object(yuuki,'post_webhook',return_value='123456') as post, \
+             patch.object(yuuki,'build_record',side_effect=[(None,'waiting_for_exhibition'),(record,'ready')]) as build:
+            result = dispatcher.yuuki_engine('20261004',{'01':['18:15']},FileStore(),clock=clock,
+                budget_seconds=60,recheck_seconds=20,monotonic=lambda:elapsed[0],sleep=sleep)
+            self.assertEqual(result,{'passes':2,'waiting':{}})
+            self.assertEqual(build.call_count,2)
+            self.assertEqual(yuuki.read(yuuki.prediction_path(record['key'])),record)
+            self.assertEqual(yuuki.read(yuuki.receipt_path(record['key']))['message_id'],'123456')
+            dispatcher.yuuki_engine('20261004',{'01':['18:15']},FileStore(),clock=clock,
+                budget_seconds=60,recheck_seconds=20,monotonic=lambda:elapsed[0],sleep=sleep)
+            post.assert_called_once()
+
+    def test_exhibition_wait_never_retries_after_deadline(self):
+        import prototype3_delivery as yuuki
+        now = datetime(2026,10,4,18,13,55,tzinfo=JST)
+        elapsed = [0.0]
+        clock = lambda: now+timedelta(seconds=elapsed[0])
+        def sleep(seconds):
+            elapsed[0] += seconds
+        with tempfile.TemporaryDirectory() as temp, patch.object(receipts,'ROOT',Path(temp)/'state'), \
+             patch.object(yuuki,'ROOT',Path(temp)/'legacy'), patch.object(yuuki,'now_jst',side_effect=clock), \
+             patch.object(yuuki,'build_record',return_value=(None,'waiting_for_exhibition')) as build, \
+             patch.object(yuuki,'post_webhook') as post:
+            dispatcher.yuuki_engine('20261004',{'01':['18:15']},FileStore(),clock=clock,
+                budget_seconds=100,recheck_seconds=70,monotonic=lambda:elapsed[0],sleep=sleep)
+            build.assert_called_once()
+            post.assert_not_called()
+
+    def test_generation_budget_prevents_starting_more_races(self):
+        import prototype3_delivery as yuuki
+        now = datetime(2026,10,4,18,12,tzinfo=JST)
+        elapsed = [0.0]
+        def process(*args):
+            elapsed[0] += 60
+        with tempfile.TemporaryDirectory() as temp, patch.object(receipts,'ROOT',Path(temp)/'state'), \
+             patch.object(yuuki,'ROOT',Path(temp)/'legacy'), patch.object(yuuki,'process_race',side_effect=process) as run:
+            dispatcher.yuuki_engine('20261004',{'01':['18:15','18:20']},FileStore(),clock=lambda:now,
+                budget_seconds=30,monotonic=lambda:elapsed[0])
+            run.assert_called_once()
+
     def test_late_first_wake_next_day_still_reports_missed_active_races(self):
         now = datetime(2026,10,5,8,45,tzinfo=JST)
         activation = datetime(2026,10,4,20,53,tzinfo=JST)
