@@ -1,0 +1,33 @@
+name: Marugame Sheet Backfill
+
+on:
+  push:
+    branches:
+      - marugame-sheet-backfill-20261005
+    paths:
+      - 'tools/marugame_sheet_backfill.py'
+      - '.github/workflows/marugame-sheet-backfill.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Collect Marugame official results
+        run: PYTHONPATH=. python tools/marugame_sheet_backfill.py
+      - name: Persist Marugame backfill on isolated branch
+        run: |
+          mkdir -p data/sheet_backfill
+          cp marugame_backfill_20260926_20261002.json data/sheet_backfill/marugame_backfill_20260926_20261002.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/sheet_backfill/marugame_backfill_20260926_20261002.json
+          git commit -m "Persist Marugame sheet backfill data" || exit 0
+          git push origin HEAD:marugame-sheet-backfill-20261005
