@@ -111,6 +111,37 @@ def _flow_multiplier(first: int, second: int, third: int) -> float:
     return mult
 
 
+
+def _aggregate_boat_probabilities(rows: list[Mapping[str, Any]]) -> dict[str, dict[str, float]]:
+    """Aggregate ordered trifecta probabilities into per-boat finish probabilities.
+
+    Because every trifecta row contains exactly three distinct boats:
+    - head sums probabilities where the boat is 1st
+    - top2 sums probabilities where the boat is 1st or 2nd
+    - top3 sums probabilities where the boat appears anywhere in the top three
+    """
+    result = {
+        str(lane): {"head": 0.0, "top2": 0.0, "top3": 0.0}
+        for lane in range(1, 7)
+    }
+    for row in rows:
+        try:
+            first, second, third = map(int, str(row["combination"]).split("-"))
+            p = float(row["probability"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        result[str(first)]["head"] += p
+        result[str(first)]["top2"] += p
+        result[str(second)]["top2"] += p
+        result[str(first)]["top3"] += p
+        result[str(second)]["top3"] += p
+        result[str(third)]["top3"] += p
+
+    for values in result.values():
+        for key in ("head", "top2", "top3"):
+            values[key] = round(values[key], 6)
+    return result
+
 def analyze_race_v2(payload: Mapping[str, Any]) -> dict:
     data = deepcopy(dict(payload))
     race = data.get("race") if isinstance(data.get("race"), Mapping) else data
@@ -151,6 +182,8 @@ def analyze_race_v2(payload: Mapping[str, Any]) -> dict:
         new_rows.sort(key=lambda x: x["probability"], reverse=True)
         out["trifecta"] = new_rows
         out["value_bets"] = [x for x in new_rows if x.get("expected_value") is not None and x["expected_value"] >= 1.05][:20]
+
+    out["boat_probabilities"] = _aggregate_boat_probabilities(out.get("trifecta", []))
 
     out["model_version"] = "kyoutei-navi-knowledge-v2"
     out["knowledge"] = [
