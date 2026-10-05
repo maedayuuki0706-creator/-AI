@@ -16,6 +16,7 @@ Endpoints:
   /result.csv?date=YYYYMMDD&jcd=20&rno=8
   /venue_results.csv?date=YYYYMMDD&jcd=20
   /section_results.csv?jcd=20&start=YYYYMMDD&end=YYYYMMDD
+  /section_roster.csv?jcd=20&date=YYYYMMDD
   /today_results.csv?date=YYYYMMDD
   /today_results.json?date=YYYYMMDD
 """
@@ -57,6 +58,7 @@ RESULT_HEADER = [
     "日付","場","R","枠","登録番号","選手名","着順","進入","実ST","決まり手",
     "3連単","3連単払戻","2連単","2連単払戻","確定",
 ]
+ROSTER_HEADER = ["登録番号","選手名","級別","モーターNo.","モーター2連率","モーター3連率"]
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
@@ -375,6 +377,34 @@ def venue_result_rows(day: str, jcd: str) -> list[list]:
     return rows
 
 
+def section_roster_rows(day: str, jcd: str) -> list[list]:
+    """Return a unique race-card roster for a venue/date, keyed by registration."""
+    if jcd not in VENUES:
+        return []
+    found: dict[str, list] = {}
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        futures = [ex.submit(parse_racelist_boats, day, jcd, rno) for rno in range(1, 13)]
+        for future in as_completed(futures):
+            try:
+                boats = future.result()
+            except Exception:
+                continue
+            for b in boats:
+                reg = str(b.get("racer_id") or "")
+                if not reg:
+                    continue
+                row = [
+                    reg,
+                    b.get("name",""),
+                    b.get("current_class",""),
+                    b.get("motor_number","") if b.get("motor_number") is not None else "",
+                    b.get("motor_top2_rate","") if b.get("motor_top2_rate") is not None else "",
+                    b.get("motor_top3_rate","") if b.get("motor_top3_rate") is not None else "",
+                ]
+                found[reg] = row
+    return sorted(found.values(), key=lambda r: int(r[0]) if str(r[0]).isdigit() else 99999)
+
+
 def section_result_rows(start_day: str, end_day: str, jcd: str) -> list[list]:
     """Return all finalized result rows for one venue across a meeting date range."""
     from datetime import date, timedelta
@@ -554,6 +584,18 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, b"bad request", "text/plain; charset=utf-8")
                     return
                 self._send(200, to_csv(venue_result_rows(day, jcd), header=RESULT_HEADER), "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/section_roster.csv":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                roster_day = (qs.get("date") or [""])[0]
+                if jcd not in VENUES or not re.fullmatch(r"20\d{6}", roster_day):
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                self._send(200, to_csv(section_roster_rows(roster_day, jcd), header=ROSTER_HEADER), "text/csv; charset=utf-8")
                 return
 
             if parsed.path == "/section_results.csv":
