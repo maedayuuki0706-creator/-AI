@@ -19,6 +19,7 @@ import direct_discord_notify as base
 import four_way_prototype as trial
 import hiyori_model
 import hiyori_source
+import pt2_sheet_db
 
 ROOT = Path("data/prototype12_delivery")
 STREAMS = ("prototype1", "prototype2")
@@ -96,10 +97,13 @@ def model_message(record, stream):
         )
     main = " / ".join(model.get("main_picks") or [])
     cover = " / ".join(model.get("cover_picks") or [])
+    db = model.get("database") or {}
+    db_state = "ON" if db.get("enabled") else "fallback"
     return (
-        f"🧪 **プロトタイプ2｜PT3×既存メイン圧縮**\n"
+        f"🧪 **プロトタイプ2｜PT3×DB補正メイン圧縮**\n"
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
-        f"⚖️ PT3を既存メインとの一致度で7〜10点へ圧縮\n"
+        f"🗃️ DB {db_state}｜選手 {db.get('player_matches', 0)}/6｜モーター {db.get('motor_matches', 0)}/6｜場データ {'ON' if db.get('venue_match') else 'OFF'}\n"
+        f"⚖️ PT3をDB補正済み既存メインとの一致度で7〜10点へ圧縮\n"
         f"◎ **本線 {len(model.get('main_picks') or [])}点**\n"
         f"`{main}`\n"
         f"○ **迎え {len(model.get('cover_picks') or [])}点**\n"
@@ -119,6 +123,7 @@ def build_record(day, jcd, rno, deadline):
     source = hiyori_source.fetch_race(day, jcd, rno)
     source["fetched_at"] = now_jst().isoformat()
     hiyori = hiyori_model.analyze(official, source, day, jcd, rno)
+    pt2_official = pt2_sheet_db.enhance_analysis(official, jcd)
     if not any(f.get("used") for f in hiyori.get("features", [])):
         return None, "hiyori_feature_unavailable"
 
@@ -141,12 +146,15 @@ def build_record(day, jcd, rno, deadline):
     existing_native = [row["combination"] for row in bridge_learning._reallocate(
         official, [{"combination": p} for p in existing_native]
     )] if False else existing_native
+    pt2_existing_native = [row["combination"] for row in base.displayed_picks_variable(
+        pt2_official, True)] if hasattr(base, "displayed_picks_variable") else [
+            row["combination"] for row in trial.cards.displayed_picks_variable(pt2_official, True)]
 
     models = {
         "prototype1": trial._prototype1_attack(
             hiyori, official, odds, native_hiyori, existing_native),
         "prototype2": trial._prototype2_compress(
-            hiyori, official, odds, native_hiyori, existing_native),
+            hiyori, pt2_official, odds, native_hiyori, pt2_existing_native),
     }
 
     key = key_for(day, jcd, rno)
