@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import json
 from pathlib import Path
@@ -14,17 +15,23 @@ OUT = Path("naruto_backfill_20260927_20261002.json")
 def sort_key(rec):
     return (rec["day"], int(rec["rno"]))
 
+def fetch_one(day, rno):
+    raw=base.fetch(base.official_url("raceresult", day, JCD, rno))
+    return parse_result(raw, day, JCD, rno)
+
 def main():
     races=[]
     errors=[]
-    for day in DAYS:
-        for rno in range(1,13):
+    jobs=[(day,rno) for day in DAYS for rno in range(1,13)]
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        futures={pool.submit(fetch_one,day,rno):(day,rno) for day,rno in jobs}
+        for future in as_completed(futures):
+            day,rno=futures[future]
             try:
-                raw=base.fetch(base.official_url("raceresult", day, JCD, rno))
-                result=parse_result(raw, day, JCD, rno)
-                races.append(result)
+                races.append(future.result())
             except Exception as exc:
                 errors.append({"day":day,"rno":rno,"error":f"{type(exc).__name__}: {exc}"})
+    races.sort(key=lambda x:(x["day"],int(x["rno"])))
 
     grouped=defaultdict(list)
     for race in races:
