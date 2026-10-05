@@ -60,6 +60,7 @@ RESULT_HEADER = [
 ]
 ROSTER_HEADER = ["登録番号","選手名","級別","モーターNo.","モーター2連率","モーター3連率"]
 BASIC_ROSTER_HEADER = ["登録番号","選手名","級別"]
+RACE_ROSTER_HEADER = ["登録番号","選手名","級別","モーターNo.","モーター2連率","モーター3連率"]
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
@@ -400,6 +401,23 @@ def assen_roster_rows(day: str, jcd: str) -> list[list]:
     return _cached(f"assen-roster:{day}:{jcd}", build)
 
 
+def race_roster_rows(day: str, jcd: str, rno: int) -> list[list]:
+    """Six-boat roster for one race; intentionally small/fast for Sheets."""
+    if jcd not in VENUES or not 1 <= int(rno) <= 12:
+        return []
+    rows = []
+    for b in parse_racelist_boats(day, jcd, int(rno)):
+        rows.append([
+            str(b.get("racer_id") or ""),
+            b.get("name",""),
+            b.get("current_class",""),
+            b.get("motor_number","") if b.get("motor_number") is not None else "",
+            b.get("motor_top2_rate","") if b.get("motor_top2_rate") is not None else "",
+            b.get("motor_top3_rate","") if b.get("motor_top3_rate") is not None else "",
+        ])
+    return rows
+
+
 def section_roster_rows(day: str, jcd: str) -> list[list]:
     """Return a unique race-card roster for a venue/date, keyed by registration."""
     if jcd not in VENUES:
@@ -607,6 +625,22 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, b"bad request", "text/plain; charset=utf-8")
                     return
                 self._send(200, to_csv(venue_result_rows(day, jcd), header=RESULT_HEADER), "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/race_roster.csv":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                roster_day = (qs.get("date") or [""])[0]
+                try:
+                    rno = int((qs.get("rno") or ["0"])[0])
+                except ValueError:
+                    rno = 0
+                if jcd not in VENUES or not re.fullmatch(r"20\d{6}", roster_day) or not 1 <= rno <= 12:
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                self._send(200, to_csv(race_roster_rows(roster_day, jcd, rno), header=RACE_ROSTER_HEADER), "text/csv; charset=utf-8")
                 return
 
             if parsed.path == "/assen_roster.csv":
