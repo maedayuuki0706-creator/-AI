@@ -195,12 +195,15 @@ def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
     return _cached(f"race:{day}:{jcd}:{rno}", build)
 
 
-def race_rows(day: str, jcd: str, rno: int) -> list[list]:
+def race_rows(day: str, jcd: str, rno: int, deadline_override: str | None = None) -> list[list]:
     boats = parse_racelist_boats(day, jcd, rno)
     if not boats:
         return []
-    dls = deadlines(day, jcd)
-    deadline = dls[rno - 1] if len(dls) >= rno else ""
+    if deadline_override is None:
+        dls = deadlines(day, jcd)
+        deadline = dls[rno - 1] if len(dls) >= rno else ""
+    else:
+        deadline = deadline_override
     rows = []
     for b in boats:
         materials = []
@@ -247,9 +250,6 @@ def parse_result(day: str, jcd: str, rno: int) -> dict:
     def build():
         raw = fetch(official_url("raceresult", day, jcd, rno))
         text = textify(raw)
-        card = parse_racelist_boats(day, jcd, rno)
-        card_by_lane = {b["lane"]: b for b in card}
-
         finish_by_lane: dict[int, int] = {}
         racer_by_lane: dict[int, str] = {}
         name_by_lane: dict[int, str] = {}
@@ -271,26 +271,12 @@ def parse_result(day: str, jcd: str, rno: int) -> dict:
             lane = int(lane_match[1])
             finish_by_lane[lane] = int(first)
             racer_by_lane[lane] = reg[1]
-            if lane in card_by_lane:
-                name_by_lane[lane] = card_by_lane[lane].get("name", "")
-
-        # Fallback: the result table can omit the boat-color class in some layouts.
-        if len(finish_by_lane) < 3 and card:
-            for body in re.findall(r"<tbody\b[^>]*>(.*?)</tbody>", raw, re.I | re.S):
-                cells = re.findall(r"<td\b[^>]*>(.*?)</td>", body, re.I | re.S)
-                if len(cells) < 3:
-                    continue
-                first = textify(cells[0])
-                body_text = textify(body)
-                reg = re.search(r"\b(\d{4})\b", body_text)
-                if not re.fullmatch(r"[1-6]", first) or not reg:
-                    continue
-                for lane, boat in card_by_lane.items():
-                    if boat["racer_id"] == reg[1]:
-                        finish_by_lane[lane] = int(first)
-                        racer_by_lane[lane] = reg[1]
-                        name_by_lane[lane] = boat.get("name", "")
-                        break
+            # Best-effort name extraction; registration number is the canonical key.
+            after_reg = body_text[reg.end():].strip().split("\n")
+            if after_reg:
+                candidate = re.sub(r"\s+", "", after_reg[0])
+                if candidate and not re.fullmatch(r"(?:A1|A2|B1|B2|\d+(?:\.\d+)?)", candidate):
+                    name_by_lane[lane] = candidate
 
         if len(finish_by_lane) < 3:
             return {}
@@ -375,10 +361,8 @@ def result_rows(day: str, jcd: str, rno: int) -> list[list]:
 
 
 def venue_result_rows(day: str, jcd: str) -> list[list]:
-    if jcd not in discover_venues(day):
-        return []
     rows: list[list] = []
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    with ThreadPoolExecutor(max_workers=12) as ex:
         futures = [ex.submit(result_rows, day, jcd, rno) for rno in range(1, 13)]
         for future in as_completed(futures):
             try:
@@ -410,11 +394,13 @@ def today_result_rows(day: str) -> list[list]:
 
 
 def venue_rows(day: str, jcd: str) -> list[list]:
-    if jcd not in discover_venues(day):
-        return []
     rows: list[list] = []
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        futures = [ex.submit(race_rows, day, jcd, rno) for rno in range(1, 13)]
+    dls = deadlines(day, jcd)
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        futures = []
+        for rno in range(1, 13):
+            deadline = dls[rno - 1] if len(dls) >= rno else ""
+            futures.append(ex.submit(race_rows, day, jcd, rno, deadline))
         for future in as_completed(futures):
             try:
                 rows.extend(future.result())
