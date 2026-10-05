@@ -76,7 +76,10 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(p1['stake_yen'], 100 * p1['point_count'])
         self.assertLessEqual(len(p1['longshot_picks']), 3)
         p2 = record['models']['prototype2']
-        self.assertLessEqual(p2['point_count'], 10)
+        self.assertGreaterEqual(p2['point_count'], p3['point_count'])
+        self.assertIsNone(p2['structure']['fixed_point_cap'])
+        self.assertTrue(set(record['native_candidate_picks']['prototype2_existing_db'])
+                        <= set(p2['picks']))
         self.assertEqual(p2['picks'], p2['main_picks'] + p2['cover_picks'])
 
     def test_even_three_way_tie_has_ten_points(self):
@@ -88,7 +91,8 @@ class ModelTests(unittest.TestCase):
         for stream in ('existing', 'hiyori'):
             self.assertEqual(len(record['models'][stream]['picks']), 10)
         self.assertTrue(8 <= len(record['models']['prototype1']['picks']) <= 13)
-        self.assertTrue(1 <= len(record['models']['prototype2']['picks']) <= 10)
+        self.assertGreaterEqual(len(record['models']['prototype2']['picks']),
+                                len(record['models']['prototype3']['picks']))
         self.assertLessEqual(len(record['models']['prototype3']['picks']), 16)
 
     def test_missing_odds_are_unknown_not_zero(self):
