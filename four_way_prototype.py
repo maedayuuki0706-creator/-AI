@@ -456,7 +456,7 @@ def summarize(day):
               'generated_at': datetime.now(JST).isoformat(), 'point_count': POINTS, 'unit_yen': UNIT_YEN,
               'point_policy': {'existing': POINTS, 'hiyori': POINTS,
                                'prototype1': scent_box.POLICY,
-                               'prototype2': 'pt3-existing-consensus-grade-7-8-10',
+                               'prototype2': 'pt3-db-consensus-no-fixed-point-cap',
                                'prototype3': 'hiyori-native-plus-mid-cover-cap16'},
               'recorded': len(predictions), 'pending': len(predictions)-len(results),
               'excluded_refunds_void_special': len(results)-len(cohort),
