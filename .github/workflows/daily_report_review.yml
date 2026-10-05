@@ -44,7 +44,19 @@ jobs:
           if [ -n "$INPUT_DAY" ]; then
             echo "REPORT_DAY=$INPUT_DAY" >> "$GITHUB_ENV"
           else
-            echo "REPORT_DAY=$(TZ=Asia/Tokyo date +%Y%m%d)" >> "$GITHUB_ENV"
+            REPORT_DAY=$(python - <<'PY'
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
+
+          now = datetime.now(ZoneInfo("Asia/Tokyo"))
+          # Scheduled Actions can be delayed. If the 23:50 JST report actually
+          # starts after midnight, keep it attached to the race day that just ended.
+          if now.hour < 6:
+              now -= timedelta(days=1)
+          print(now.strftime("%Y%m%d"))
+          PY
+          )
+            echo "REPORT_DAY=$REPORT_DAY" >> "$GITHUB_ENV"
           fi
       - name: Verify separate report channel
         env:
