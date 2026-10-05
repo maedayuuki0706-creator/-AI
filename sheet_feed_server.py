@@ -59,6 +59,7 @@ RESULT_HEADER = [
     "3連単","3連単払戻","2連単","2連単払戻","確定",
 ]
 ROSTER_HEADER = ["登録番号","選手名","級別","モーターNo.","モーター2連率","モーター3連率"]
+BASIC_ROSTER_HEADER = ["登録番号","選手名","級別"]
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
@@ -377,6 +378,28 @@ def venue_result_rows(day: str, jcd: str) -> list[list]:
     return rows
 
 
+def assen_roster_rows(day: str, jcd: str) -> list[list]:
+    """Fast venue roster from the official assignment page (single HTTP request)."""
+    if jcd not in VENUES:
+        return []
+    def build():
+        url = official_url("assen", day, jcd)
+        raw = fetch(url)
+        text = textify(raw)
+        rows = []
+        seen = set()
+        pat = re.compile(r"(?:^|\n)(\d{4})\n([^\n]+)\n級別\s*[:：]?\s*(A1|A2|B1|B2)\b")
+        for m in pat.finditer(text):
+            reg = m.group(1)
+            if reg in seen:
+                continue
+            seen.add(reg)
+            name = re.sub(r"\s+", "", m.group(2)).strip()
+            rows.append([reg, name, m.group(3)])
+        return rows
+    return _cached(f"assen-roster:{day}:{jcd}", build)
+
+
 def section_roster_rows(day: str, jcd: str) -> list[list]:
     """Return a unique race-card roster for a venue/date, keyed by registration."""
     if jcd not in VENUES:
@@ -584,6 +607,18 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, b"bad request", "text/plain; charset=utf-8")
                     return
                 self._send(200, to_csv(venue_result_rows(day, jcd), header=RESULT_HEADER), "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/assen_roster.csv":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                roster_day = (qs.get("date") or [""])[0]
+                if jcd not in VENUES or not re.fullmatch(r"20\d{6}", roster_day):
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                self._send(200, to_csv(assen_roster_rows(roster_day, jcd), header=BASIC_ROSTER_HEADER), "text/csv; charset=utf-8")
                 return
 
             if parsed.path == "/section_roster.csv":
