@@ -15,6 +15,7 @@ on:
       - "daily_report.py"
       - "daily_report_format.py"
       - "stake_simulation_3000.py"
+      - "selected_metrics.py"
       - "selected_daily_report.py"
       - ".github/workflows/daily_report_review.yml"
 
@@ -103,6 +104,8 @@ jobs:
         run: python daily_report.py --day "$REPORT_DAY"
       - name: Build 3000 yen stake simulation
         run: python stake_simulation_3000.py --day "$REPORT_DAY"
+      - name: Build selected metrics for report
+        run: python selected_metrics.py --day "$REPORT_DAY"
       - name: Send reviewed daily report
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
