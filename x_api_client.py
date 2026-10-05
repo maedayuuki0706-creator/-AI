@@ -110,8 +110,8 @@ def post_text(text: str, *, reply_to: str | None = None) -> str:
 
     data = payload.get("data") or {}
     post_id = str(data.get("id") or "").strip()
-    if not post_id:
-        raise RuntimeError(f"X response missing post id: {payload}")
+    if not post_id.isdigit():
+        raise RuntimeError("X response missing a numeric post id")
     return post_id
 
 

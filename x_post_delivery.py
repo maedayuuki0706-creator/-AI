@@ -418,7 +418,7 @@ def send_selected_mid(record: dict, payload: dict) -> bool:
 
 
 
-def send_featured_record(
+def build_featured_post(
     record: dict,
     picks=None,
     *,
@@ -426,8 +426,8 @@ def send_featured_record(
     note: str = "",
     main_picks=None,
     cover_picks=None,
-) -> bool:
-    """Publish one featured X race as 10 main + up to 8 alternate-head covers."""
+) -> tuple[str, list[str]]:
+    """Render exact existing tickets without sending or creating an outbox."""
     if source not in {"AI重なり本線", "配当期待本線"}:
         raise ValueError("invalid featured X source")
 
@@ -443,7 +443,7 @@ def send_featured_record(
     main = main[:10]
     raw_picks = _unique_picks(main + cover)
     if not raw_picks:
-        return False
+        return "", []
 
     venue = record.get("venue") or str(record.get("jcd") or "")
     rno = int(record.get("rno") or 0)
@@ -458,15 +458,26 @@ def send_featured_record(
     ]
     if cover:
         lines += [
-            f"🛡️ 抑え・逆転候補 {len(cover)}点",
+            f"🛡️ 抑え {len(cover)}点",
             *_compact_picks(cover),
         ]
     note = str(note or "").strip()
     if note:
         lines += [f"📊 {note}"]
-    lines += ["🔔 結果も自動投稿"]
+    lines += ["結果も自動投稿｜フォローお願いします！"]
+    if weighted_length("\n".join(lines)) > 280:
+        # Keep all tickets and the follow invitation; detailed model reasons
+        # remain in the source record and delivery receipt.
+        lines = ["📊 展示反映" if line.startswith("📊 ") else line for line in lines]
+    return _fit_post(lines), raw_picks
 
-    post = _fit_post(lines)
+
+def send_featured_record(record: dict, picks=None, *, source: str, note: str = "",
+                         main_picks=None, cover_picks=None) -> bool:
+    post, raw_picks = build_featured_post(record, picks, source=source, note=note,
+                                        main_picks=main_picks, cover_picks=cover_picks)
+    if not post:
+        return False
     enriched = dict(record)
     enriched["x_picks"] = raw_picks
     return _send_once(enriched, source, post)

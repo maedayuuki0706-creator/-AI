@@ -336,6 +336,7 @@ def sync_archived_result_to_x(day: str, jcd: str, rno: int, archive_ref: str = "
         winner, payout = max(((str(combo), int(yen)) for combo, yen in payouts.items()), key=lambda item: item[1])
         hit = winner in _archived_pick_set(row)
         text = _result_text(row, winner, payout, hit)
+        posted_text, posted_reply_to = text, original_post_id
 
         _X_RESULT_UNCERTAIN.add(key)
         try:
@@ -346,7 +347,13 @@ def sync_archived_result_to_x(day: str, jcd: str, rno: int, archive_ref: str = "
                 # posting is still allowed. Fall back once so result delivery
                 # remains automatic.
                 fallback = text + f"\n記録 {day[-4:]}-{rno}R"
-                post_id = post_to_x(fallback)
+                try:
+                    post_id = post_to_x(fallback)
+                except XPostRejected as rejected:
+                    if 400 <= rejected.status < 500:
+                        _X_RESULT_UNCERTAIN.discard(key)
+                    raise
+                posted_text, posted_reply_to = fallback, None
                 print(f"X result reply fallback sent: {key} post_id={post_id}", flush=True)
             else:
                 if 400 <= exc.status < 500:
@@ -363,6 +370,8 @@ def sync_archived_result_to_x(day: str, jcd: str, rno: int, archive_ref: str = "
             "winner": winner,
             "odds": payout / 100.0,
             "hit": hit,
+            "text": posted_text,
+            "reply_to": posted_reply_to,
         }
 
 

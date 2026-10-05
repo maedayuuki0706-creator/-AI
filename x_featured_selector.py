@@ -427,39 +427,42 @@ def _stems(day: str) -> set[str]:
     return stems
 
 
-def run(now: datetime | None = None) -> int:
-    now = (now or datetime.now(JST)).astimezone(JST)
+def collect_candidates(now: datetime, state: dict, *, audit: dict | None = None) -> list[dict]:
+    """Reuse the existing selection rules; expose why a wake-up found no race."""
+    now = now.astimezone(JST)
     day = now.strftime("%Y%m%d")
-    local = xpost._load(day)
-    durable = outbox.load_state(day) if outbox.configured() else {}
-    state = outbox.merge_state(durable, local)
-
+    audit = audit if audit is not None else {}
+    def count(reason):
+        audit[reason] = audit.get(reason, 0) + 1
     featured = list(map(str, state.get("x_featured_races") or []))
-    if len(featured) >= MAX_DAILY_POSTS:
-        print(f"X featured quota full: {len(featured)}/{MAX_DAILY_POSTS}", flush=True)
-        return 0
-
     posted = set(map(str, state.get("x_posted_races") or []))
     used_modes = set((state.get("x_featured_modes") or {}).values())
     candidates = []
     for stem in sorted(_stems(day)):
+        count("prediction_files")
         race = _load_race(day, stem)
         if not race:
+            count("model_unavailable")
             continue
         key = _race_key(day, race["jcd"], race["rno"])
         if key in posted or key in featured:
+            count("already_selected")
             continue
         close = _deadline(day, race["deadline"])
         if close is None:
+            count("invalid_deadline")
             continue
         lead = (close - now).total_seconds()
         if lead < MIN_LEAD_SECONDS or lead > MAX_LEAD_SECONDS:
+            count("inside_cutoff" if lead < MIN_LEAD_SECONDS else "not_due")
             continue
         pick = _candidate(race)
         if not pick:
+            count("selection_gate")
             continue
         plan = _ticket_plan(race)
         if not plan or len(plan["main"]) < MAIN_POINTS:
+            count("ticket_plan_unavailable")
             continue
         diversity_bonus = 4 if pick["source"] not in used_modes else 0
         pick = {
@@ -475,6 +478,22 @@ def run(now: datetime | None = None) -> int:
         candidates.append(pick)
 
     candidates.sort(key=lambda item: (item["rank"], -int(item["race"]["rno"])), reverse=True)
+    audit["eligible"] = len(candidates)
+    return candidates
+
+
+def run(now: datetime | None = None) -> int:
+    now = (now or datetime.now(JST)).astimezone(JST)
+    day = now.strftime("%Y%m%d")
+    local = xpost._load(day)
+    durable = outbox.load_state(day) if outbox.configured() else {}
+    state = outbox.merge_state(durable, local)
+    featured = list(map(str, state.get("x_featured_races") or []))
+    if len(featured) >= MAX_DAILY_POSTS:
+        print(f"X featured quota full: {len(featured)}/{MAX_DAILY_POSTS}", flush=True)
+        return 0
+    used_modes = set((state.get("x_featured_modes") or {}).values())
+    candidates = collect_candidates(now, state)
     remaining = MAX_DAILY_POSTS - len(featured)
     sent = 0
     for item in candidates:

@@ -29,6 +29,11 @@ class WakeupTests(unittest.TestCase):
         api = self.api([{'id':2,'status':'completed','created_at':'2026-10-05T01:59:00Z'}])
         self.assertEqual(wakeup.wake('sokuhou-delivery.yml',api=api,now=self.now)['status'],'recent_run')
 
+    def test_x_has_short_wakeup_window_while_discord_keeps_existing_interval(self):
+        rows=[{'id':2,'status':'completed','created_at':'2026-10-05T01:57:30Z'}]
+        self.assertEqual(wakeup.wake('x-delivery-v2-production.yml',api=self.api(rows),now=self.now)['status'],'requested')
+        self.assertEqual(wakeup.wake('discord_notify.yml',api=self.api(rows),now=self.now)['status'],'recent_run')
+
     def test_continuation_ignores_its_parent_and_uses_dispatch_event(self):
         api = self.api([{'id':1,'status':'in_progress','created_at':'2026-10-05T01:59:00Z'}])
         result = wakeup.wake(wakeup.DISPATCHER,api=api,now=self.now,current_run_id='1',continuation=True)

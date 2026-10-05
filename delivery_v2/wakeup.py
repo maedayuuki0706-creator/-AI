@@ -10,7 +10,7 @@ import urllib.request
 API = 'https://api.github.com/repos/maedayuuki0706-creator/-AI'
 DISPATCHER = 'discord-delivery-v2-production.yml'
 TARGETS = ('discord_notify.yml', 'prototype3-delivery.yml', 'sokuhou-delivery.yml',
-           'hiyori-discord.yml', 'prototype12-delivery.yml')
+           'hiyori-discord.yml', 'prototype12-delivery.yml', 'x-delivery-v2-production.yml')
 INTERVAL_SECONDS = 300
 
 
@@ -39,7 +39,8 @@ def wake(workflow, *, api=request, now=None, current_run_id='', continuation=Fal
         return {'workflow': workflow, 'status': 'already_active'}
     if not continuation and others:
         last = max(datetime.fromisoformat(row['created_at'].replace('Z','+00:00')) for row in others)
-        if (now-last).total_seconds() < INTERVAL_SECONDS:
+        interval = 120 if workflow == 'x-delivery-v2-production.yml' else INTERVAL_SECONDS
+        if (now-last).total_seconds() < interval:
             return {'workflow': workflow, 'status': 'recent_run'}
     payload = {'ref': 'main'}
     if continuation:

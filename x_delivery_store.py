@@ -146,6 +146,24 @@ def merge_state(remote: dict, local: dict) -> dict:
     result["x_result_post_ids"] = {**(remote.get("x_result_post_ids") or {}), **(local.get("x_result_post_ids") or {})}
     result["x_featured_modes"] = {**(remote.get("x_featured_modes") or {}), **(local.get("x_featured_modes") or {})}
     result["x_exhibition_update_ids"] = {**(remote.get("x_exhibition_update_ids") or {}), **(local.get("x_exhibition_update_ids") or {})}
+    # An older legacy checkout must not replace newer native acknowledgement
+    # receipts or change their immutable post IDs during a main checkpoint.
+    native = dict(remote.get("x_v2_receipts") or {})
+    for key, row in (local.get("x_v2_receipts") or {}).items():
+        prior = native.get(key) or {}
+        if prior.get("status") == "sent":
+            continue
+        if row.get("status") == "sent" or row.get("updated_at", row.get("claimed_at", "")) >= prior.get("updated_at", prior.get("claimed_at", "")):
+            native[key] = row
+    if native:
+        result["x_v2_receipts"] = native
+        for row in native.values():
+            if row.get("status") != "sent" or not str(row.get("post_id", "")).isdigit():
+                continue
+            original = row["row"]
+            race = f'{original["day"]}:{str(original["jcd"]).zfill(2)}:{int(original["rno"])}'
+            field = "x_post_ids" if row["phase"] == "prediction" else "x_result_post_ids"
+            result[field][race] = row["post_id"]
     # A confirmed receipt always wins over an interrupted attempt.
     attempts = {**(remote.get("x_attempts") or {}), **(local.get("x_attempts") or {})}
     for key in result["x_posted_races"]:
@@ -159,6 +177,21 @@ def merge_state(remote: dict, local: dict) -> dict:
     for key in result["x_result_races"]:
         result_attempts.pop(key, None)
     result["x_result_attempts"] = result_attempts
+    # A stale runtime checkout can still contain an older retryable attempt.
+    # The native receipt's owner remains authoritative until it is resolved.
+    for row in native.values():
+        original = row["row"]
+        race = f'{original["day"]}:{str(original["jcd"]).zfill(2)}:{int(original["rno"])}'
+        field = "x_attempts" if row["phase"] == "prediction" else "x_result_attempts"
+        if row.get("status") == "sent":
+            result[field].pop(race, None)
+            continue
+        matching = [state.get(field, {}).get(race) for state in (remote, local)]
+        matching = [attempt for attempt in matching if attempt and attempt.get("id") == row.get("owner")]
+        if matching:
+            result[field][race] = max(matching, key=lambda attempt:attempt.get("retry_at", attempt.get("at", "")))
+        else:
+            result[field][race] = {"id":row["owner"], "status":"blocked", "attempt":row["attempt"]}
     return result
 
 

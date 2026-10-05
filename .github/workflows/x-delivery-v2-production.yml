@@ -1,0 +1,51 @@
+name: X Delivery V2 Production
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '1-56/5 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'x_delivery_v2/**'
+      - 'x_featured_selector.py'
+      - 'x_post_delivery.py'
+      - 'x_delivery_store.py'
+      - 'x_api_client.py'
+      - '.github/workflows/x-delivery-v2-production.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: x-delivery-production
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify X claims, cutoff and restart guards without posting
+        run: |
+          python -m unittest discover -s tests -p 'test_x_delivery_v2*.py' -v
+          python -m unittest discover -s tests -p 'test_x_featured_selector.py' -v
+      - name: Dispatch current predictions and confirmed-post results
+        env:
+          TZ: Asia/Tokyo
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: X_DELIVERY_SOURCE_COMMIT="$(git rev-parse HEAD)" python -u -m x_delivery_v2.dispatcher --budget-seconds 90
+      - name: Preserve acknowledgement recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x-delivery-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          path: data/x_delivery_v2_recovery/
+          if-no-files-found: ignore
+          retention-days: 14

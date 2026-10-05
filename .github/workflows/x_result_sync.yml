@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: x-result-auto-post
+  group: x-delivery-production
   cancel-in-progress: false
 
 jobs:
@@ -37,5 +37,14 @@ jobs:
 
       - name: Publish settled X results
         env:
+          TZ: Asia/Tokyo
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python x_post_delivery.py --sync-results
+        run: X_DELIVERY_SOURCE_COMMIT="$(git rev-parse HEAD)" python -u -m x_delivery_v2.dispatcher --mode results --budget-seconds 90
+
+      - name: Preserve X result acknowledgement recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x-results-v2-${{ github.run_id }}
+          path: data/x_delivery_v2_recovery/
+          if-no-files-found: ignore
