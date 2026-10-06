@@ -143,6 +143,27 @@ def deadlines(day: str, jcd: str) -> list[str]:
     return _cached(f"deadlines:{day}:{jcd}", build)
 
 
+
+def debug_race_structure(day: str, jcd: str, rno: int) -> dict:
+    raw = fetch(official_url("racelist", day, jcd, rno))
+    bodies = []
+    for idx, body in enumerate(re.findall(r"<tbody\\b[^>]*>(.*?)</tbody>", raw, re.I | re.S)):
+        cells = re.findall(r"<td\\b[^>]*>(.*?)</td>", body, re.I | re.S)
+        txt = textify(body)
+        lane_match = re.search(r"is-boatColor([1-6])", body)
+        reg = re.search(r"(\\d{4})\\s*/\\s*(A1|A2|B1|B2)\\b", txt)
+        if lane_match or reg:
+            bodies.append({
+                "index": idx,
+                "lane": int(lane_match.group(1)) if lane_match else None,
+                "registration": reg.group(1) if reg else None,
+                "class": reg.group(2) if reg else None,
+                "cell_count": len(cells),
+                "cells": [textify(x)[:500] for x in cells],
+                "text": txt[:1500],
+            })
+    return {"url": official_url("racelist", day, jcd, rno), "tbody_count": len(bodies), "bodies": bodies}
+
 def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
     def build():
         raw = fetch(official_url("racelist", day, jcd, rno))
@@ -575,6 +596,22 @@ class Handler(BaseHTTPRequestHandler):
                     "prediction_delivery_touched": False,
                     "day_jst": day,
                 }
+                self._send(200, json.dumps(payload, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+                return
+
+            if parsed.path == "/debug_race.json":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                try:
+                    rno = int((qs.get("rno") or ["0"])[0])
+                except ValueError:
+                    rno = 0
+                if jcd not in VENUES or not 1 <= rno <= 12:
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                payload = debug_race_structure(day, jcd, rno)
                 self._send(200, json.dumps(payload, ensure_ascii=False).encode(), "application/json; charset=utf-8")
                 return
 
