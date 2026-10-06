@@ -30,67 +30,56 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Debug official beforeinfo and collect first 3 venue footwork sections
+      - name: Collect batch 2 footwork and results
         run: |
           python - <<'PY'
-          import csv, json, urllib.request
+          import csv, json
           from pathlib import Path
           import sheet_feed_server as s
 
-          dbg_url = "https://www.boatrace.jp/owpc/pc/race/beforeinfo?hd=20260926&jcd=02&rno=1"
-          req = urllib.request.Request(dbg_url, headers={"User-Agent":"Mozilla/5.0"})
-          raw = urllib.request.urlopen(req, timeout=20).read().decode("utf-8","ignore")
-          Path("data/footwork_backfill").mkdir(parents=True, exist_ok=True)
-          Path("data/footwork_backfill/debug_beforeinfo.html").write_text(raw, encoding="utf-8")
-          Path("data/footwork_backfill/debug_beforeinfo.txt").write_text(s.textify(raw), encoding="utf-8")
-          raid_url = "https://boatraceraid.jp/exhibition/?opdt=2026-09-26&rcoursecd=02&rno=01"
-          try:
-              req2 = urllib.request.Request(raid_url, headers={
-                  "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36",
-                  "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                  "Referer":"https://boatraceraid.jp/"
-              })
-              raw2 = urllib.request.urlopen(req2, timeout=20).read().decode("utf-8","ignore")
-              Path("data/footwork_backfill/debug_raid.html").write_text(raw2, encoding="utf-8")
-              Path("data/footwork_backfill/debug_raid.txt").write_text(s.textify(raw2), encoding="utf-8")
-          except Exception as e:
-              Path("data/footwork_backfill/debug_raid_error.txt").write_text(repr(e), encoding="utf-8")
-
           jobs = [
-              ("01","桐生","20260905","20260910"),
-              ("02","戸田","20260926","20260930"),
               ("04","平和島","20260914","20260919"),
+              ("05","多摩川","20260925","20260930"),
+              ("06","浜名湖","20260919","20260924"),
           ]
-          outdir = Path("data/footwork_backfill")
+          outdir = Path("data/footwork_backfill/batch2")
           outdir.mkdir(parents=True, exist_ok=True)
           summary = {}
-          all_rows = []
+          all_foot = []
+          all_results = []
           for jcd, venue, start, end in jobs:
-              rows = s.section_footwork_rows(start, end, jcd)
-              summary[venue] = {"rows": len(rows), "start": start, "end": end}
-              p = outdir / f"{jcd}_{start}_{end}.csv"
-              with p.open("w", encoding="utf-8-sig", newline="") as f:
-                  w = csv.writer(f)
-                  w.writerow(s.FOOTWORK_HEADER)
-                  w.writerows(rows)
-              all_rows.extend(rows)
-          with (outdir / "first3_all.csv").open("w", encoding="utf-8-sig", newline="") as f:
-              w = csv.writer(f)
-              w.writerow(s.FOOTWORK_HEADER)
-              w.writerows(all_rows)
+              foot = s.section_footwork_rows(start, end, jcd)
+              results = s.section_result_rows(start, end, jcd)
+              summary[venue] = {
+                  "footwork_rows": len(foot),
+                  "result_rows": len(results),
+                  "start": start,
+                  "end": end,
+              }
+              with (outdir / f"{jcd}_{start}_{end}_footwork.csv").open("w", encoding="utf-8-sig", newline="") as f:
+                  w = csv.writer(f); w.writerow(s.FOOTWORK_HEADER); w.writerows(foot)
+              with (outdir / f"{jcd}_{start}_{end}_results.csv").open("w", encoding="utf-8-sig", newline="") as f:
+                  w = csv.writer(f); w.writerow(s.RESULT_HEADER); w.writerows(results)
+              all_foot.extend(foot)
+              all_results.extend(results)
+
+          with (outdir / "batch2_footwork.csv").open("w", encoding="utf-8-sig", newline="") as f:
+              w = csv.writer(f); w.writerow(s.FOOTWORK_HEADER); w.writerows(all_foot)
+          with (outdir / "batch2_results.csv").open("w", encoding="utf-8-sig", newline="") as f:
+              w = csv.writer(f); w.writerow(s.RESULT_HEADER); w.writerows(all_results)
           (outdir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
           print(json.dumps(summary, ensure_ascii=False))
           PY
 
-      - name: Commit backfill output
+      - name: Commit batch 2 output
         run: |
-          if [ -z "$(git status --porcelain data/footwork_backfill/)" ]; then
+          if [ -z "$(git status --porcelain data/footwork_backfill/batch2/)" ]; then
             echo "No backfill changes"
             exit 0
           fi
           git config user.name "boat-ai-sheet-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add data/footwork_backfill/
-          git commit -m "Backfill first 3 venue footwork data"
+          git add data/footwork_backfill/batch2/
+          git commit -m "Backfill batch 2 venue footwork data"
           git pull --rebase origin sheet-auto-update
           git push origin HEAD:sheet-auto-update
