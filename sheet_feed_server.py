@@ -61,6 +61,11 @@ RESULT_HEADER = [
 ROSTER_HEADER = ["登録番号","選手名","級別","モーターNo.","モーター2連率","モーター3連率"]
 BASIC_ROSTER_HEADER = ["登録番号","選手名","級別"]
 RACE_ROSTER_HEADER = ["登録番号","選手名","級別","モーターNo.","モーター2連率","モーター3連率"]
+EXHIBITION_HEADER = [
+    "日付","場","R","枠","登録番号","選手名","級別","モーターNo.",
+    "展示タイム","展示進入","展示ST","本番進入","本番ST","着順","決まり手",
+    "チルト","プロペラ","部品交換","風速","波高","気温","水温",
+]
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
@@ -518,6 +523,163 @@ def section_roster_rows(day: str, jcd: str) -> list[list]:
     return sorted(found.values(), key=lambda r: int(r[0]) if str(r[0]).isdigit() else 99999)
 
 
+
+def _cell_float(value: str):
+    value = textify(value).replace("kg", "").replace("℃", "").replace("cm", "").replace("m", "").strip()
+    if re.fullmatch(r"-?\d+(?:\.\d+)?", value):
+        try:
+            return float(value)
+        except ValueError:
+            return ""
+    return ""
+
+
+def parse_beforeinfo(day: str, jcd: str, rno: int) -> dict:
+    """Parse official pre-race information (exhibition/start/weather)."""
+    def build():
+        raw = fetch(official_url("beforeinfo", day, jcd, rno))
+        text = textify(raw)
+        roster = {int(b["lane"]): b for b in parse_racelist_boats(day, jcd, rno)}
+        rows: dict[int, dict] = {}
+
+        for body in re.findall(r"<tbody\b[^>]*>(.*?)</tbody>", raw, re.I | re.S):
+            lane_match = re.search(r"is-boatColor([1-6])", body)
+            if not lane_match:
+                continue
+            lane = int(lane_match[1])
+            cells = re.findall(r"<td\b[^>]*>(.*?)</td>", body, re.I | re.S)
+            if len(cells) < 6:
+                continue
+
+            exhibition = ""
+            if len(cells) > 4:
+                t = textify(cells[4]).strip()
+                if re.fullmatch(r"[6-9]\.\d{2}", t):
+                    exhibition = float(t)
+            if exhibition == "":
+                for cell in cells:
+                    t = textify(cell).strip()
+                    if re.fullmatch(r"[6-9]\.\d{2}", t):
+                        exhibition = float(t)
+                        break
+
+            tilt = ""
+            if len(cells) > 5:
+                t = textify(cells[5]).strip()
+                if re.fullmatch(r"-?\d+(?:\.\d+)?", t):
+                    v = float(t)
+                    if -1.5 <= v <= 3.0:
+                        tilt = v
+
+            propeller = ""
+            if len(cells) > 6 and "新" in textify(cells[6]):
+                propeller = "新"
+
+            parts = ""
+            if len(cells) > 7:
+                p = re.sub(r"\s+", "", textify(cells[7]))
+                known = ["ピストン","リング","電気","キャブ","シリンダ","シャフト","ギヤ","キャリボ"]
+                found = [x for x in known if x in p]
+                parts = "・".join(found)
+
+            base = roster.get(lane, {})
+            rows[lane] = {
+                "lane": lane,
+                "racer_id": str(base.get("racer_id") or ""),
+                "name": base.get("name",""),
+                "current_class": base.get("current_class",""),
+                "motor_number": base.get("motor_number","") if base.get("motor_number") is not None else "",
+                "exhibition_time": exhibition,
+                "tilt": tilt,
+                "propeller": propeller,
+                "parts": parts,
+            }
+
+        start_by_lane: dict[int, dict] = {}
+        starts = re.findall(
+            r"table1_boatImage1Number[^>]*>\s*([1-6])\s*</span>.*?"
+            r"table1_boatImage1Time[^>]*>(.*?)</span>",
+            raw, re.I | re.S
+        )
+        for course, (lane_s, value) in enumerate(starts[:6], 1):
+            lane = int(lane_s)
+            start_by_lane[lane] = {"course": course, "st": _start_value(value)}
+
+        def weather(pattern):
+            m = re.search(pattern, text)
+            return float(m[1]) if m else ""
+
+        weather_data = {
+            "wind": weather(r"風速\s*([0-9]+(?:\.[0-9]+)?)\s*m"),
+            "wave": weather(r"波高\s*([0-9]+(?:\.[0-9]+)?)\s*cm"),
+            "air_temp": weather(r"気温\s*([0-9]+(?:\.[0-9]+)?)\s*℃"),
+            "water_temp": weather(r"水温\s*([0-9]+(?:\.[0-9]+)?)\s*℃"),
+        }
+        return {"rows": rows, "starts": start_by_lane, "weather": weather_data}
+    return _cached(f"before:{day}:{jcd}:{rno}", build)
+
+
+def exhibition_rows(day: str, jcd: str, rno: int) -> list[list]:
+    info = parse_beforeinfo(day, jcd, rno)
+    if not info:
+        return []
+    result = parse_result(day, jcd, rno)
+    result = result if result and result.get("final") else {}
+    out = []
+    for lane in range(1, 7):
+        row = info.get("rows", {}).get(lane)
+        if not row:
+            continue
+        disp = info.get("starts", {}).get(lane, {})
+        actual = result.get("start_by_lane", {}).get(lane, {})
+        finish = result.get("finish_by_lane", {}).get(lane, "")
+        method = result.get("method", "") if finish == 1 else ""
+        w = info.get("weather", {})
+        out.append([
+            day, VENUES[jcd], rno, lane,
+            row.get("racer_id",""), row.get("name",""), row.get("current_class",""),
+            row.get("motor_number",""), row.get("exhibition_time",""),
+            disp.get("course", lane), disp.get("st",""),
+            actual.get("course", lane), actual.get("st",""),
+            finish, method, row.get("tilt",""), row.get("propeller",""), row.get("parts",""),
+            w.get("wind",""), w.get("wave",""), w.get("air_temp",""), w.get("water_temp",""),
+        ])
+    return out
+
+
+def section_exhibition_rows(start_day: str, end_day: str, jcd: str) -> list[list]:
+    from datetime import timedelta
+
+    if jcd not in VENUES:
+        return []
+    try:
+        start = datetime.strptime(start_day, "%Y%m%d").date()
+        end = datetime.strptime(end_day, "%Y%m%d").date()
+    except ValueError:
+        return []
+    today = datetime.now(JST).date()
+    end = min(end, today)
+    if end < start or (end - start).days > 10:
+        return []
+
+    days = []
+    d = start
+    while d <= end:
+        days.append(d.strftime("%Y%m%d"))
+        d += timedelta(days=1)
+
+    rows: list[list] = []
+    with ThreadPoolExecutor(max_workers=min(24, max(12, len(days) * 6))) as ex:
+        futures = [ex.submit(exhibition_rows, day, jcd, rno) for day in days for rno in range(1, 13)]
+        for future in as_completed(futures):
+            try:
+                rows.extend(future.result())
+            except Exception:
+                continue
+    rows.sort(key=lambda r: (str(r[0]), int(r[2]), int(r[3])))
+    return rows
+
+
 def section_result_rows(start_day: str, end_day: str, jcd: str) -> list[list]:
     """Return all finalized result rows for one venue across a meeting date range."""
     from datetime import date, timedelta
@@ -753,6 +915,19 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, b"bad request", "text/plain; charset=utf-8")
                     return
                 self._send(200, to_csv(section_roster_rows(roster_day, jcd), header=ROSTER_HEADER), "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/section_exhibition.csv":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                start = (qs.get("start") or [""])[0]
+                end = (qs.get("end") or [""])[0]
+                if jcd not in VENUES or not re.fullmatch(r"20\d{6}", start) or not re.fullmatch(r"20\d{6}", end):
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                self._send(200, to_csv(section_exhibition_rows(start, end, jcd), header=EXHIBITION_HEADER), "text/csv; charset=utf-8")
                 return
 
             if parsed.path == "/section_results.csv":
