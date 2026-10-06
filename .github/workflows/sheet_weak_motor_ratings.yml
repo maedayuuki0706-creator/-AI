@@ -1,0 +1,33 @@
+name: Sheet Weak Motor Ratings
+
+on:
+  schedule:
+    # 01:45 JST, after daily results/learning jobs.
+    - cron: "45 16 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sheet-weak-motor-ratings
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sheet-auto-update
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Sheets client
+        run: pip install "gspread>=6,<7" "google-auth>=2,<3"
+      - name: Recompute weak-motor recovery ratings
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          BOAT_SHEET_ID: "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo"
+        run: python sheet_weak_motor_ratings.py
