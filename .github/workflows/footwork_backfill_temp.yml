@@ -1,0 +1,77 @@
+name: Footwork Backfill Temp
+
+on:
+  push:
+    branches: [sheet-auto-update]
+    paths:
+      - ".github/workflows/footwork_backfill_temp.yml"
+      - "data/footwork_backfill_trigger.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: footwork-backfill-temp
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: sheet-auto-update
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Collect first 3 venue footwork sections
+        run: |
+          python - <<'PY'
+          import csv, json
+          from pathlib import Path
+          import sheet_feed_server as s
+
+          jobs = [
+              ("01","桐生","20260905","20260910"),
+              ("02","戸田","20260926","20260930"),
+              ("04","平和島","20260914","20260919"),
+          ]
+          outdir = Path("data/footwork_backfill")
+          outdir.mkdir(parents=True, exist_ok=True)
+          summary = {}
+          all_rows = []
+          for jcd, venue, start, end in jobs:
+              rows = s.section_footwork_rows(start, end, jcd)
+              summary[venue] = {"rows": len(rows), "start": start, "end": end}
+              p = outdir / f"{jcd}_{start}_{end}.csv"
+              with p.open("w", encoding="utf-8-sig", newline="") as f:
+                  w = csv.writer(f)
+                  w.writerow(s.FOOTWORK_HEADER)
+                  w.writerows(rows)
+              all_rows.extend(rows)
+          with (outdir / "first3_all.csv").open("w", encoding="utf-8-sig", newline="") as f:
+              w = csv.writer(f)
+              w.writerow(s.FOOTWORK_HEADER)
+              w.writerows(all_rows)
+          (outdir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+          print(json.dumps(summary, ensure_ascii=False))
+          PY
+
+      - name: Commit backfill output
+        run: |
+          if [ -z "$(git status --porcelain data/footwork_backfill/)" ]; then
+            echo "No backfill changes"
+            exit 0
+          fi
+          git config user.name "boat-ai-sheet-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/footwork_backfill/
+          git commit -m "Backfill first 3 venue footwork data"
+          git pull --rebase origin sheet-auto-update
+          git push origin HEAD:sheet-auto-update
