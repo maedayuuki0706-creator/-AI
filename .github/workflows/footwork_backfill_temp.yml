@@ -43,6 +43,18 @@ jobs:
           Path("data/footwork_backfill").mkdir(parents=True, exist_ok=True)
           Path("data/footwork_backfill/debug_beforeinfo.html").write_text(raw, encoding="utf-8")
           Path("data/footwork_backfill/debug_beforeinfo.txt").write_text(s.textify(raw), encoding="utf-8")
+          raid_url = "https://boatraceraid.jp/exhibition/?opdt=2026-09-26&rcoursecd=02&rno=01"
+          try:
+              req2 = urllib.request.Request(raid_url, headers={
+                  "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36",
+                  "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                  "Referer":"https://boatraceraid.jp/"
+              })
+              raw2 = urllib.request.urlopen(req2, timeout=20).read().decode("utf-8","ignore")
+              Path("data/footwork_backfill/debug_raid.html").write_text(raw2, encoding="utf-8")
+              Path("data/footwork_backfill/debug_raid.txt").write_text(s.textify(raw2), encoding="utf-8")
+          except Exception as e:
+              Path("data/footwork_backfill/debug_raid_error.txt").write_text(repr(e), encoding="utf-8")
 
           jobs = [
               ("01","桐生","20260905","20260910"),
