@@ -743,7 +743,7 @@ def raid_footwork_rows(day: str, jcd: str, rno: int) -> list[list]:
 
 
 def venue_footwork_rows(day: str, jcd: str) -> list[list]:
-    if jcd not in VENUES or not re.fullmatch(r"20\\d{6}", day):
+    if jcd not in VENUES or not re.fullmatch(r"20\d{6}", day):
         return []
     rows: list[list] = []
     with ThreadPoolExecutor(max_workers=6) as ex:
@@ -1216,7 +1216,7 @@ class Handler(BaseHTTPRequestHandler):
                     jcd = VENUE_CODES.get(venue, "")
                 start = (qs.get("start") or [""])[0]
                 end = (qs.get("end") or [""])[0]
-                if jcd not in VENUES or not re.fullmatch(r"20\\d{6}", start) or not re.fullmatch(r"20\\d{6}", end):
+                if jcd not in VENUES or not re.fullmatch(r"20\d{6}", start) or not re.fullmatch(r"20\d{6}", end):
                     self._send(400, b"bad request", "text/plain; charset=utf-8")
                     return
                 self._send(200, to_csv(section_footwork_rows(start, end, jcd), header=FOOTWORK_HEADER), "text/csv; charset=utf-8")
