@@ -452,8 +452,34 @@ def result_rows(day: str, jcd: str, rno: int) -> list[list]:
 
 def venue_result_rows(day: str, jcd: str) -> list[list]:
     rows: list[list] = []
-    with ThreadPoolExecutor(max_workers=12) as ex:
-        futures = [ex.submit(result_rows, day, jcd, rno) for rno in range(1, 13)]
+
+    # For today's live meeting, do not request future result pages.
+    # Google Sheets IMPORTDATA waits for the whole response, and some future
+    # race-result pages can be slow while a night race meeting is still running.
+    rnos = list(range(1, 13))
+    today = datetime.now(JST).strftime("%Y%m%d")
+    if day == today:
+        dls = deadlines(day, jcd)
+        if dls:
+            now = datetime.now(JST)
+            now_minutes = now.hour * 60 + now.minute
+            eligible: list[int] = []
+            for idx, deadline in enumerate(dls[:12], 1):
+                try:
+                    h, m = map(int, deadline.split(":"))
+                except (TypeError, ValueError):
+                    continue
+                # Give the official site a short window to publish the result.
+                if now_minutes >= h * 60 + m + 2:
+                    eligible.append(idx)
+            rnos = eligible
+
+    if not rnos:
+        return rows
+
+    # Keep upstream pressure modest; this feed is used by live Google Sheets.
+    with ThreadPoolExecutor(max_workers=min(6, len(rnos))) as ex:
+        futures = [ex.submit(result_rows, day, jcd, rno) for rno in rnos]
         for future in as_completed(futures):
             try:
                 rows.extend(future.result())
