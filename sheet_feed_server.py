@@ -561,22 +561,32 @@ def _raid_num(value: str):
 
 def raid_footwork_rows(day: str, jcd: str, rno: int) -> list[list]:
     """Historical original exhibition data from BoatRaceRaid public race pages."""
-    if jcd not in VENUES or not re.fullmatch(r"20\\d{6}", day) or not 1 <= int(rno) <= 12:
+    if jcd not in VENUES or not re.fullmatch(r"20\d{6}", day) or not 1 <= int(rno) <= 12:
         return []
 
     def build():
         dashed = f"{day[:4]}-{day[4:6]}-{day[6:8]}"
         url = f"{RAID_BASE}?opdt={dashed}&rcoursecd={jcd}&rno={int(rno):02d}"
         try:
-            raw = fetch(url)
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Referer": "https://boatraceraid.jp/",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                raw = resp.read().decode("utf-8", "ignore")
         except Exception:
             return []
 
+        # First try table extraction. Some page variants expose real HTML tables.
         tables = _html_tables(raw)
         all_rows = [row for table in tables for row in table if row]
         by_label: dict[str, list[str]] = {}
         for row in all_rows:
-            label = re.sub(r"\\s+", "", row[0])
+            label = re.sub(r"\s+", "", row[0])
             if label and label not in by_label:
                 by_label[label] = row[1:7]
 
@@ -593,13 +603,68 @@ def raid_footwork_rows(day: str, jcd: str, rno: int) -> list[list]:
         prop = by_label.get("プロペラ", [])
         parts = by_label.get("部品交換", [])
 
+        # Current BoatRaceRaid markup renders the useful values outside <table>.
+        # Fall back to the normalized text stream and read six values after labels.
+        txt = textify(raw)
+        lines = [re.sub(r"\s+", " ", x).strip() for x in txt.splitlines() if x.strip()]
+
+        def find_from(label: str, start: int = 0):
+            for i in range(start, len(lines)):
+                if lines[i] == label:
+                    return i
+            return -1
+
+        def six_after(label: str, start: int = 0):
+            i = find_from(label, start)
+            if i < 0 or i + 6 >= len(lines):
+                return []
+            return lines[i + 1:i + 7]
+
+        reg_pos = -1
+        if len(regs) < 6:
+            for i, x in enumerate(lines):
+                if x != "登録番号":
+                    continue
+                cand = lines[i + 1:i + 7]
+                if len(cand) == 6 and all(re.fullmatch(r"\d{4}", v) for v in cand):
+                    regs = cand
+                    reg_pos = i
+                    break
+        if reg_pos < 0:
+            reg_pos = find_from("登録番号", 0)
+
+        if len(names) < 6:
+            names = six_after("選手名", max(0, reg_pos))
+        if len(classes) < 6:
+            classes = six_after("級", max(0, reg_pos))
+
+        ex_info = find_from("展示情報", max(0, reg_pos))
+        if ex_info < 0:
+            ex_info = max(0, reg_pos)
+
+        if len(ex_entry) < 6:
+            ex_entry = six_after("進入", ex_info)
+        if len(exhibit) < 6:
+            exhibit = six_after("展示", ex_info)
+        if len(lap) < 6:
+            lap = six_after("周回", ex_info)
+        if len(turn) < 6:
+            turn = six_after("回り足", ex_info)
+        if len(straight) < 6:
+            straight = six_after("直線", ex_info)
+        if len(ex_st) < 6:
+            ex_st = six_after("ST", ex_info)
+        if len(tilt) < 6:
+            tilt = six_after("チルト", ex_info)
+
         if len(regs) < 6 or len(exhibit) < 6:
             return []
 
         weather = {"天気":"","気温":"","水温":"","風速":"","風向":"","波高":""}
+        # Table-based weather, when present.
         for table in tables:
             for idx, row in enumerate(table[:-1]):
-                compact = [re.sub(r"\\s+", "", x) for x in row]
+                compact = [re.sub(r"\s+", "", x) for x in row]
                 if compact[:6] == ["天気","気温","水温","風速","風向","波高"]:
                     vals = table[idx + 1]
                     if len(vals) >= 6:
@@ -607,10 +672,22 @@ def raid_footwork_rows(day: str, jcd: str, rno: int) -> list[list]:
                             weather[k] = v
                     break
 
+        # Text fallback: labels are followed by six values on current pages.
+        wpos = find_from("気象情報", ex_info)
+        if wpos >= 0:
+            labels = ["天気","気温","水温","風速","風向","波高"]
+            lp = [find_from(x, wpos) for x in labels]
+            if all(x >= 0 for x in lp):
+                last_label = max(lp)
+                vals = lines[last_label + 1:last_label + 7]
+                if len(vals) >= 6:
+                    for k, v in zip(labels, vals[:6]):
+                        weather[k] = v
+
         out = []
         for lane in range(1, 7):
             reg = regs[lane-1] if lane-1 < len(regs) else ""
-            if not re.fullmatch(r"\\d{4}", reg or ""):
+            if not re.fullmatch(r"\d{4}", reg or ""):
                 continue
             st_raw = ex_st[lane-1] if lane-1 < len(ex_st) else ""
             out.append([
@@ -637,7 +714,6 @@ def raid_footwork_rows(day: str, jcd: str, rno: int) -> list[list]:
         return out
 
     return _cached(f"raid-footwork:{day}:{jcd}:{rno}", build)
-
 
 
 def venue_footwork_rows(day: str, jcd: str) -> list[list]:
