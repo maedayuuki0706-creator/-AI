@@ -1,23 +1,40 @@
 {
-  "audit": {},
-  "checked_at": "2026-10-06T10:53:33.178608+09:00",
+  "audit": {
+    "already_selected": 4,
+    "eligible": 1,
+    "inside_cutoff": 18,
+    "prediction_files": 23
+  },
+  "checked_at": "2026-10-06T10:55:42.802301+09:00",
   "counts": {
-    "waiting_result": 2
+    "sent": 3,
+    "waiting_result": 1
   },
   "day": "20261006",
   "errors": [],
   "events": [
     {
+      "key": "prediction:20261006:05:2",
+      "post_id": "2107288546361155947",
+      "status": "sent"
+    },
+    {
       "key": "result:20261006:13:1",
-      "status": "waiting_result"
+      "post_id": "2107288566946771439",
+      "status": "sent"
     },
     {
       "key": "result:20261006:02:1",
+      "post_id": "2107288586605531393",
+      "status": "sent"
+    },
+    {
+      "key": "result:20261006:14:6",
       "status": "waiting_result"
     }
   ],
   "held": [],
-  "mode": "results",
+  "mode": "all",
   "production_verification": [
     {
       "content_sha256": "10665ee5f85b592084cc57b71dc9a7abd805a0f4d8ac6c80d531b1fcc0098a92",
@@ -25,6 +42,14 @@
       "post_id": "2107282404847346054",
       "restart_duplicate_guard_verified": true,
       "sent_at": "2026-10-06T10:30:51.710529+09:00",
+      "verified": true
+    },
+    {
+      "content_sha256": "3b1e55b5917092364e1936ee59cda99d0a9d2db8054242f1efe4a1013fe601bf",
+      "key": "prediction:20261006:05:2",
+      "post_id": "2107288546361155947",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-06T10:55:15.947054+09:00",
       "verified": true
     },
     {
@@ -50,9 +75,25 @@
       "restart_duplicate_guard_verified": true,
       "sent_at": "2026-10-06T10:42:44.724679+09:00",
       "verified": true
+    },
+    {
+      "content_sha256": "10665ee5f85b592084cc57b71dc9a7abd805a0f4d8ac6c80d531b1fcc0098a92",
+      "key": "result:20261006:02:1",
+      "post_id": "2107288586605531393",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-06T10:55:25.543659+09:00",
+      "verified": true
+    },
+    {
+      "content_sha256": "58153a4f2aac18530b16895990a3c7bf7c6964677f059e3810599a546e1f05c8",
+      "key": "result:20261006:13:1",
+      "post_id": "2107288566946771439",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-06T10:55:20.847893+09:00",
+      "verified": true
     }
   ],
   "status": "checked",
-  "trigger_event": "schedule",
-  "workflow_run_id": "37401399900"
+  "trigger_event": "workflow_dispatch",
+  "workflow_run_id": "37401556546"
 }
