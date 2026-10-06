@@ -42,6 +42,7 @@ from zoneinfo import ZoneInfo
 JST = ZoneInfo("Asia/Tokyo")
 BASE = "https://www.boatrace.jp/owpc/pc/race"
 HOCHI_BASE = "https://boatnavi.hochi.co.jp/shussou"
+RAID_BASE = "https://boatraceraid.jp/exhibition/"
 UA = "Boat-Sheet-Feed/1.0 (+isolated-sheet-updater)"
 VENUES = {
     "01":"桐生","02":"戸田","03":"江戸川","04":"平和島","05":"多摩川","06":"浜名湖",
@@ -61,6 +62,12 @@ RESULT_HEADER = [
 ROSTER_HEADER = ["登録番号","選手名","級別","モーターNo.","モーター2連率","モーター3連率"]
 BASIC_ROSTER_HEADER = ["登録番号","選手名","級別"]
 RACE_ROSTER_HEADER = ["登録番号","選手名","級別","モーターNo.","モーター2連率","モーター3連率"]
+FOOTWORK_HEADER = [
+    "日付","場","R","枠","登録番号","選手名","級別",
+    "展示タイム","一周タイム","回り足タイム","直線タイム",
+    "展示進入","展示ST","チルト","プロペラ","部品交換",
+    "天気","気温","水温","風速","風向","波高","出典URL",
+]
 EXHIBITION_HEADER = [
     "日付","場","R","枠","登録番号","選手名","級別","モーターNo.",
     "展示タイム","展示進入","展示ST","本番進入","本番ST","着順","決まり手",
@@ -524,6 +531,147 @@ def section_roster_rows(day: str, jcd: str) -> list[list]:
 
 
 
+
+def _html_tables(raw: str) -> list[list[list[str]]]:
+    """Small stdlib-only table extractor for public HTML pages."""
+    out: list[list[list[str]]] = []
+    for table in re.findall(r"<table\\b[^>]*>(.*?)</table>", raw, re.I | re.S):
+        rows: list[list[str]] = []
+        for tr in re.findall(r"<tr\\b[^>]*>(.*?)</tr>", table, re.I | re.S):
+            cells = re.findall(r"<t[dh]\\b[^>]*>(.*?)</t[dh]>", tr, re.I | re.S)
+            if not cells:
+                continue
+            rows.append([textify(x).strip() for x in cells])
+        if rows:
+            out.append(rows)
+    return out
+
+
+def _raid_num(value: str):
+    value = (value or "").replace("kg","").replace("℃","").replace("cm","").replace("m/s","").strip()
+    if value in {"", "-", "－", "―", "—"}:
+        return ""
+    if re.fullmatch(r"-?\\d+(?:\\.\\d+)?", value):
+        try:
+            return float(value)
+        except ValueError:
+            return ""
+    return ""
+
+
+def raid_footwork_rows(day: str, jcd: str, rno: int) -> list[list]:
+    """Historical original exhibition data from BoatRaceRaid public race pages."""
+    if jcd not in VENUES or not re.fullmatch(r"20\\d{6}", day) or not 1 <= int(rno) <= 12:
+        return []
+
+    def build():
+        dashed = f"{day[:4]}-{day[4:6]}-{day[6:8]}"
+        url = f"{RAID_BASE}?opdt={dashed}&rcoursecd={jcd}&rno={int(rno):02d}"
+        try:
+            raw = fetch(url)
+        except Exception:
+            return []
+
+        tables = _html_tables(raw)
+        all_rows = [row for table in tables for row in table if row]
+        by_label: dict[str, list[str]] = {}
+        for row in all_rows:
+            label = re.sub(r"\\s+", "", row[0])
+            if label and label not in by_label:
+                by_label[label] = row[1:7]
+
+        regs = by_label.get("登録番号", [])
+        names = by_label.get("選手名", [])
+        classes = by_label.get("級", by_label.get("級別", []))
+        exhibit = by_label.get("展示", [])
+        lap = by_label.get("周回", [])
+        turn = by_label.get("回り足", [])
+        straight = by_label.get("直線", [])
+        ex_entry = by_label.get("進入", [])
+        ex_st = by_label.get("ST", [])
+        tilt = by_label.get("チルト", [])
+        prop = by_label.get("プロペラ", [])
+        parts = by_label.get("部品交換", [])
+
+        if len(regs) < 6 or len(exhibit) < 6:
+            return []
+
+        weather = {"天気":"","気温":"","水温":"","風速":"","風向":"","波高":""}
+        for table in tables:
+            for idx, row in enumerate(table[:-1]):
+                compact = [re.sub(r"\\s+", "", x) for x in row]
+                if compact[:6] == ["天気","気温","水温","風速","風向","波高"]:
+                    vals = table[idx + 1]
+                    if len(vals) >= 6:
+                        for k, v in zip(["天気","気温","水温","風速","風向","波高"], vals[:6]):
+                            weather[k] = v
+                    break
+
+        out = []
+        for lane in range(1, 7):
+            reg = regs[lane-1] if lane-1 < len(regs) else ""
+            if not re.fullmatch(r"\\d{4}", reg or ""):
+                continue
+            st_raw = ex_st[lane-1] if lane-1 < len(ex_st) else ""
+            out.append([
+                day, VENUES[jcd], int(rno), lane, reg,
+                names[lane-1] if lane-1 < len(names) else "",
+                classes[lane-1] if lane-1 < len(classes) else "",
+                _raid_num(exhibit[lane-1] if lane-1 < len(exhibit) else ""),
+                _raid_num(lap[lane-1] if lane-1 < len(lap) else ""),
+                _raid_num(turn[lane-1] if lane-1 < len(turn) else ""),
+                _raid_num(straight[lane-1] if lane-1 < len(straight) else ""),
+                _raid_num(ex_entry[lane-1] if lane-1 < len(ex_entry) else ""),
+                _start_value(st_raw),
+                _raid_num(tilt[lane-1] if lane-1 < len(tilt) else ""),
+                prop[lane-1] if lane-1 < len(prop) else "",
+                parts[lane-1] if lane-1 < len(parts) else "",
+                weather["天気"],
+                _raid_num(weather["気温"]),
+                _raid_num(weather["水温"]),
+                _raid_num(weather["風速"]),
+                weather["風向"],
+                _raid_num(weather["波高"]),
+                url,
+            ])
+        return out
+
+    return _cached(f"raid-footwork:{day}:{jcd}:{rno}", build)
+
+
+def section_footwork_rows(start_day: str, end_day: str, jcd: str) -> list[list]:
+    from datetime import timedelta
+
+    if jcd not in VENUES:
+        return []
+    try:
+        start = datetime.strptime(start_day, "%Y%m%d").date()
+        end = datetime.strptime(end_day, "%Y%m%d").date()
+    except ValueError:
+        return []
+    today = datetime.now(JST).date()
+    end = min(end, today)
+    if end < start or (end - start).days > 10:
+        return []
+
+    days = []
+    d = start
+    while d <= end:
+        days.append(d.strftime("%Y%m%d"))
+        d += timedelta(days=1)
+
+    rows: list[list] = []
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = [ex.submit(raid_footwork_rows, day, jcd, rno) for day in days for rno in range(1, 13)]
+        for future in as_completed(futures):
+            try:
+                rows.extend(future.result())
+            except Exception:
+                continue
+    rows.sort(key=lambda r: (str(r[0]), int(r[2]), int(r[3])))
+    return rows
+
+
 def _cell_float(value: str):
     value = textify(value).replace("kg", "").replace("℃", "").replace("cm", "").replace("m", "").strip()
     if re.fullmatch(r"-?\d+(?:\.\d+)?", value):
@@ -915,6 +1063,19 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, b"bad request", "text/plain; charset=utf-8")
                     return
                 self._send(200, to_csv(section_roster_rows(roster_day, jcd), header=ROSTER_HEADER), "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/section_footwork.csv":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                start = (qs.get("start") or [""])[0]
+                end = (qs.get("end") or [""])[0]
+                if jcd not in VENUES or not re.fullmatch(r"20\\d{6}", start) or not re.fullmatch(r"20\\d{6}", end):
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                self._send(200, to_csv(section_footwork_rows(start, end, jcd), header=FOOTWORK_HEADER), "text/csv; charset=utf-8")
                 return
 
             if parsed.path == "/section_exhibition.csv":
