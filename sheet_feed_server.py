@@ -91,12 +91,12 @@ def _cached(key: str, producer):
     return value
 
 
-def fetch(url: str) -> str:
+def fetch(url: str, timeout: int = 25) -> str:
     req = urllib.request.Request(
         url,
         headers={"User-Agent": UA, "Accept-Language": "ja-JP,ja;q=0.9"},
     )
-    with urllib.request.urlopen(req, timeout=25) as r:
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read().decode("utf-8", errors="replace")
 
 
@@ -335,10 +335,10 @@ def _start_value(value: str):
     return ""
 
 
-def parse_result(day: str, jcd: str, rno: int) -> dict:
+def parse_result(day: str, jcd: str, rno: int, timeout: int = 25) -> dict:
     """Parse an official result page without importing prediction/delivery code."""
     def build():
-        raw = fetch(official_url("raceresult", day, jcd, rno))
+        raw = fetch(official_url("raceresult", day, jcd, rno), timeout=timeout)
         text = textify(raw)
         finish_by_lane: dict[int, int] = {}
         racer_by_lane: dict[int, str] = {}
@@ -422,8 +422,8 @@ def parse_result(day: str, jcd: str, rno: int) -> dict:
     return _cached(f"result:{day}:{jcd}:{rno}", build)
 
 
-def result_rows(day: str, jcd: str, rno: int) -> list[list]:
-    result = parse_result(day, jcd, rno)
+def result_rows(day: str, jcd: str, rno: int, timeout: int = 25) -> list[list]:
+    result = parse_result(day, jcd, rno, timeout=timeout)
     if not result or not result.get("final"):
         return []
     rows = []
@@ -479,7 +479,7 @@ def venue_result_rows(day: str, jcd: str) -> list[list]:
 
     # Keep upstream pressure modest; this feed is used by live Google Sheets.
     with ThreadPoolExecutor(max_workers=min(6, len(rnos))) as ex:
-        futures = [ex.submit(result_rows, day, jcd, rno) for rno in rnos]
+        futures = [ex.submit(result_rows, day, jcd, rno, 6) for rno in rnos]
         for future in as_completed(futures):
             try:
                 rows.extend(future.result())
