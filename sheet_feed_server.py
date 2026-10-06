@@ -548,10 +548,10 @@ def _html_tables(raw: str) -> list[list[list[str]]]:
 
 
 def _raid_num(value: str):
-    value = (value or "").replace("kg","").replace("℃","").replace("cm","").replace("m/s","").strip()
+    value = (value or "").replace("kg","").replace("℃","").replace("°C","").replace("cm","").replace("m/s","").strip()
     if value in {"", "-", "－", "―", "—"}:
         return ""
-    if re.fullmatch(r"-?\\d+(?:\\.\\d+)?", value):
+    if re.fullmatch(r"-?\d+(?:\.\d+)?", value):
         try:
             return float(value)
         except ValueError:
