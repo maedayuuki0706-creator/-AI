@@ -639,6 +639,22 @@ def raid_footwork_rows(day: str, jcd: str, rno: int) -> list[list]:
     return _cached(f"raid-footwork:{day}:{jcd}:{rno}", build)
 
 
+
+def venue_footwork_rows(day: str, jcd: str) -> list[list]:
+    if jcd not in VENUES or not re.fullmatch(r"20\\d{6}", day):
+        return []
+    rows: list[list] = []
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futures = [ex.submit(raid_footwork_rows, day, jcd, rno) for rno in range(1, 13)]
+        for future in as_completed(futures):
+            try:
+                rows.extend(future.result())
+            except Exception:
+                continue
+    rows.sort(key=lambda r: (int(r[2]), int(r[3])))
+    return rows
+
+
 def section_footwork_rows(start_day: str, end_day: str, jcd: str) -> list[list]:
     from datetime import timedelta
 
@@ -1063,6 +1079,32 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(400, b"bad request", "text/plain; charset=utf-8")
                     return
                 self._send(200, to_csv(section_roster_rows(roster_day, jcd), header=ROSTER_HEADER), "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/footwork.csv":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                try:
+                    rno = int((qs.get("rno") or ["0"])[0])
+                except ValueError:
+                    rno = 0
+                if jcd not in VENUES or not 1 <= rno <= 12:
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                self._send(200, to_csv(raid_footwork_rows(day, jcd, rno), header=FOOTWORK_HEADER), "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/venue_footwork.csv":
+                jcd = (qs.get("jcd") or [""])[0]
+                venue = (qs.get("venue") or [""])[0]
+                if not jcd and venue:
+                    jcd = VENUE_CODES.get(venue, "")
+                if jcd not in VENUES:
+                    self._send(400, b"bad request", "text/plain; charset=utf-8")
+                    return
+                self._send(200, to_csv(venue_footwork_rows(day, jcd), header=FOOTWORK_HEADER), "text/csv; charset=utf-8")
                 return
 
             if parsed.path == "/section_footwork.csv":
