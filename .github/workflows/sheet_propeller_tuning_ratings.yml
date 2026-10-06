@@ -1,0 +1,33 @@
+name: Sheet Propeller Tuning Ratings
+
+on:
+  schedule:
+    # 01:55 JST, after the 01:45 weak-motor rating job.
+    - cron: "55 16 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sheet-propeller-tuning-ratings
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sheet-auto-update
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Sheets client
+        run: pip install "gspread>=6,<7" "google-auth>=2,<3"
+      - name: Recompute propeller tuning ratings
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          BOAT_SHEET_ID: "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo"
+        run: python sheet_propeller_tuning_ratings.py
