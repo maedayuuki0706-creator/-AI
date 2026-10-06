@@ -41,6 +41,7 @@ from zoneinfo import ZoneInfo
 
 JST = ZoneInfo("Asia/Tokyo")
 BASE = "https://www.boatrace.jp/owpc/pc/race"
+HOCHI_BASE = "https://boatnavi.hochi.co.jp/shussou"
 UA = "Boat-Sheet-Feed/1.0 (+isolated-sheet-updater)"
 VENUES = {
     "01":"桐生","02":"戸田","03":"江戸川","04":"平和島","05":"多摩川","06":"浜名湖",
@@ -164,6 +165,58 @@ def debug_race_structure(day: str, jcd: str, rno: int) -> dict:
             })
     return {"url": official_url("racelist", day, jcd, rno), "tbody_count": len(bodies), "bodies": bodies}
 
+
+def parse_boatnavi_basic(day: str, jcd: str, rno: int) -> list[dict]:
+    """Fallback basic six-boat card from BOATNAVI when official detailed parsing fails."""
+    try:
+        raw = fetch(f"{HOCHI_BASE}/{day}/{jcd}/{int(rno)}")
+        txt = textify(raw)
+    except Exception:
+        return []
+    matches = list(re.finditer(r"(?<!\\d)(\\d{4})\\s*/\\s*(A1|A2|B1|B2)\\b", txt))
+    seen = set()
+    racers = []
+    for m in matches:
+        reg, cls = m.group(1), m.group(2)
+        if reg in seen:
+            continue
+        seen.add(reg)
+        # Best-effort racer name: nearest non-empty text immediately before registration.
+        prefix = txt[max(0, m.start()-120):m.start()].split("\\n")
+        name = ""
+        for part in reversed(prefix):
+            part = re.sub(r"\\s+", "", part).strip()
+            if part and not re.fullmatch(r"(?:Image|[1-6]|◎|○|◯|▲|△|×|印)", part):
+                name = part
+                break
+        racers.append((reg, cls, name))
+        if len(racers) == 6:
+            break
+    if len(racers) != 6:
+        return []
+    out = []
+    for lane, (reg, cls, name) in enumerate(racers, 1):
+        out.append({
+            "lane": lane,
+            "racer_id": reg,
+            "current_class": cls,
+            "name": name,
+            "avg_st": None,
+            "f_count": 0,
+            "l_count": 0,
+            "win_rate": None,
+            "top2_rate": None,
+            "top3_rate": None,
+            "local_win_rate": None,
+            "local_top2_rate": None,
+            "local_top3_rate": None,
+            "motor_number": None,
+            "motor_top2_rate": None,
+            "motor_top3_rate": None,
+        })
+    return out
+
+
 def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
     def build():
         raw = fetch(official_url("racelist", day, jcd, rno))
@@ -215,7 +268,7 @@ def parse_racelist_boats(day: str, jcd: str, rno: int) -> list[dict]:
             })
         if len(boats) == 6 and {b["lane"] for b in boats} == set(range(1, 7)):
             return sorted(boats, key=lambda x: x["lane"])
-        return []
+        return parse_boatnavi_basic(day, jcd, rno)
     return _cached(f"race:{day}:{jcd}:{rno}", build)
 
 
