@@ -26,7 +26,6 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import csv
 from datetime import datetime
-from functools import lru_cache
 import html
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
@@ -79,7 +78,6 @@ def _cached(key: str, producer):
     return value
 
 
-@lru_cache(maxsize=512)
 def fetch(url: str) -> str:
     req = urllib.request.Request(
         url,
