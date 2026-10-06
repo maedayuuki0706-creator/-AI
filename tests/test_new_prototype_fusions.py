@@ -40,17 +40,22 @@ class NewPrototypeFusionTests(unittest.TestCase):
         self.assertIn('🛟 **抜け目', message)
         self.assertIn('💣 **穴目', message)
         self.assertIn('試験配信', message)
-        self.assertEqual(p2['selection_policy'], 'pt3-existing-consensus-compress-grade-7-8-10')
-        self.assertGreaterEqual(p2['point_count'], 1)
-        self.assertLessEqual(p2['point_count'], 10)
-        self.assertTrue(set(p2['picks']).issubset(set(p3['picks'])))
+        self.assertEqual(p2['selection_policy'], 'pt3-db-consensus-no-fixed-point-cap')
+        self.assertGreaterEqual(p2['point_count'], p3['point_count'])
+        self.assertIsNone(p2['structure']['fixed_point_cap'])
+        self.assertTrue(set(p3['picks']).issubset(set(p2['picks'])))
+        self.assertTrue(set(record['native_candidate_picks']['prototype2_existing_db'])
+                        <= set(p2['picks']))
 
-    def test_pt2_grade_targets_are_compact(self):
+    def test_pt2_retains_uncapped_candidates(self):
         req, hy, src, now = self.prepared()
         record = trial.build_bundle(req, hy, src, now)
         p2 = record['models']['prototype2']
-        expected = {'A': 7, 'B': 8, 'C': 10}[p2['grade']]
-        self.assertEqual(p2['point_count'], min(expected, record['models']['prototype3']['point_count']))
+        p3 = record['models']['prototype3']
+        self.assertIsNone(p2['structure']['fixed_point_cap'])
+        self.assertGreaterEqual(p2['point_count'], p3['point_count'])
+        self.assertTrue(set(record['native_candidate_picks']['prototype2_existing_db'])
+                        <= set(p2['picks']))
 
     def test_box_hit_is_measured_separately_from_cover_hit(self):
         req, hy, src, now = self.prepared()
