@@ -30,12 +30,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Collect first 3 venue footwork sections
+      - name: Debug official beforeinfo and collect first 3 venue footwork sections
         run: |
           python - <<'PY'
-          import csv, json
+          import csv, json, urllib.request
           from pathlib import Path
           import sheet_feed_server as s
+
+          dbg_url = "https://www.boatrace.jp/owpc/pc/race/beforeinfo?hd=20260926&jcd=02&rno=1"
+          req = urllib.request.Request(dbg_url, headers={"User-Agent":"Mozilla/5.0"})
+          raw = urllib.request.urlopen(req, timeout=20).read().decode("utf-8","ignore")
+          Path("data/footwork_backfill").mkdir(parents=True, exist_ok=True)
+          Path("data/footwork_backfill/debug_beforeinfo.html").write_text(raw, encoding="utf-8")
+          Path("data/footwork_backfill/debug_beforeinfo.txt").write_text(s.textify(raw), encoding="utf-8")
 
           jobs = [
               ("01","桐生","20260905","20260910"),
