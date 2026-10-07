@@ -11,6 +11,8 @@ import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import pt2_strategy_cards
+
 SPREADSHEET_ID = os.getenv(
     "BOAT_SHEET_ID",
     "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo",
@@ -37,9 +39,6 @@ def _latest_record():
         if not record:
             continue
         model = ((record.get("models") or {}).get("prototype2") or {})
-        cards = ((model.get("strategy_cards") or {}).get("cards") or {})
-        if not cards:
-            continue
         created = str(record.get("created_at") or "")
         candidates.append((created, path.name, record))
     if not candidates:
@@ -119,6 +118,53 @@ def _boat_scores(model):
     return values, heads
 
 
+def _strategy_cards(model):
+    existing = ((model.get("strategy_cards") or {}).get("cards") or {})
+    if existing:
+        return existing
+
+    # Backfill the first live view from pre-multi-strategy predictions using the
+    # DB audit that already stores the adjusted probability delta for all 120
+    # combinations. This does not alter the archived prediction.
+    db = model.get("database") or {}
+    audit = db.get("probability_audit") or {}
+    base = audit.get("base_probability") or {}
+    delta = audit.get("probability_delta_pp") or {}
+    odds = {
+        str(row.get("combination")): _safe_float(row.get("odds"))
+        for row in model.get("trifecta") or []
+        if row.get("combination")
+    }
+    rows = []
+    for combo, base_p in base.items():
+        try:
+            probability = float(base_p) + float(delta.get(combo, 0.0)) / 100.0
+        except (TypeError, ValueError):
+            continue
+        if probability <= 0:
+            continue
+        odd = odds.get(str(combo))
+        rows.append({
+            "combination": str(combo),
+            "probability": probability,
+            "odds": odd,
+            "expected_value": probability * odd if odd is not None else None,
+        })
+    if not rows:
+        return {}
+    return pt2_strategy_cards.build_strategy_cards(
+        {"trifecta": rows},
+        model,
+    ).get("cards") or {}
+
+
+def _safe_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _summary(cards, model):
     scores, heads = _boat_scores(model)
     ranked = sorted(range(1, 7), key=lambda lane: scores[lane - 1], reverse=True)
@@ -193,7 +239,7 @@ def _side_cards(cards, summary):
 
 def build_payload(record):
     model = ((record.get("models") or {}).get("prototype2") or {})
-    cards = ((model.get("strategy_cards") or {}).get("cards") or {})
+    cards = _strategy_cards(model)
     summary = _summary(cards, model)
     sides = _side_cards(cards, summary)
     db = model.get("database") or {}
