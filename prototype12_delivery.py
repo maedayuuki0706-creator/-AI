@@ -20,6 +20,7 @@ import four_way_prototype as trial
 import hiyori_model
 import hiyori_source
 import pt2_sheet_db
+import pt2_strategy_cards
 
 ROOT = Path("data/prototype12_delivery")
 STREAMS = ("prototype1", "prototype2")
@@ -194,17 +195,28 @@ def model_message(record, stream):
     db = model.get("database") or {}
     db_state = "ON" if db.get("enabled") else "fallback"
     version_label = model.get("version_label") or pt2_version_label(model)
+    strategies = ((model.get("strategy_cards") or {}).get("cards") or {})
+    strategy_lines = []
+    for key, icon in (("probability", "📌"), ("value", "💹"), ("longshot", "💣")):
+        card = strategies.get(key) or {}
+        picks = card.get("picks") or []
+        rendered = " / ".join(picks) if picks else "候補なし"
+        strategy_lines.append(
+            f"{icon} **{card.get('label') or key} {len(picks)}点** `{rendered}`"
+        )
+    strategy_text = "\n".join(strategy_lines)
     return (
         f"🧪 **{version_label}｜PT3×DB補正・固定点数上限なし**\n"
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
         f"🗃️ DB {db_state}｜選手 {db.get('player_matches', 0)}/6｜モーター {db.get('motor_matches', 0)}/6｜場データ {'ON' if db.get('venue_match') else 'OFF'}\n"
         f"⚖️ 固定点数上限なし｜PT3＋DB補正済み候補を保持\n"
-        f"◎ **本線 {len(model.get('main_picks') or [])}点**\n"
+        f"◎ **総合型・本線 {len(model.get('main_picks') or [])}点**\n"
         f"`{main}`\n"
-        f"○ **迎え {len(model.get('cover_picks') or [])}点**\n"
+        f"○ **総合型・迎え {len(model.get('cover_picks') or [])}点**\n"
         f"`{cover}`\n"
-        f"🎯 **合計 {model['point_count']}点**\n"
-        f"📊 Grade {model['grade']}｜比較テスト配信"
+        f"🎯 **総合型 合計 {model['point_count']}点**\n"
+        f"{strategy_text}\n"
+        f"📊 Grade {model['grade']}｜4パターン比較学習"
     )
 
 def build_record(day, jcd, rno, deadline):
@@ -258,6 +270,10 @@ def build_record(day, jcd, rno, deadline):
         pt2_official,
         existing_native,
         pt2_existing_native,
+        models["prototype2"],
+    )
+    models["prototype2"]["strategy_cards"] = pt2_strategy_cards.build_strategy_cards(
+        pt2_official,
         models["prototype2"],
     )
 
