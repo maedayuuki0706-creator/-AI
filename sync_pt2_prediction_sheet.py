@@ -470,9 +470,9 @@ def _append_prediction_logs(log_ws, records):
 
 def _install_selector_formulas(book, ws, helper):
     formulas = {
-        "D3": '="締切："&' + _lookup_formula(3),
-        "G3": '="荒れ指数："&' + _lookup_formula(5),
-        "J3": '="最終更新："&' + _lookup_formula(4),
+        "D3": '="締切："&' + _lookup_formula(3).lstrip("="),
+        "G3": '="荒れ指数："&' + _lookup_formula(5).lstrip("="),
+        "J3": '="最終更新："&' + _lookup_formula(4).lstrip("="),
         "A5": _lookup_formula(6),
         "C5": _lookup_formula(7),
         "E5": _lookup_formula(8),
