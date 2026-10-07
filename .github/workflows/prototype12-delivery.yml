@@ -11,9 +11,11 @@ on:
       - 'four_way_prototype.py'
       - 'scent_box.py'
       - 'pt2_sheet_db.py'
+      - 'pt2_strategy_cards.py'
       - 'data/sheet_db/**'
       - 'tests/test_pt2_sheet_db.py'
       - 'tests/test_pt2_rollout_tracking.py'
+      - 'tests/test_pt2_strategy_cards.py'
       - 'tests/test_prototype_scoreboard.py'
       - 'prototype_scoreboard.py'
       - 'live_status.py'
@@ -46,9 +48,10 @@ jobs:
           PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
           PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
         run: |
-          python -m py_compile prototype12_delivery.py prototype_runner.py four_way_prototype.py scent_box.py pt2_sheet_db.py prototype_scoreboard.py live_status.py
+          python -m py_compile prototype12_delivery.py prototype_runner.py four_way_prototype.py scent_box.py pt2_sheet_db.py pt2_strategy_cards.py prototype_scoreboard.py live_status.py
           python -m unittest discover -s tests -p 'test_pt2_sheet_db.py' -v
           python -m unittest discover -s tests -p 'test_pt2_rollout_tracking.py' -v
+          python -m unittest discover -s tests -p 'test_pt2_strategy_cards.py' -v
           python -m unittest discover -s tests -p 'test_prototype_scoreboard.py' -v
           python -m unittest discover -s tests -p 'test_new_prototype_fusions.py' -v
           python -m unittest discover -s tests -p 'test_scent_box.py' -v
