@@ -662,11 +662,11 @@ def publish():
 
     records = _active_records()
     payloads = [build_payload(record) for record in records]
-    # Permanent logging is not limited to races that are still selectable.
-    # This backfills predictions that were generated correctly but missed a
-    # delayed Sheets refresh after their deadline.
-    logged_count = _append_prediction_logs(log_ws, _all_prediction_records())
-    result_backfill_count = _backfill_prediction_results(log_ws)
+    # PT2 prediction-log writes are temporarily paused.
+    # Keep the live selector/presentation sheet running, but do not append new
+    # log rows or backfill result cells until logging is resumed.
+    logged_count = 0
+    result_backfill_count = 0
 
     rows = [HELPER_HEADERS]
     if payloads:
