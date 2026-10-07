@@ -36,6 +36,42 @@ class PT2RolloutTrackingTests(unittest.TestCase):
         self.assertEqual(delivery.pt2_model_version(old), delivery.PT2_LEGACY_VERSION)
         self.assertEqual(scoreboard.pt2_model_version(old), scoreboard.PT2_LEGACY_VERSION)
 
+    def test_learning_audit_tracks_db_added_pick(self):
+        official = {
+            "trifecta": [
+                {"combination": "1-2-3", "probability": 0.10, "odds": 8.0},
+                {"combination": "1-3-2", "probability": 0.05, "odds": 20.0},
+            ]
+        }
+        pt2 = {
+            "trifecta": [
+                {"combination": "1-2-3", "probability": 0.08, "odds": 8.0, "expected_value": 0.64},
+                {"combination": "1-3-2", "probability": 0.07, "odds": 20.0, "expected_value": 1.4},
+            ],
+            "sheet_database": {
+                "lane_factors": {"1": {"factor": 1.01, "signals": ["course=60.0/55.0"]}},
+                "probability_audit": {
+                    "base_probability": {"1-2-3": 0.10, "1-3-2": 0.05},
+                    "head_delta_pp": {"1": 0.0},
+                    "top_combination_shifts": [],
+                },
+            },
+        }
+        model = {
+            "picks": ["1-3-2"],
+            "main_picks": ["1-3-2"],
+            "cover_picks": [],
+        }
+        audit = delivery.pt2_learning_audit(
+            official, pt2, ["1-2-3"], ["1-2-3", "1-3-2"], model
+        )
+        self.assertEqual(audit["added_by_db"], ["1-3-2"])
+        row = audit["pick_explanations"][0]
+        self.assertTrue(row["added_by_db"])
+        self.assertEqual(row["delta_pp"], 2.0)
+        self.assertEqual(row["base_ev"], 1.0)
+        self.assertEqual(row["adjusted_ev"], 1.4)
+
     def test_message_distinguishes_legacy_and_new_pt2(self):
         base_model = {
             "main_picks": ["1-2-3"],
