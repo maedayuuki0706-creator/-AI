@@ -99,7 +99,8 @@ class PT2PredictionSheetTests(unittest.TestCase):
         self.assertEqual(row[3], "8")
         self.assertEqual(row[5], "20261007_24_08")
         self.assertIn("5-1-2", row[14])
-        self.assertEqual(row[29:], ["", "", "", "", "", ""])
+        self.assertEqual(row[28:34], ["", "", "", "", "", ""])
+        self.assertEqual(row[34], "2026-10-07T17:55:00+09:00")
 
     def test_deadline_parser_uses_jst(self):
         deadline = view._deadline_at(self.record())
