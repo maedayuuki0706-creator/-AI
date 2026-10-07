@@ -552,9 +552,9 @@ def _append_prediction_logs(log_ws, records):
         existing_keys.add(key)
     if rows:
         log_ws.append_rows(rows, value_input_option="RAW")
-    # Keep the permanent log newest-first so results and hit columns are easy
-    # to review on mobile. Sort whole rows to preserve result/hit alignment.
-    log_ws.sort((1, "des"), range=f"A2:AI{log_ws.row_count}")
+    # Keep the permanent log in race-deadline order: newest day first,
+    # then later deadlines first. Sort whole rows to preserve result/hit alignment.
+    log_ws.sort((2, "des"), (5, "des"), range=f"A2:AI{log_ws.row_count}")
     return len(rows)
 
 
