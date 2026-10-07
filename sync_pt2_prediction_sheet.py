@@ -662,11 +662,10 @@ def publish():
 
     records = _active_records()
     payloads = [build_payload(record) for record in records]
-    # PT2 prediction-log writes are temporarily paused.
-    # Keep the live selector/presentation sheet running, but do not append new
-    # log rows or backfill result cells until logging is resumed.
-    logged_count = 0
-    result_backfill_count = 0
+    # Persist every PT2 prediction independently of whether it is still in the
+    # live selector, then backfill result/payout and per-strategy hit columns.
+    logged_count = _append_prediction_logs(log_ws, _all_prediction_records())
+    result_backfill_count = _backfill_prediction_results(log_ws)
 
     rows = [HELPER_HEADERS]
     if payloads:
