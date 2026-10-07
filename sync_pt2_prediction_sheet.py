@@ -457,7 +457,7 @@ def _column_letter(number):
     return out
 
 
-def _scoreboard_result_values(scored):
+def _scoreboard_result_values(scored, prediction=None):
     if not isinstance(scored, dict):
         return None
     official = scored.get("official") or {}
@@ -489,13 +489,29 @@ def _scoreboard_result_values(scored):
 
     pt2 = ((scored.get("models") or {}).get("prototype2") or {})
     strategies = pt2.get("strategies") or {}
+
+    # Older PT2 results may predate strategy-score persistence. Rebuild the
+    # four strategy cards from the archived prediction and judge them against
+    # the official winner(s) so legacy rows can still receive ○/×.
+    rebuilt_cards = {}
+    if status == "settled" and isinstance(prediction, dict):
+        model = ((prediction.get("models") or {}).get("prototype2") or {})
+        if isinstance(model, dict) and model:
+            rebuilt_cards = _strategy_cards(model) or {}
+
+    winning_combos = {combo for combo, _ in winners} if status == "settled" else set()
     hit_cells = []
     for name in ("balanced", "probability", "value", "longshot"):
         strategy = strategies.get(name)
-        if not isinstance(strategy, dict):
-            hit_cells.append("—")
-        else:
+        if isinstance(strategy, dict):
             hit_cells.append("○" if strategy.get("hit") else "×")
+            continue
+        card = rebuilt_cards.get(name)
+        if isinstance(card, dict):
+            picks = {str(pick) for pick in (card.get("picks") or [])}
+            hit_cells.append("○" if winning_combos & picks else "×")
+        else:
+            hit_cells.append("—")
     return [result_text, payout_text, *hit_cells]
 
 
@@ -519,11 +535,18 @@ def _backfill_prediction_results(log_ws):
         if not key:
             continue
         existing_result = str(row[result_index] if result_index < len(row) else "").strip()
-        if existing_result:
+        current_hits = [
+            str(row[i] if i < len(row) else "").strip()
+            for i in range(result_index + 2, result_index + 6)
+        ]
+        needs_result = not existing_result
+        needs_hits = any(value in {"", "—"} for value in current_hits)
+        if not needs_result and not needs_hits:
             continue
         day = str(row[day_index] if day_index < len(row) else "").strip() or key[:8]
         scored = _load(SCORE_ROOT / day / "results" / f"{key}.json")
-        values = _scoreboard_result_values(scored)
+        prediction = _load(PREDICTION_ROOT / f"{key}.json")
+        values = _scoreboard_result_values(scored, prediction=prediction)
         if values is None:
             continue
         updates.append({
