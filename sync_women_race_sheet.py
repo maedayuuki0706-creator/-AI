@@ -42,7 +42,8 @@ def classify(title,grade):
     if "ヴィーナスシリーズ" in t:return "ヴィーナスシリーズ","一般"
     if "オールレディース" in t:return "オールレディース","G3"
     if not any(k in t for k in KEYWORDS[2:]):return None
-    if "プリンセスカップ" in t:return "女子G3","G3"\n    if grade=="G1":return "女子G1","G1"
+    if "プリンセスカップ" in t:return "女子G3","G3"
+    if grade=="G1":return "女子G1","G1"
     if grade=="G2":return "女子G2","G2"
     if grade=="G3":return "女子G3","G3"
     return "女子戦",grade or "一般"
