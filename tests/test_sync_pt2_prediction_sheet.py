@@ -102,6 +102,33 @@ class PT2PredictionSheetTests(unittest.TestCase):
         self.assertEqual(row[28:34], ["", "", "", "", "", ""])
         self.assertEqual(row[34], "2026-10-07T17:55:00+09:00")
 
+    def test_scoreboard_result_values_maps_strategy_hits(self):
+        scored = {
+            "official": {
+                "status": "settled",
+                "payouts": {"1-6-3": 2250},
+            },
+            "models": {
+                "prototype2": {
+                    "strategies": {
+                        "balanced": {"hit": True},
+                        "probability": {"hit": True},
+                        "value": {"hit": False},
+                        "longshot": {"hit": False},
+                    }
+                }
+            },
+        }
+        self.assertEqual(
+            view._scoreboard_result_values(scored),
+            ["1-6-3", "2,250円", "○", "○", "×", "×"],
+        )
+
+    def test_result_column_letters_match_log_schema(self):
+        result_index = view.LOG_HEADERS.index("結果")
+        self.assertEqual(view._column_letter(result_index + 1), "AC")
+        self.assertEqual(view._column_letter(result_index + 6), "AH")
+
     def test_deadline_parser_uses_jst(self):
         deadline = view._deadline_at(self.record())
         self.assertEqual(deadline.isoformat(), "2026-10-07T18:10:00+09:00")
