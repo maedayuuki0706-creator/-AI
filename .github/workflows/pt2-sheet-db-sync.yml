@@ -7,6 +7,10 @@ on:
     paths:
       - 'sync_pt2_sheet_db.py'
       - 'pt2_sheet_db.py'
+      - 'sync_pt2_prediction_sheet.py'
+      - 'pt2_strategy_cards.py'
+      - 'tests/test_sync_pt2_prediction_sheet.py'
+      - 'data/prototype12_delivery/predictions/**'
       - 'tests/test_sync_pt2_sheet_db.py'
       - 'tests/test_pt2_sheet_db.py'
       - '.github/workflows/pt2-sheet-db-sync.yml'
@@ -37,9 +41,10 @@ jobs:
 
       - name: Verify parsers and PT2 adapter
         run: |
-          python -m py_compile sync_pt2_sheet_db.py pt2_sheet_db.py
+          python -m py_compile sync_pt2_sheet_db.py pt2_sheet_db.py sync_pt2_prediction_sheet.py
           python -m unittest discover -s tests -p 'test_sync_pt2_sheet_db.py' -v
           python -m unittest discover -s tests -p 'test_pt2_sheet_db.py' -v
+          python -m unittest discover -s tests -p 'test_sync_pt2_prediction_sheet.py' -v
 
       - name: Install Google Sheets client
         run: pip install "gspread>=6,<7" "google-auth>=2,<3"
@@ -51,7 +56,9 @@ jobs:
           PT2_DB_MIN_PLAYERS: "1200"
           PT2_DB_MIN_MOTORS: "1000"
           PT2_DB_MIN_VENUES: "24"
-        run: python sync_pt2_sheet_db.py
+        run: |
+          python sync_pt2_sheet_db.py
+          python sync_pt2_prediction_sheet.py
 
       - name: Persist snapshot only when source data changed
         run: |
