@@ -1,0 +1,39 @@
+name: Motor Data Result Sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '5,20,35,50 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'sync_motor_data_from_results.py'
+      - 'data/motor_cycles.json'
+      - '.github/workflows/motor-data-result-sync.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: motor-data-result-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile sync_motor_data_from_results.py
+      - run: pip install "gspread>=6,<7" "google-auth>=2,<3"
+      - name: Update motor data from settled results
+        env:
+          TZ: Asia/Tokyo
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          BOAT_SHEET_ID: "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo"
+        run: python -u sync_motor_data_from_results.py
