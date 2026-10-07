@@ -232,7 +232,13 @@ def _parse_venues(values):
         name = _text(raw.get("ボートレース場"))
         if jcd is None or not name:
             continue
-        out[f"{jcd:02d}"] = {
+        key = f"{jcd:02d}"
+        # 24場データ contains additional venue-coded sections below the
+        # canonical first 24-row table. Keep the first complete venue record
+        # instead of letting later auxiliary rows overwrite it.
+        if key in out:
+            continue
+        out[key] = {
             "name": name,
             "water": _text(raw.get("水質")),
             "tide": _text(raw.get("潮汐影響")),
