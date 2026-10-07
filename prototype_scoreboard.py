@@ -47,7 +47,13 @@ def pt2_model_version(model: dict) -> str:
 
 
 def pt2_version_label(model: dict) -> str:
-    return PT2_VERSION_LABELS.get(pt2_model_version(model), pt2_model_version(model))
+    version = pt2_model_version(model)
+    return PT2_VERSION_LABELS.get(version, version)
+
+
+def pt2_result_version(row: dict) -> str:
+    meta = ((row.get("model_metadata") or {}).get("prototype2") or {})
+    return meta.get("model_version") or PT2_LEGACY_VERSION
 
 
 def read_json(path: Path, default=None):
@@ -396,8 +402,7 @@ def build_summary(day: str, races: dict, predicted: dict, delivered: dict):
     versions = sorted({
         row["version"] for row in pt2_delivery_rows
     } | {
-        (((row.get("model_metadata") or {}).get("prototype2") or {}).get("model_version")
-         or PT2_LEGACY_VERSION)
+        pt2_result_version(row)
         for row in result_rows
         if "prototype2" in (row.get("models") or {})
     })
@@ -406,8 +411,7 @@ def build_summary(day: str, races: dict, predicted: dict, delivered: dict):
             row["models"]["prototype2"]
             for row in result_rows
             if "prototype2" in (row.get("models") or {})
-            and (((row.get("model_metadata") or {}).get("prototype2") or {}).get("model_version")
-                 or PT2_LEGACY_VERSION) == version
+            and pt2_result_version(row) == version
         ]
         stats = aggregate(version_scores)
         delivered_rows = [row for row in pt2_delivery_rows if row["version"] == version]
