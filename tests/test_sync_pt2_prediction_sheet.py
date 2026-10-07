@@ -38,6 +38,7 @@ class PT2PredictionSheetTests(unittest.TestCase):
             },
         }
         return {
+            "day": "20261007",
             "key": "20261007_24_08",
             "venue": "大村",
             "rno": 8,
