@@ -84,6 +84,22 @@ class PT2PredictionSheetTests(unittest.TestCase):
         self.assertEqual(payload["helper_row"][0], "大村 8R｜18:10")
         self.assertEqual(payload["helper_row"][1], "20261007_24_08")
 
+    def test_prediction_log_row_preserves_key_and_cards(self):
+        record = self.record()
+        payload = view.build_payload(record)
+        row = view._prediction_log_row(
+            record,
+            payload,
+            saved_at=datetime.fromisoformat("2026-10-07T18:30:00+09:00"),
+        )
+        self.assertEqual(len(row), len(view.LOG_HEADERS))
+        self.assertEqual(row[1], "20261007")
+        self.assertEqual(row[2], "大村")
+        self.assertEqual(row[3], "8")
+        self.assertEqual(row[5], "20261007_24_08")
+        self.assertIn("5-1-2", row[14])
+        self.assertEqual(row[29:], ["", "", "", "", "", ""])
+
     def test_deadline_parser_uses_jst(self):
         deadline = view._deadline_at(self.record())
         self.assertEqual(deadline.isoformat(), "2026-10-07T18:10:00+09:00")
