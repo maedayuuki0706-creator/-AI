@@ -178,7 +178,8 @@ def _summary(cards, model):
         for pick in longshot_picks
         if str(pick)[:1].isdigit()
     )
-    hole_lane = head_counts.most_common(1)[0][0] if head_counts else ranked[3]
+    non_axis_holes = [(lane, count) for lane, count in head_counts.most_common() if lane != axis]
+    hole_lane = non_axis_holes[0][0] if non_axis_holes else ranked[3]
 
     balanced = cards.get("balanced") or {}
     top_pick = (balanced.get("picks") or [None])[0]
@@ -227,13 +228,13 @@ def _side_cards(cards, summary):
             break
 
     top3 = summary["ranked"][:3]
-    box = [f"{''.join(map(str, top3))}BOX"]
+    box = f"{''.join(map(str, top3))}BOX"
 
     return {
         "squeeze": _mini_text(squeeze, len(squeeze)),
         "hole": _mini_text(hole, len(hole)),
         "escape": _mini_text(escape, len(escape)),
-        "box": _mini_text(box, 6),
+        "box": f"{box}\n\n計6点",
     }
 
 
