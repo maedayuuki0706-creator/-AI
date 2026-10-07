@@ -59,5 +59,15 @@ class PT2SheetDatabaseTests(unittest.TestCase):
         self.assertFalse(result["sheet_database"]["venue_match"])
         self.assertAlmostEqual(result["heads"][1], 1 / 6, places=9)
 
+    def test_venue_only_snapshot_reports_fallback(self):
+        db = {"players": {}, "motors": {}, "venues": self.database()["venues"],
+              "meta": {"source": "test", "snapshot_at": "2026-10-07T12:00:00+09:00"}}
+        result = pt2_sheet_db.enhance_analysis(self.analysis(), "20", db)
+        self.assertFalse(result["sheet_database"]["enabled"])
+        self.assertTrue(result["sheet_database"]["venue_match"])
+        self.assertEqual(result["sheet_database"]["player_coverage_pct"], 0.0)
+        self.assertEqual(result["sheet_database"]["motor_coverage_pct"], 0.0)
+        self.assertAlmostEqual(result["heads"][1], 1 / 6, places=9)
+
 if __name__ == "__main__":
     unittest.main()
