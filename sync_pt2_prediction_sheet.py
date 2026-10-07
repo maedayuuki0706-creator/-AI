@@ -423,31 +423,32 @@ def _install_selector_formulas(book, ws, helper):
         raw=False,
     )
 
-    book.batch_update({
-        "requests": [
-            {
-                "setDataValidation": {
-                    "range": {
-                        "sheetId": ws.id,
-                        "startRowIndex": 2,
-                        "endRowIndex": 3,
-                        "startColumnIndex": 0,
-                        "endColumnIndex": 3,
-                    },
-                    "rule": {
-                        "condition": {
-                            "type": "ONE_OF_RANGE",
-                            "values": [{
-                                "userEnteredValue": f"'{HELPER_SHEET_NAME}'!$A$2:$A$100"
-                            }],
+    options = [str(value) for value in helper.col_values(1)[1:] if str(value).strip()]
+    condition_values = [{"userEnteredValue": value} for value in options]
+    if condition_values:
+        book.batch_update({
+            "requests": [
+                {
+                    "setDataValidation": {
+                        "range": {
+                            "sheetId": ws.id,
+                            "startRowIndex": 2,
+                            "endRowIndex": 3,
+                            "startColumnIndex": 0,
+                            "endColumnIndex": 1,
                         },
-                        "strict": True,
-                        "showCustomUi": True,
-                    },
+                        "rule": {
+                            "condition": {
+                                "type": "ONE_OF_LIST",
+                                "values": condition_values,
+                            },
+                            "strict": True,
+                            "showCustomUi": True,
+                        },
+                    }
                 }
-            }
-        ]
-    })
+            ]
+        })
 
 
 def publish():
