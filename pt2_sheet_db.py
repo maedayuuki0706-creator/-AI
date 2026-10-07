@@ -164,6 +164,10 @@ def enhance_analysis(analysis, jcd, database=None):
             "source": meta.get("source") or "Google Sheets 競艇AI データベース",
             "snapshot_at": meta.get("snapshot_at"),
             "spreadsheet_id": meta.get("spreadsheet_id"),
+            "schema_version": meta.get("schema_version"),
+            "snapshot_player_count": meta.get("player_count"),
+            "snapshot_motor_count": meta.get("motor_count"),
+            "snapshot_venue_count": meta.get("venue_count"),
             "player_matches": 0,
             "motor_matches": 0,
             "player_coverage_pct": 0.0,
@@ -175,9 +179,22 @@ def enhance_analysis(analysis, jcd, database=None):
         return copied
     if len(factors) != 6 or not rows:
         copied["sheet_database"] = {
-            "enabled": False, "reason": "insufficient_snapshot_coverage",
-            "snapshot_at": meta.get("snapshot_at"), "player_matches": player_matches,
-            "motor_matches": motor_matches, "venue_match": bool(venue),
+            "enabled": False,
+            "reason": "insufficient_snapshot_coverage",
+            "source": meta.get("source") or "Google Sheets 競艇AI データベース",
+            "snapshot_at": meta.get("snapshot_at"),
+            "spreadsheet_id": meta.get("spreadsheet_id"),
+            "schema_version": meta.get("schema_version"),
+            "snapshot_player_count": meta.get("player_count"),
+            "snapshot_motor_count": meta.get("motor_count"),
+            "snapshot_venue_count": meta.get("venue_count"),
+            "player_matches": player_matches,
+            "motor_matches": motor_matches,
+            "player_coverage_pct": round(player_matches / 6 * 100, 1),
+            "motor_coverage_pct": round(motor_matches / 6 * 100, 1),
+            "venue_match": bool(venue),
+            "venue_volatility": venue.get("volatility"),
+            "lane_factors": detail,
         }
         return copied
 
@@ -222,6 +239,10 @@ def enhance_analysis(analysis, jcd, database=None):
         "source": meta.get("source") or "Google Sheets 競艇AI データベース",
         "snapshot_at": meta.get("snapshot_at"),
         "spreadsheet_id": meta.get("spreadsheet_id"),
+        "schema_version": meta.get("schema_version"),
+        "snapshot_player_count": meta.get("player_count"),
+        "snapshot_motor_count": meta.get("motor_count"),
+        "snapshot_venue_count": meta.get("venue_count"),
         "player_matches": player_matches,
         "motor_matches": motor_matches,
         "player_coverage_pct": round(player_matches / 6 * 100, 1),

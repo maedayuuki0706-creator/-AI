@@ -23,6 +23,13 @@ LABELS = {
     "prototype2": "PT2（PT3ベース・日和本線6点＋中穴迎え4点）",
     "prototype3": "新人予想家 ゆうき（日和本線＋中穴抑え）",
 }
+PT2_NEW_VERSION = "new-pt2-full-sheet-db-v2"
+PT2_LEGACY_VERSION = "legacy-pt2-pre-full-db"
+PT2_VERSION_LABELS = {
+    PT2_LEGACY_VERSION: "旧PT2",
+    PT2_NEW_VERSION: "新PT2",
+}
+PT2_ROLLOUT_COMMIT = "4a54ebb113ae8dbb938f9724d34290f0b0c249ba"
 P12_ROOT = Path("data/prototype12_delivery")
 P3_ROOT = Path("data/prototype3_delivery")
 ROOT = Path("data/prototype_scoreboard")
@@ -91,6 +98,7 @@ def collect_delivered(day: str):
             "rno": int(record.get("rno") or 0),
             "venue": record.get("venue"),
             "deadline": record.get("deadline"),
+            "prediction_created_at": record.get("created_at"),
             "models": {},
             "receipts": {},
             "digests": {},
@@ -125,6 +133,7 @@ def collect_delivered(day: str):
             "rno": int(record.get("rno") or 0),
             "venue": record.get("venue"),
             "deadline": record.get("deadline"),
+            "prediction_created_at": record.get("created_at"),
             "models": {},
             "receipts": {},
             "digests": {},
@@ -233,10 +242,23 @@ def fetch_official(day: str, race: dict, refresh_settled: bool = False):
 
 def score_race(day: str, race: dict, result: dict):
     models = {}
+    model_metadata = {}
     for stream, model in race["models"].items():
         score = score_model(model, result)
         if score is not None:
             models[stream] = score
+            if stream == "prototype2":
+                db = model.get("database") or {}
+                model_metadata[stream] = {
+                    "model_version": model.get("model_version") or PT2_LEGACY_VERSION,
+                    "version_label": model.get("version_label") or PT2_VERSION_LABELS[PT2_LEGACY_VERSION],
+                    "rollout_commit": model.get("rollout_commit"),
+                    "db_snapshot_at": db.get("snapshot_at"),
+                    "db_schema_version": db.get("schema_version"),
+                    "db_player_matches": db.get("player_matches"),
+                    "db_motor_matches": db.get("motor_matches"),
+                    "db_enabled": bool(db.get("enabled")),
+                }
     if not models:
         return None
     return {
@@ -246,11 +268,13 @@ def score_race(day: str, race: dict, result: dict):
         "rno": race["rno"],
         "venue": race.get("venue"),
         "deadline": race.get("deadline"),
+        "prediction_created_at": race.get("prediction_created_at"),
         "prediction_digests": race["digests"],
         "delivered_at": {
             stream: receipt.get("delivered_at")
             for stream, receipt in race["receipts"].items()
         },
+        "model_metadata": model_metadata,
         "official": result,
         "models": models,
     }
@@ -275,6 +299,10 @@ def aggregate(rows):
         "torigami": sum(bool(row.get("torigami")) for row in judged),
         "main_hits": sum(bool(row.get("main_hit")) for row in judged),
         "cover_hits": sum(bool(row.get("cover_hit")) for row in judged),
+        "avg_points": (
+            sum(int(row.get("point_count") or 0) for row in resolved) / len(resolved)
+            if resolved else None
+        ),
     }
 
 
@@ -331,6 +359,80 @@ def build_summary(day: str, races: dict, predicted: dict, delivered: dict):
                                for row in common_rows),
             }
 
+    pt2_delivery_rows = []
+    for race in races.values():
+        model = (race.get("models") or {}).get("prototype2")
+        receipt = (race.get("receipts") or {}).get("prototype2")
+        if not isinstance(model, dict) or not isinstance(receipt, dict):
+            continue
+        version = model.get("model_version") or PT2_LEGACY_VERSION
+        pt2_delivery_rows.append({
+            "version": version,
+            "version_label": model.get("version_label") or PT2_VERSION_LABELS.get(version, version),
+            "key": race.get("key"),
+            "venue": race.get("venue"),
+            "rno": race.get("rno"),
+            "prediction_created_at": race.get("prediction_created_at"),
+            "delivered_at": receipt.get("delivered_at"),
+            "db_snapshot_at": (model.get("database") or {}).get("snapshot_at"),
+        })
+
+    pt2_versions = {}
+    versions = sorted({
+        row["version"] for row in pt2_delivery_rows
+    } | {
+        ((row.get("model_metadata") or {}).get("prototype2") or {}).get("model_version", PT2_LEGACY_VERSION)
+        for row in result_rows
+        if "prototype2" in (row.get("models") or {})
+    })
+    for version in versions:
+        version_scores = [
+            row["models"]["prototype2"]
+            for row in result_rows
+            if "prototype2" in (row.get("models") or {})
+            and (((row.get("model_metadata") or {}).get("prototype2") or {}).get("model_version")
+                 or PT2_LEGACY_VERSION) == version
+        ]
+        stats = aggregate(version_scores)
+        delivered_rows = [row for row in pt2_delivery_rows if row["version"] == version]
+        delivered_rows.sort(key=lambda row: str(row.get("delivered_at") or ""))
+        stats.update({
+            "label": PT2_VERSION_LABELS.get(version, delivered_rows[0]["version_label"] if delivered_rows else version),
+            "model_version": version,
+            "delivered": len(delivered_rows),
+            "pending": max(0, len(delivered_rows) - stats["resolved"]),
+            "first_delivery": delivered_rows[0] if delivered_rows else None,
+            "last_delivery": delivered_rows[-1] if delivered_rows else None,
+        })
+        pt2_versions[version] = stats
+
+    new_stats = pt2_versions.get(PT2_NEW_VERSION) or {}
+    old_stats = pt2_versions.get(PT2_LEGACY_VERSION) or {}
+    pt2_comparison = {
+        "baseline_version": PT2_LEGACY_VERSION,
+        "new_version": PT2_NEW_VERSION,
+        "rollout_commit": PT2_ROLLOUT_COMMIT,
+        "first_new_delivery": new_stats.get("first_delivery"),
+        "versions": pt2_versions,
+        "delta_new_minus_old": {
+            "hit_rate_points": (
+                new_stats["hit_rate"] - old_stats["hit_rate"]
+                if new_stats.get("hit_rate") is not None and old_stats.get("hit_rate") is not None
+                else None
+            ),
+            "roi_points": (
+                new_stats["roi"] - old_stats["roi"]
+                if new_stats.get("roi") is not None and old_stats.get("roi") is not None
+                else None
+            ),
+            "avg_points": (
+                new_stats["avg_points"] - old_stats["avg_points"]
+                if new_stats.get("avg_points") is not None and old_stats.get("avg_points") is not None
+                else None
+            ),
+        },
+    }
+
     latest_checked = max(
         (str((row.get("official") or {}).get("checked_at") or "") for row in result_rows),
         default="",
@@ -347,6 +449,7 @@ def build_summary(day: str, races: dict, predicted: dict, delivered: dict):
         "updated_at": latest_checked,
         "race_keys_with_any_delivery": len(races),
         "totals": totals,
+        "pt2_version_comparison": pt2_comparison,
         "common_cohort": {
             "judged_races": len(common_rows),
             "keys": [row["key"] for row in common_rows],
