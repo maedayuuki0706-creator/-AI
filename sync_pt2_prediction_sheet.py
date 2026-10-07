@@ -152,14 +152,21 @@ def _compact_formations(picks):
     return out
 
 
-def _card_text(card, main_limit=4, cover_limit=6):
+def _card_text(card, main_limit=4, cover_limit=6, *, show_all=False):
     main = list(card.get("main_picks") or [])
     cover = list(card.get("cover_picks") or [])
     if not main and card.get("picks"):
-        main = list(card.get("picks") or [])[:main_limit]
-        cover = list(card.get("picks") or [])[main_limit:]
-    main_lines = _compact_formations(main[:main_limit])
-    cover_lines = _compact_formations(cover[:cover_limit])
+        picks = list(card.get("picks") or [])
+        if show_all:
+            main = picks
+            cover = []
+        else:
+            main = picks[:main_limit]
+            cover = picks[main_limit:]
+    main_view = main if show_all else main[:main_limit]
+    cover_view = cover if show_all else cover[:cover_limit]
+    main_lines = _compact_formations(main_view)
+    cover_lines = _compact_formations(cover_view)
     lines = ["本線"]
     lines.extend(main_lines or ["—"])
     if cover:
@@ -353,7 +360,7 @@ def build_payload(record):
             "G5": str(summary["scores"][3]),
             "I5": str(summary["scores"][4]),
             "K5": str(summary["scores"][5]),
-            "B7": _card_text(cards.get("balanced") or {}),
+            "B7": _card_text(cards.get("balanced") or {}, show_all=True),
             "B12": _card_text(cards.get("probability") or {}),
             "B17": _card_text(cards.get("value") or {}),
             "B22": _card_text(cards.get("longshot") or {}),
@@ -378,7 +385,7 @@ def build_payload(record):
             updated,
             volatility_text,
             *[str(value) for value in summary["scores"]],
-            _card_text(cards.get("balanced") or {}),
+            _card_text(cards.get("balanced") or {}, show_all=True),
             _card_text(cards.get("probability") or {}),
             _card_text(cards.get("value") or {}),
             _card_text(cards.get("longshot") or {}),
@@ -513,6 +520,48 @@ def _scoreboard_result_values(scored, prediction=None):
         else:
             hit_cells.append("—")
     return [result_text, payout_text, *hit_cells]
+
+
+def _refresh_logged_balanced_text(log_ws, records):
+    """Refresh existing 総合型 cells so every stored pick is visible."""
+    rows = log_ws.get_all_values()
+    if not rows:
+        return 0
+    headers = rows[0]
+    try:
+        key_index = headers.index("key")
+        balanced_index = headers.index("総合型")
+    except ValueError:
+        return 0
+
+    record_map = {
+        str(record.get("key") or "").strip(): record
+        for record in records
+        if str(record.get("key") or "").strip()
+    }
+    column = _column_letter(balanced_index + 1)
+    updates = []
+    for row_number, row in enumerate(rows[1:], start=2):
+        key = str(row[key_index] if key_index < len(row) else "").strip()
+        record = record_map.get(key)
+        if not record:
+            continue
+        model = ((record.get("models") or {}).get("prototype2") or {})
+        cards = _strategy_cards(model)
+        balanced = cards.get("balanced") if isinstance(cards, dict) else None
+        if not isinstance(balanced, dict) or not balanced.get("picks"):
+            continue
+        desired = _card_text(balanced, show_all=True)
+        current = str(row[balanced_index] if balanced_index < len(row) else "")
+        if current == desired:
+            continue
+        updates.append({
+            "range": f"{column}{row_number}",
+            "values": [[desired]],
+        })
+    if updates:
+        log_ws.batch_update(updates, raw=True)
+    return len(updates)
 
 
 def _backfill_prediction_results(log_ws):
@@ -664,7 +713,9 @@ def publish():
     payloads = [build_payload(record) for record in records]
     # Persist every PT2 prediction independently of whether it is still in the
     # live selector, then backfill result/payout and per-strategy hit columns.
-    logged_count = _append_prediction_logs(log_ws, _all_prediction_records())
+    all_records = _all_prediction_records()
+    logged_count = _append_prediction_logs(log_ws, all_records)
+    balanced_refresh_count = _refresh_logged_balanced_text(log_ws, all_records)
     result_backfill_count = _backfill_prediction_results(log_ws)
 
     rows = [HELPER_HEADERS]
@@ -707,6 +758,7 @@ def publish():
         "options": options,
         "sheet": SHEET_NAME,
         "logged_count": logged_count,
+        "balanced_refresh_count": balanced_refresh_count,
         "result_backfill_count": result_backfill_count,
         "log_sheet": LOG_SHEET_NAME,
     }, ensure_ascii=False))
