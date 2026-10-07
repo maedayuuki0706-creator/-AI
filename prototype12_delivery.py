@@ -28,6 +28,11 @@ WEBHOOKS = {
     "prototype2": ("PROTO2_DISCORD_WEBHOOK_URL", "プロトタイプ2"),
 }
 
+PT2_MODEL_VERSION = "new-pt2-full-sheet-db-v2"
+PT2_VERSION_LABEL = "新PT2"
+PT2_LEGACY_VERSION = "legacy-pt2-pre-full-db"
+PT2_ROLLOUT_COMMIT = "4a54ebb113ae8dbb938f9724d34290f0b0c249ba"
+
 
 def now_jst():
     return datetime.now(base.JST)
@@ -47,6 +52,24 @@ def read(path):
 
 def write_json(path, value):
     trial.write_json(path, value)
+
+
+def pt2_rollout_metadata(model):
+    db = model.get("database") or {}
+    return {
+        "model_version": PT2_MODEL_VERSION,
+        "version_label": PT2_VERSION_LABEL,
+        "baseline_version": PT2_LEGACY_VERSION,
+        "rollout_commit": PT2_ROLLOUT_COMMIT,
+        "db_schema_version": db.get("schema_version"),
+        "db_snapshot_at": db.get("snapshot_at"),
+        "db_snapshot_player_count": db.get("snapshot_player_count"),
+        "db_snapshot_motor_count": db.get("snapshot_motor_count"),
+        "db_snapshot_venue_count": db.get("snapshot_venue_count"),
+        "db_player_matches": db.get("player_matches"),
+        "db_motor_matches": db.get("motor_matches"),
+        "db_enabled": bool(db.get("enabled")),
+    }
 
 
 def post_webhook(url, payload):
@@ -99,8 +122,9 @@ def model_message(record, stream):
     cover = " / ".join(model.get("cover_picks") or [])
     db = model.get("database") or {}
     db_state = "ON" if db.get("enabled") else "fallback"
+    version_label = model.get("version_label") or "旧PT2"
     return (
-        f"🧪 **プロトタイプ2｜PT3×DB補正・固定点数上限なし**\n"
+        f"🧪 **{version_label}｜PT3×DB補正・固定点数上限なし**\n"
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
         f"🗃️ DB {db_state}｜選手 {db.get('player_matches', 0)}/6｜モーター {db.get('motor_matches', 0)}/6｜場データ {'ON' if db.get('venue_match') else 'OFF'}\n"
         f"⚖️ 固定点数上限なし｜PT3＋DB補正済み候補を保持\n"
@@ -156,6 +180,8 @@ def build_record(day, jcd, rno, deadline):
         "prototype2": trial._prototype2_compress(
             hiyori, pt2_official, odds, native_hiyori, pt2_existing_native),
     }
+    pt2_meta = pt2_rollout_metadata(models["prototype2"])
+    models["prototype2"].update(pt2_meta)
 
     key = key_for(day, jcd, rno)
     record = {
@@ -167,6 +193,9 @@ def build_record(day, jcd, rno, deadline):
         "deadline": deadline,
         "created_at": now_jst().isoformat(),
         "models": models,
+        "rollouts": {
+            "prototype2": pt2_meta,
+        },
     }
     record["digest"] = sha256(
         json.dumps(record, ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -193,12 +222,41 @@ def deliver(record):
             continue
         try:
             post_webhook(url, {"username": username, "content": model_message(record, stream)})
-            write_json(receipt, {
+            delivered_at = now_jst().isoformat()
+            model = (record.get("models") or {}).get(stream) or {}
+            receipt_value = {
                 "key": key,
                 "stream": stream,
                 "prediction_digest": record["digest"],
-                "delivered_at": now_jst().isoformat(),
-            })
+                "delivered_at": delivered_at,
+            }
+            if stream == "prototype2":
+                receipt_value.update({
+                    "model_version": model.get("model_version") or PT2_LEGACY_VERSION,
+                    "version_label": model.get("version_label") or "旧PT2",
+                    "db_snapshot_at": (model.get("database") or {}).get("snapshot_at"),
+                })
+            write_json(receipt, receipt_value)
+            if stream == "prototype2" and model.get("model_version") == PT2_MODEL_VERSION:
+                rollout = {
+                    "rollout_id": PT2_MODEL_VERSION,
+                    "version_label": PT2_VERSION_LABEL,
+                    "baseline_version": PT2_LEGACY_VERSION,
+                    "rollout_commit": PT2_ROLLOUT_COMMIT,
+                    "first_prediction_key": key,
+                    "day": record.get("day"),
+                    "venue": record.get("venue"),
+                    "rno": record.get("rno"),
+                    "prediction_created_at": record.get("created_at"),
+                    "first_delivered_at": delivered_at,
+                    "prediction_digest": record.get("digest"),
+                    "database": model.get("database"),
+                }
+                rollout_path = ROOT / "rollouts" / f"{PT2_MODEL_VERSION}.json"
+                trial.write_once(
+                    rollout_path,
+                    (json.dumps(rollout, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8"),
+                )
             print(f"delivery confirmed {key} {stream}", flush=True)
         except Exception as exc:
             print(f"delivery retry pending {key} {stream}: {type(exc).__name__}", flush=True)
