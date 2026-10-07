@@ -32,6 +32,7 @@ PT2_MODEL_VERSION = "new-pt2-full-sheet-db-v2"
 PT2_VERSION_LABEL = "新PT2"
 PT2_LEGACY_VERSION = "legacy-pt2-pre-full-db"
 PT2_ROLLOUT_COMMIT = "4a54ebb113ae8dbb938f9724d34290f0b0c249ba"
+PT2_NEW_DB_SNAPSHOT_MIN = "2026-10-07T13:02:56+09:00"
 
 
 def now_jst():
@@ -52,6 +53,20 @@ def read(path):
 
 def write_json(path, value):
     trial.write_json(path, value)
+
+
+def pt2_model_version(model):
+    explicit = model.get("model_version")
+    if explicit:
+        return explicit
+    snapshot_at = str((model.get("database") or {}).get("snapshot_at") or "")
+    if snapshot_at and snapshot_at >= PT2_NEW_DB_SNAPSHOT_MIN:
+        return PT2_MODEL_VERSION
+    return PT2_LEGACY_VERSION
+
+
+def pt2_version_label(model):
+    return PT2_VERSION_LABEL if pt2_model_version(model) == PT2_MODEL_VERSION else "旧PT2"
 
 
 def pt2_rollout_metadata(model):
@@ -122,7 +137,7 @@ def model_message(record, stream):
     cover = " / ".join(model.get("cover_picks") or [])
     db = model.get("database") or {}
     db_state = "ON" if db.get("enabled") else "fallback"
-    version_label = model.get("version_label") or "旧PT2"
+    version_label = model.get("version_label") or pt2_version_label(model)
     return (
         f"🧪 **{version_label}｜PT3×DB補正・固定点数上限なし**\n"
         f"🏁 **{record['venue']} {record['rno']}R**｜締切 {record['deadline']}\n"
@@ -232,12 +247,12 @@ def deliver(record):
             }
             if stream == "prototype2":
                 receipt_value.update({
-                    "model_version": model.get("model_version") or PT2_LEGACY_VERSION,
-                    "version_label": model.get("version_label") or "旧PT2",
+                    "model_version": pt2_model_version(model),
+                    "version_label": model.get("version_label") or pt2_version_label(model),
                     "db_snapshot_at": (model.get("database") or {}).get("snapshot_at"),
                 })
             write_json(receipt, receipt_value)
-            if stream == "prototype2" and model.get("model_version") == PT2_MODEL_VERSION:
+            if stream == "prototype2" and pt2_model_version(model) == PT2_MODEL_VERSION:
                 rollout = {
                     "rollout_id": PT2_MODEL_VERSION,
                     "version_label": PT2_VERSION_LABEL,
