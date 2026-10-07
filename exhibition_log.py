@@ -119,6 +119,9 @@ def record_analysis(day: str, jcd: str, rno: int, analysis: dict | None) -> bool
             "rno": rno, "lane": lane,
             "racer_id": str(boat.get("racer_id") or ""),
             "name": str(boat.get("name") or ""),
+            "current_class": str(boat.get("current_class") or ""),
+            "motor_number": boat.get("motor_number"),
+            "boat_number": boat.get("boat_number"),
             "exhibition_time": exhibition_time,
             "exhibition_rank": boat.get("exhibition_rank"),
             "venue_median_delta": (
