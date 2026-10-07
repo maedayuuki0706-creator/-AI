@@ -124,7 +124,7 @@ class PT2PredictionSheetTests(unittest.TestCase):
             ["1-6-3", "2,250円", "○", "○", "×", "×"],
         )
 
-    def test_scoreboard_result_values_rebuilds_legacy_strategy_hits(self):
+    def test_scoreboard_result_values_returns_unknown_when_legacy_cards_are_unrecoverable(self):
         prediction = self.record()
         prediction["models"]["prototype2"].pop("strategy_cards", None)
         scored = {
@@ -140,7 +140,7 @@ class PT2PredictionSheetTests(unittest.TestCase):
         }
         values = view._scoreboard_result_values(scored, prediction=prediction)
         self.assertEqual(values[0], "1-3-2")
-        self.assertEqual(values[2], "○")
+        self.assertEqual(values[2], "—")
 
     def test_result_column_letters_match_log_schema(self):
         result_index = view.LOG_HEADERS.index("結果")
