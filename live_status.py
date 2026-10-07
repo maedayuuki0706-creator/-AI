@@ -223,9 +223,10 @@ def prototype_streams(day: str):
             }
             if stream == "prototype2":
                 db = model.get("database") or {}
+                version = prototype_scoreboard.pt2_model_version(model)
                 item.update({
-                    "model_version": model.get("model_version") or PT2_LEGACY_VERSION,
-                    "version_label": model.get("version_label") or PT2_VERSION_LABELS[PT2_LEGACY_VERSION],
+                    "model_version": version,
+                    "version_label": model.get("version_label") or PT2_VERSION_LABELS.get(version, version),
                     "rollout_commit": model.get("rollout_commit"),
                     "db_snapshot_at": db.get("snapshot_at"),
                     "db_player_matches": db.get("player_matches"),
