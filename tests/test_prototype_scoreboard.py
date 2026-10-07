@@ -47,10 +47,12 @@ class PrototypeScoreboardTests(unittest.TestCase):
             {
                 "eligible": True, "hit": True, "stake_yen": 1000, "return_yen": 2200,
                 "manshu": False, "torigami": False, "main_hit": True, "cover_hit": False,
+                "point_count": 10,
             },
             {
                 "eligible": False, "hit": False, "stake_yen": 1000, "return_yen": 1000,
                 "manshu": False, "torigami": False, "main_hit": False, "cover_hit": False,
+                "point_count": 14,
             },
         ]
         stats = board.aggregate(rows)
@@ -61,6 +63,7 @@ class PrototypeScoreboardTests(unittest.TestCase):
         self.assertEqual(stats["stake_yen"], 2000)
         self.assertEqual(stats["return_yen"], 3200)
         self.assertAlmostEqual(stats["roi"], 160.0)
+        self.assertAlmostEqual(stats["avg_points"], 12.0)
 
 
 if __name__ == "__main__":
