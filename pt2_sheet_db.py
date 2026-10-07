@@ -98,6 +98,18 @@ def _boat_factor(boat, venue, players, motors, jcd):
         player_used = True
         reasons.append(f"method={method:.3f}")
 
+    tuning = [
+        _number(player.get("maintenance_grade")),
+        _number(player.get("propeller_grade")),
+    ]
+    tuning = [value for value in tuning if value is not None]
+    if tuning:
+        tuning_avg = sum(tuning) / len(tuning)
+        tuning_factor = _clip(1.0 + (tuning_avg - 2.5) * 0.01, 0.985, 1.025)
+        factor *= tuning_factor
+        player_used = True
+        reasons.append(f"tuning={tuning_avg:.2f}")
+
     grade = _grade_average(motor)
     if grade is not None:
         motor_factor = _clip(1.0 + (grade - 0.72) * 0.18, 0.94, 1.06)
@@ -145,11 +157,20 @@ def enhance_analysis(analysis, jcd, database=None):
         motor_matches += int(m_used)
 
     rows = copied.get("trifecta") or []
-    if player_matches == 0 and motor_matches == 0 and not venue:
+    if player_matches == 0 and motor_matches == 0:
         copied["sheet_database"] = {
-            "enabled": False, "reason": "snapshot_has_no_matching_signals",
-            "snapshot_at": meta.get("snapshot_at"), "player_matches": 0,
-            "motor_matches": 0, "venue_match": False,
+            "enabled": False,
+            "reason": "snapshot_has_no_matching_individual_signals",
+            "source": meta.get("source") or "Google Sheets 競艇AI データベース",
+            "snapshot_at": meta.get("snapshot_at"),
+            "spreadsheet_id": meta.get("spreadsheet_id"),
+            "player_matches": 0,
+            "motor_matches": 0,
+            "player_coverage_pct": 0.0,
+            "motor_coverage_pct": 0.0,
+            "venue_match": bool(venue),
+            "venue_volatility": venue.get("volatility"),
+            "lane_factors": detail,
         }
         return copied
     if len(factors) != 6 or not rows:
@@ -203,6 +224,11 @@ def enhance_analysis(analysis, jcd, database=None):
         "spreadsheet_id": meta.get("spreadsheet_id"),
         "player_matches": player_matches,
         "motor_matches": motor_matches,
+        "player_coverage_pct": round(player_matches / 6 * 100, 1),
+        "motor_coverage_pct": round(motor_matches / 6 * 100, 1),
+        "matched_lanes": [
+            lane for lane, item in detail.items() if item.get("signals")
+        ],
         "venue_match": bool(venue),
         "venue_volatility": venue.get("volatility"),
         "lane_factors": detail,
