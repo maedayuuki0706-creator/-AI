@@ -1,56 +1,56 @@
 {
-  "action": "keep_live_weights",
+  "action": "keep_collecting",
   "automatic_live_promotion": false,
   "current_metrics": {
-    "avg_logloss_improvement": 0.05418226032760165,
-    "hit_rate": 40.90909090909091,
-    "roi": 54.91525423728814,
-    "samples": 22,
-    "winner_probability_improved_rate": 59.09090909090909
+    "avg_logloss_improvement": 0.04582947249589809,
+    "hit_rate": 46.0,
+    "roi": 65.2589641434263,
+    "samples": 50,
+    "winner_probability_improved_rate": 64.0
   },
   "model_version": "new-pt2-full-sheet-db-v2",
-  "phase": "collecting",
+  "phase": "evidence_positive",
   "promotion_gate": {
     "minimum_samples": 100,
     "requires_no_material_roi_regression": true,
     "requires_positive_logloss_improvement": true,
     "requires_shadow_backtest": true
   },
-  "reason": "Need at least 50 settled audited races before weight review.",
+  "reason": "DB adjustment is improving winner probability on average; keep live weights stable while collecting more evidence.",
   "signal_candidates": {
     "course": {
-      "mean_logloss_improvement": 0.076349,
-      "mean_winner_delta_pp": 0.222076,
-      "raw_occurrences": 54,
+      "mean_logloss_improvement": 0.059418,
+      "mean_winner_delta_pp": 0.199037,
+      "raw_occurrences": 117,
       "recommended_multiplier_change": 0.05,
       "status": "positive_candidate"
     },
     "method": {
-      "mean_logloss_improvement": 0.054064,
-      "mean_winner_delta_pp": 0.178137,
-      "raw_occurrences": 64,
+      "mean_logloss_improvement": 0.049412,
+      "mean_winner_delta_pp": 0.176693,
+      "raw_occurrences": 135,
       "recommended_multiplier_change": 0.05,
       "status": "positive_candidate"
     },
     "motor_grade": {
-      "mean_logloss_improvement": 0.054182,
-      "mean_winner_delta_pp": 0.17864,
-      "raw_occurrences": 66,
+      "mean_logloss_improvement": 0.045829,
+      "mean_winner_delta_pp": 0.172021,
+      "raw_occurrences": 150,
       "recommended_multiplier_change": 0.05,
       "status": "positive_candidate"
     },
     "motor_rate": {
-      "mean_logloss_improvement": 0.056811,
-      "mean_winner_delta_pp": 0.187276,
-      "raw_occurrences": 63,
+      "mean_logloss_improvement": 0.046786,
+      "mean_winner_delta_pp": 0.175587,
+      "raw_occurrences": 147,
       "recommended_multiplier_change": 0.05,
       "status": "positive_candidate"
     },
     "tuning": {
-      "raw_occurrences": 9,
+      "raw_occurrences": 17,
       "recommended_multiplier_change": 0.0,
       "status": "collecting"
     }
   },
-  "updated_at": "2026-10-07T17:32:01.108914+09:00"
+  "updated_at": "2026-10-07T22:47:48.029924+09:00"
 }
