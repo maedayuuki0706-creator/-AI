@@ -1,0 +1,42 @@
+name: Women Race Sheet Sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '10,25,40,55 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'sync_women_race_sheet.py'
+      - '.github/workflows/women-race-sheet-sync.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: women-race-sheet-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify women race sync
+        run: python -m py_compile sync_women_race_sheet.py direct_discord_notify.py race_context.py
+      - name: Install Google Sheets client
+        run: pip install "gspread>=6,<7" "google-auth>=2,<3"
+      - name: Sync women-only settled results
+        env:
+          TZ: Asia/Tokyo
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          BOAT_SHEET_ID: "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo"
+          WOMEN_SHEET: "女子戦"
+          WOMEN_BACKFILL_DAYS: "3"
+        run: python -u sync_women_race_sheet.py
