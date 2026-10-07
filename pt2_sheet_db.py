@@ -98,6 +98,18 @@ def _boat_factor(boat, venue, players, motors, jcd):
         player_used = True
         reasons.append(f"method={method:.3f}")
 
+    tuning = [
+        _number(player.get("maintenance_grade")),
+        _number(player.get("propeller_grade")),
+    ]
+    tuning = [value for value in tuning if value is not None]
+    if tuning:
+        tuning_avg = sum(tuning) / len(tuning)
+        tuning_factor = _clip(1.0 + (tuning_avg - 2.5) * 0.01, 0.985, 1.025)
+        factor *= tuning_factor
+        player_used = True
+        reasons.append(f"tuning={tuning_avg:.2f}")
+
     grade = _grade_average(motor)
     if grade is not None:
         motor_factor = _clip(1.0 + (grade - 0.72) * 0.18, 0.94, 1.06)
