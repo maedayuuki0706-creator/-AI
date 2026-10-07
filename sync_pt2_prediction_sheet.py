@@ -18,8 +18,17 @@ SPREADSHEET_ID = os.getenv(
     "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo",
 )
 SHEET_NAME = os.getenv("PT2_VIEW_SHEET", "PT2予想シート")
+HELPER_SHEET_NAME = os.getenv("PT2_VIEW_HELPER_SHEET", "PT2予想候補")
 PREDICTION_ROOT = Path("data/prototype12_delivery/predictions")
 JST = ZoneInfo("Asia/Tokyo")
+HELPER_HEADERS = [
+    "選択", "key", "締切", "更新", "荒れ指数",
+    "1号艇指数", "2号艇指数", "3号艇指数", "4号艇指数", "5号艇指数", "6号艇指数",
+    "総合型", "本命型", "妙味型", "高配当型",
+    "激絞り", "穴特化", "逃げ穴", "BOX型",
+    "軸候補", "相手上位", "穴警戒", "DB一致度", "AI一致度", "万舟候補",
+    "model_version", "strategy_version", "created_at",
+]
 
 
 def _load(path: Path):
@@ -30,7 +39,47 @@ def _load(path: Path):
         return None
 
 
+def _deadline_at(record):
+    day = str(record.get("day") or "")
+    deadline = str(record.get("deadline") or "")
+    try:
+        return datetime.strptime(f"{day} {deadline}", "%Y%m%d %H:%M").replace(tzinfo=JST)
+    except (TypeError, ValueError):
+        return None
+
+
+def _active_records(now=None):
+    now = now or datetime.now(JST)
+    out = []
+    if not PREDICTION_ROOT.exists():
+        return out
+    for path in PREDICTION_ROOT.glob("*.json"):
+        record = _load(path)
+        if not record:
+            continue
+        model = ((record.get("models") or {}).get("prototype2") or {})
+        if not model:
+            continue
+        created = str(record.get("created_at") or "")
+        try:
+            created_at = datetime.fromisoformat(created).astimezone(JST)
+        except (TypeError, ValueError):
+            continue
+        deadline_at = _deadline_at(record)
+        if deadline_at is None:
+            continue
+        # Only races whose prediction already exists and whose deadline has not
+        # passed are selectable.
+        if created_at <= now < deadline_at:
+            out.append((deadline_at, created_at, str(record.get("key") or ""), record))
+    out.sort(key=lambda item: (item[0], item[1], item[2]))
+    return [item[3] for item in out]
+
+
 def _latest_record():
+    active = _active_records()
+    if active:
+        return active[0]
     candidates = []
     if not PREDICTION_ROOT.exists():
         return None
@@ -39,6 +88,8 @@ def _latest_record():
         if not record:
             continue
         model = ((record.get("models") or {}).get("prototype2") or {})
+        if not model:
+            continue
         created = str(record.get("created_at") or "")
         candidates.append((created, path.name, record))
     if not candidates:
@@ -257,10 +308,14 @@ def build_payload(record):
     except Exception:
         updated = created[-8:] if created else "—"
 
+    selector = f"{record.get('venue', '—')} {record.get('rno', '—')}R｜{record.get('deadline') or '—'}"
+    strategy_version = str(((model.get("strategy_cards") or {}).get("version") or ""))
     return {
         "key": record.get("key"),
+        "selector": selector,
+        "deadline_at": _deadline_at(record),
         "values": {
-            "A3": f"場・R：{record.get('venue', '—')} {record.get('rno', '—')}R",
+            "A3": selector,
             "D3": f"締切：{record.get('deadline') or '—'}",
             "G3": f"荒れ指数：{volatility_text}",
             "J3": f"最終更新：{updated}",
@@ -286,19 +341,119 @@ def build_payload(record):
             "K29": summary["manshu"],
             "N1": str(record.get("key") or ""),
             "N2": str(model.get("model_version") or ""),
-            "N3": str(((model.get("strategy_cards") or {}).get("version") or "")),
+            "N3": strategy_version,
         },
+        "helper_row": [
+            selector,
+            str(record.get("key") or ""),
+            str(record.get("deadline") or ""),
+            updated,
+            volatility_text,
+            *[str(value) for value in summary["scores"]],
+            _card_text(cards.get("balanced") or {}),
+            _card_text(cards.get("probability") or {}),
+            _card_text(cards.get("value") or {}),
+            _card_text(cards.get("longshot") or {}),
+            sides["squeeze"],
+            sides["hole"],
+            sides["escape"],
+            sides["box"],
+            summary["axis"],
+            summary["opponents"],
+            summary["hole"],
+            summary["db"],
+            summary["ai"],
+            summary["manshu"],
+            str(model.get("model_version") or ""),
+            strategy_version,
+            created,
+        ],
     }
+
+
+def _lookup_formula(index):
+    return f'=IFERROR(VLOOKUP($A$3,\'{HELPER_SHEET_NAME}\'!$A$2:$AB$100,{index},FALSE),"—")'
+
+
+def _ensure_helper(book):
+    import gspread
+
+    try:
+        helper = book.worksheet(HELPER_SHEET_NAME)
+    except gspread.WorksheetNotFound:
+        helper = book.add_worksheet(title=HELPER_SHEET_NAME, rows=120, cols=len(HELPER_HEADERS))
+        try:
+            helper.hide()
+        except Exception:
+            pass
+    return helper
+
+
+def _install_selector_formulas(book, ws, helper):
+    formulas = {
+        "D3": '="締切："&' + _lookup_formula(3),
+        "G3": '="荒れ指数："&' + _lookup_formula(5),
+        "J3": '="最終更新："&' + _lookup_formula(4),
+        "A5": _lookup_formula(6),
+        "C5": _lookup_formula(7),
+        "E5": _lookup_formula(8),
+        "G5": _lookup_formula(9),
+        "I5": _lookup_formula(10),
+        "K5": _lookup_formula(11),
+        "B7": _lookup_formula(12),
+        "B12": _lookup_formula(13),
+        "B17": _lookup_formula(14),
+        "B22": _lookup_formula(15),
+        "J7": _lookup_formula(16),
+        "J12": _lookup_formula(17),
+        "J17": _lookup_formula(18),
+        "J22": _lookup_formula(19),
+        "A29": _lookup_formula(20),
+        "C29": _lookup_formula(21),
+        "E29": _lookup_formula(22),
+        "G29": _lookup_formula(23),
+        "I29": _lookup_formula(24),
+        "K29": _lookup_formula(25),
+        "N1": _lookup_formula(2),
+        "N2": _lookup_formula(26),
+        "N3": _lookup_formula(27),
+    }
+    ws.batch_update(
+        [{"range": cell, "values": [[formula]]} for cell, formula in formulas.items()],
+        raw=False,
+    )
+
+    options = [str(value) for value in helper.col_values(1)[1:] if str(value).strip()]
+    condition_values = [{"userEnteredValue": value} for value in options]
+    if condition_values:
+        book.batch_update({
+            "requests": [
+                {
+                    "setDataValidation": {
+                        "range": {
+                            "sheetId": ws.id,
+                            "startRowIndex": 2,
+                            "endRowIndex": 3,
+                            "startColumnIndex": 0,
+                            "endColumnIndex": 1,
+                        },
+                        "rule": {
+                            "condition": {
+                                "type": "ONE_OF_LIST",
+                                "values": condition_values,
+                            },
+                            "strict": True,
+                            "showCustomUi": True,
+                        },
+                    }
+                }
+            ]
+        })
 
 
 def publish():
     import gspread
     from google.oauth2.service_account import Credentials
-
-    record = _latest_record()
-    if record is None:
-        print("No multi-strategy PT2 prediction available yet.")
-        return 0
 
     raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if not raw:
@@ -310,18 +465,37 @@ def publish():
     )
     book = gspread.authorize(creds).open_by_key(SPREADSHEET_ID)
     ws = book.worksheet(SHEET_NAME)
+    helper = _ensure_helper(book)
 
-    payload = build_payload(record)
-    current_key = (ws.acell("N1").value or "").strip()
-    if current_key == str(payload["key"] or ""):
-        print(f"PT2 prediction sheet already current: {current_key}")
-        return 0
+    records = _active_records()
+    payloads = [build_payload(record) for record in records]
 
-    updates = [
-        {"range": cell, "values": [[value]]}
-        for cell, value in payload["values"].items()
-    ]
-    ws.batch_update(updates, raw=True)
+    rows = [HELPER_HEADERS]
+    if payloads:
+        rows.extend(payload["helper_row"] for payload in payloads)
+    else:
+        rows.append(["現在選択可能な予想なし"] + [""] * (len(HELPER_HEADERS) - 1))
+
+    helper.clear()
+    helper.update(rows, "A1", raw=True)
+    try:
+        helper.hide()
+    except Exception:
+        pass
+
+    _install_selector_formulas(book, ws, helper)
+
+    options = [payload["selector"] for payload in payloads]
+    current = (ws.acell("A3").value or "").strip()
+    if not options:
+        desired = "現在選択可能な予想なし"
+    elif current in options:
+        desired = current
+    else:
+        # Default to the race with the nearest remaining deadline.
+        desired = options[0]
+    if current != desired:
+        ws.update_acell("A3", desired)
 
     # Keep implementation/debug metadata out of the visible prediction board.
     try:
@@ -331,9 +505,9 @@ def publish():
 
     print(json.dumps({
         "updated": True,
-        "key": payload["key"],
-        "venue": record.get("venue"),
-        "rno": record.get("rno"),
+        "active_count": len(payloads),
+        "selected": desired,
+        "options": options,
         "sheet": SHEET_NAME,
     }, ensure_ascii=False))
     return 0

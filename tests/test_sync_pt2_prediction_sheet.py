@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime
 
 import sync_pt2_prediction_sheet as view
 
@@ -76,6 +77,16 @@ class PT2PredictionSheetTests(unittest.TestCase):
         self.assertEqual(payload["G29"], "6/6 選手\n6/6 M")
         self.assertIn("5-1-2", payload["K29"])
         self.assertIn("2-4-1", payload["K29"])
+
+    def test_payload_selector_contains_race_and_deadline(self):
+        payload = view.build_payload(self.record())
+        self.assertEqual(payload["selector"], "大村 8R｜18:10")
+        self.assertEqual(payload["helper_row"][0], "大村 8R｜18:10")
+        self.assertEqual(payload["helper_row"][1], "20261007_24_08")
+
+    def test_deadline_parser_uses_jst(self):
+        deadline = view._deadline_at(self.record())
+        self.assertEqual(deadline.isoformat(), "2026-10-07T18:10:00+09:00")
 
     def test_index_uses_db_adjusted_head_probability(self):
         payload = view.build_payload(self.record())["values"]
