@@ -24,6 +24,8 @@ class PT2SheetDatabaseTests(unittest.TestCase):
             for lane in range(1, 7)
         }
         players["1001"]["course_win"][0] = 90.0
+        players["1001"]["maintenance_grade"] = 5.0
+        players["1001"]["propeller_grade"] = 4.0
         motors = {
             f"20:{lane}": {
                 "top2": 30.0, "launch": "S" if lane == 1 else "B",
@@ -46,6 +48,12 @@ class PT2SheetDatabaseTests(unittest.TestCase):
         self.assertEqual(result["sheet_database"]["player_matches"], 6)
         self.assertEqual(result["sheet_database"]["motor_matches"], 6)
         self.assertTrue(result["sheet_database"]["venue_match"])
+        self.assertEqual(result["sheet_database"]["player_coverage_pct"], 100.0)
+        self.assertEqual(result["sheet_database"]["motor_coverage_pct"], 100.0)
+        self.assertTrue(any(
+            str(signal).startswith("tuning=")
+            for signal in result["sheet_database"]["lane_factors"]["1"]["signals"]
+        ))
         self.assertAlmostEqual(sum(row["probability"] for row in result["trifecta"]), 1.0, places=9)
         self.assertGreater(result["heads"][1], 1 / 6)
 
