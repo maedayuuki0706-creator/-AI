@@ -30,9 +30,30 @@ PT2_VERSION_LABELS = {
     PT2_NEW_VERSION: "新PT2",
 }
 PT2_ROLLOUT_COMMIT = "4a54ebb113ae8dbb938f9724d34290f0b0c249ba"
+PT2_NEW_DB_SNAPSHOT_MIN = "2026-10-07T13:02:56+09:00"
 P12_ROOT = Path("data/prototype12_delivery")
 P3_ROOT = Path("data/prototype3_delivery")
 ROOT = Path("data/prototype_scoreboard")
+
+
+def pt2_model_version(model: dict) -> str:
+    explicit = model.get("model_version")
+    if explicit:
+        return explicit
+    snapshot_at = str((model.get("database") or {}).get("snapshot_at") or "")
+    if snapshot_at and snapshot_at >= PT2_NEW_DB_SNAPSHOT_MIN:
+        return PT2_NEW_VERSION
+    return PT2_LEGACY_VERSION
+
+
+def pt2_version_label(model: dict) -> str:
+    version = pt2_model_version(model)
+    return PT2_VERSION_LABELS.get(version, version)
+
+
+def pt2_result_version(row: dict) -> str:
+    meta = ((row.get("model_metadata") or {}).get("prototype2") or {})
+    return meta.get("model_version") or PT2_LEGACY_VERSION
 
 
 def read_json(path: Path, default=None):
@@ -250,8 +271,8 @@ def score_race(day: str, race: dict, result: dict):
             if stream == "prototype2":
                 db = model.get("database") or {}
                 model_metadata[stream] = {
-                    "model_version": model.get("model_version") or PT2_LEGACY_VERSION,
-                    "version_label": model.get("version_label") or PT2_VERSION_LABELS[PT2_LEGACY_VERSION],
+                    "model_version": pt2_model_version(model),
+                    "version_label": model.get("version_label") or pt2_version_label(model),
                     "rollout_commit": model.get("rollout_commit"),
                     "db_snapshot_at": db.get("snapshot_at"),
                     "db_schema_version": db.get("schema_version"),
@@ -365,7 +386,7 @@ def build_summary(day: str, races: dict, predicted: dict, delivered: dict):
         receipt = (race.get("receipts") or {}).get("prototype2")
         if not isinstance(model, dict) or not isinstance(receipt, dict):
             continue
-        version = model.get("model_version") or PT2_LEGACY_VERSION
+        version = pt2_model_version(model)
         pt2_delivery_rows.append({
             "version": version,
             "version_label": model.get("version_label") or PT2_VERSION_LABELS.get(version, version),
@@ -381,7 +402,7 @@ def build_summary(day: str, races: dict, predicted: dict, delivered: dict):
     versions = sorted({
         row["version"] for row in pt2_delivery_rows
     } | {
-        ((row.get("model_metadata") or {}).get("prototype2") or {}).get("model_version", PT2_LEGACY_VERSION)
+        pt2_result_version(row)
         for row in result_rows
         if "prototype2" in (row.get("models") or {})
     })
@@ -390,8 +411,7 @@ def build_summary(day: str, races: dict, predicted: dict, delivered: dict):
             row["models"]["prototype2"]
             for row in result_rows
             if "prototype2" in (row.get("models") or {})
-            and (((row.get("model_metadata") or {}).get("prototype2") or {}).get("model_version")
-                 or PT2_LEGACY_VERSION) == version
+            and pt2_result_version(row) == version
         ]
         stats = aggregate(version_scores)
         delivered_rows = [row for row in pt2_delivery_rows if row["version"] == version]

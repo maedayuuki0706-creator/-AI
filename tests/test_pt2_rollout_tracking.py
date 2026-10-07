@@ -1,6 +1,7 @@
 import unittest
 
 import prototype12_delivery as delivery
+import prototype_scoreboard as scoreboard
 
 
 class PT2RolloutTrackingTests(unittest.TestCase):
@@ -25,6 +26,15 @@ class PT2RolloutTrackingTests(unittest.TestCase):
         self.assertEqual(meta["db_player_matches"], 6)
         self.assertEqual(meta["db_motor_matches"], 6)
         self.assertTrue(meta["db_enabled"])
+
+    def test_pre_tag_full_db_snapshot_is_classified_as_new(self):
+        model = {"database": {"snapshot_at": "2026-10-07T13:02:56.865+09:00"}}
+        self.assertEqual(delivery.pt2_model_version(model), delivery.PT2_MODEL_VERSION)
+        self.assertEqual(scoreboard.pt2_model_version(model), scoreboard.PT2_NEW_VERSION)
+
+        old = {"database": {"snapshot_at": "2026-10-05T16:56:44+09:00"}}
+        self.assertEqual(delivery.pt2_model_version(old), delivery.PT2_LEGACY_VERSION)
+        self.assertEqual(scoreboard.pt2_model_version(old), scoreboard.PT2_LEGACY_VERSION)
 
     def test_message_distinguishes_legacy_and_new_pt2(self):
         base_model = {
