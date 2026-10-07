@@ -384,6 +384,7 @@ def build_state(rows: list[dict]) -> dict:
             "overall": _summary(srows),
             "prior": _summary(prior),
             "recent_3_days": _summary(recent),
+            "by_day": _group_summary(srows, "day"),
             "by_venue": venues,
             "by_point_band": bands,
         }
@@ -449,6 +450,16 @@ def main() -> int:
         "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in rows),
         encoding="utf-8",
     )
+    daily_dir = OUT / "daily"
+    daily_dir.mkdir(parents=True, exist_ok=True)
+    by_day_rows = defaultdict(list)
+    for row in rows:
+        by_day_rows[str(row.get("day") or "unknown")].append(row)
+    for day, day_rows in sorted(by_day_rows.items()):
+        (daily_dir / f"{day}.jsonl").write_text(
+            "".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in day_rows),
+            encoding="utf-8",
+        )
     _write_json(STATE_PATH, state)
     _write_json(RECOMMENDATION_PATH, {
         "updated_at": state["updated_at"],
