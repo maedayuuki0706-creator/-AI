@@ -312,6 +312,16 @@ def score_race(day: str, race: dict, result: dict):
     for stream, model in race["models"].items():
         score = score_model(model, result)
         if score is not None:
+            if stream == "prototype2":
+                strategy_scores = {}
+                cards = ((model.get("strategy_cards") or {}).get("cards") or {})
+                for strategy_name, strategy_card in cards.items():
+                    if not isinstance(strategy_card, dict):
+                        continue
+                    strategy_score = score_model(strategy_card, result)
+                    if strategy_score is not None:
+                        strategy_scores[strategy_name] = strategy_score
+                score["strategies"] = strategy_scores
             models[stream] = score
             if stream == "prototype2":
                 db = model.get("database") or {}
@@ -492,6 +502,31 @@ def build_summary(day: str, races: dict, predicted: dict, delivered: dict):
         ),
     }
 
+    strategy_labels = {
+        "balanced": "総合型",
+        "probability": "本命型",
+        "value": "妙味型",
+        "longshot": "高配当型",
+    }
+    strategy_names = sorted({
+        name
+        for row in result_rows
+        for name in (((row.get("models") or {}).get("prototype2") or {}).get("strategies") or {})
+    })
+    pt2_strategy_comparison = {}
+    for name in strategy_names:
+        rows_for_strategy = [
+            (((row.get("models") or {}).get("prototype2") or {}).get("strategies") or {}).get(name)
+            for row in result_rows
+        ]
+        rows_for_strategy = [row for row in rows_for_strategy if isinstance(row, dict)]
+        stats = aggregate(rows_for_strategy)
+        stats.update({
+            "strategy": name,
+            "label": strategy_labels.get(name, name),
+        })
+        pt2_strategy_comparison[name] = stats
+
     new_stats = pt2_versions.get(PT2_NEW_VERSION) or {}
     old_stats = pt2_versions.get(PT2_LEGACY_VERSION) or {}
     pt2_comparison = {
@@ -536,6 +571,7 @@ def build_summary(day: str, races: dict, predicted: dict, delivered: dict):
         "race_keys_with_any_delivery": len(races),
         "totals": totals,
         "pt2_version_comparison": pt2_comparison,
+        "pt2_strategy_comparison": pt2_strategy_comparison,
         "pt2_learning_summary": pt2_learning_summary,
         "common_cohort": {
             "judged_races": len(common_rows),
