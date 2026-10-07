@@ -30,14 +30,13 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: prototype12-discord-delivery
-  cancel-in-progress: false
-
 jobs:
   deliver:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    concurrency:
+      group: prototype12-discord-delivery
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,11 +49,10 @@ jobs:
           PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
           PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
         run: |
-          python -m py_compile prototype12_delivery.py prototype_runner.py four_way_prototype.py scent_box.py pt2_sheet_db.py pt2_strategy_cards.py prototype_scoreboard.py live_status.py sync_pt2_prediction_sheet.py
+          python -m py_compile prototype12_delivery.py prototype_runner.py four_way_prototype.py scent_box.py pt2_sheet_db.py pt2_strategy_cards.py prototype_scoreboard.py live_status.py
           python -m unittest discover -s tests -p 'test_pt2_sheet_db.py' -v
           python -m unittest discover -s tests -p 'test_pt2_rollout_tracking.py' -v
           python -m unittest discover -s tests -p 'test_pt2_strategy_cards.py' -v
-          python -m unittest discover -s tests -p 'test_sync_pt2_prediction_sheet.py' -v
           python -m unittest discover -s tests -p 'test_prototype_scoreboard.py' -v
           python -m unittest discover -s tests -p 'test_new_prototype_fusions.py' -v
           python -m unittest discover -s tests -p 'test_scent_box.py' -v
@@ -67,19 +65,7 @@ jobs:
           PROTO2_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO2_DISCORD_WEBHOOK_URL }}
           PROTOTYPE12_WATCH_SECONDS: '210'
         run: python -u prototype12_delivery.py
-      - name: Refresh PT2 active-race selector sheet
-        if: always()
-        env:
-          TZ: Asia/Tokyo
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          BOAT_SHEET_ID: "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo"
-          PT2_VIEW_SHEET: "PT2予想シート"
-          PT2_VIEW_HELPER_SHEET: "PT2予想候補"
-          PT2_VIEW_LOG_SHEET: "PT2予想ログ"
-        run: |
-          pip install "gspread>=6,<7" "google-auth>=2,<3"
-          python -u sync_pt2_prediction_sheet.py
-      - name: Persist delivery receipts for retry and deduplication
+      - name: Persist delivery receipts and predictions for retry and deduplication
         if: always()
         run: |
           if [ ! -d data/prototype12_delivery ]; then exit 0; fi
@@ -92,3 +78,34 @@ jobs:
             git pull --rebase origin main && git push origin HEAD:main && exit 0
           done
           exit 1
+
+  sync-pt2-sheet:
+    needs: deliver
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    concurrency:
+      group: pt2-sheet-sync
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify PT2 Sheets sync only
+        run: |
+          python -m py_compile sync_pt2_prediction_sheet.py pt2_strategy_cards.py
+          python -m unittest discover -s tests -p 'test_sync_pt2_prediction_sheet.py' -v
+      - name: Refresh PT2 active-race selector sheet
+        env:
+          TZ: Asia/Tokyo
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          BOAT_SHEET_ID: "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo"
+          PT2_VIEW_SHEET: "PT2予想シート"
+          PT2_VIEW_HELPER_SHEET: "PT2予想候補"
+          PT2_VIEW_LOG_SHEET: "PT2予想ログ"
+        run: |
+          pip install "gspread>=6,<7" "google-auth>=2,<3"
+          python -u sync_pt2_prediction_sheet.py
