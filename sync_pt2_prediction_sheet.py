@@ -21,6 +21,7 @@ SHEET_NAME = os.getenv("PT2_VIEW_SHEET", "PT2予想シート")
 HELPER_SHEET_NAME = os.getenv("PT2_VIEW_HELPER_SHEET", "PT2予想候補")
 LOG_SHEET_NAME = os.getenv("PT2_VIEW_LOG_SHEET", "PT2予想ログ")
 PREDICTION_ROOT = Path("data/prototype12_delivery/predictions")
+SCORE_ROOT = Path("data/prototype_scoreboard")
 JST = ZoneInfo("Asia/Tokyo")
 LOG_HEADERS = [
     "保存日時", "開催日", "場", "R", "締切", "key",
@@ -448,6 +449,92 @@ def _prediction_log_row(record, payload, saved_at=None):
     ]
 
 
+def _column_letter(number):
+    out = ""
+    while number:
+        number, rem = divmod(number - 1, 26)
+        out = chr(65 + rem) + out
+    return out
+
+
+def _scoreboard_result_values(scored):
+    if not isinstance(scored, dict):
+        return None
+    official = scored.get("official") or {}
+    status = official.get("status")
+    if status not in {"settled", "void", "special"}:
+        return None
+
+    if status == "settled":
+        winners = []
+        for combo, payout in (official.get("payouts") or {}).items():
+            try:
+                amount = int(payout or 0)
+            except (TypeError, ValueError):
+                continue
+            if amount > 0:
+                winners.append((str(combo), amount))
+        winners.sort()
+        result_text = " / ".join(combo for combo, _ in winners) if winners else "—"
+        payout_text = " / ".join(f"{amount:,}円" for _, amount in winners) if winners else "—"
+    elif status == "void":
+        result_text = "中止・返還"
+        payout_text = "返還"
+    else:
+        result_text = "特払い"
+        try:
+            payout_text = f"{int(official.get('special_per_100') or 0):,}円"
+        except (TypeError, ValueError):
+            payout_text = "—"
+
+    pt2 = ((scored.get("models") or {}).get("prototype2") or {})
+    strategies = pt2.get("strategies") or {}
+    hit_cells = []
+    for name in ("balanced", "probability", "value", "longshot"):
+        strategy = strategies.get(name)
+        if not isinstance(strategy, dict):
+            hit_cells.append("—")
+        else:
+            hit_cells.append("○" if strategy.get("hit") else "×")
+    return [result_text, payout_text, *hit_cells]
+
+
+def _backfill_prediction_results(log_ws):
+    rows = log_ws.get_all_values()
+    if not rows:
+        return 0
+    headers = rows[0]
+    try:
+        key_index = headers.index("key")
+        day_index = headers.index("開催日")
+        result_index = headers.index("結果")
+    except ValueError:
+        return 0
+
+    start_col = _column_letter(result_index + 1)
+    end_col = _column_letter(result_index + 6)
+    updates = []
+    for row_number, row in enumerate(rows[1:], start=2):
+        key = str(row[key_index] if key_index < len(row) else "").strip()
+        if not key:
+            continue
+        existing_result = str(row[result_index] if result_index < len(row) else "").strip()
+        if existing_result:
+            continue
+        day = str(row[day_index] if day_index < len(row) else "").strip() or key[:8]
+        scored = _load(SCORE_ROOT / day / "results" / f"{key}.json")
+        values = _scoreboard_result_values(scored)
+        if values is None:
+            continue
+        updates.append({
+            "range": f"{start_col}{row_number}:{end_col}{row_number}",
+            "values": [values],
+        })
+    if updates:
+        log_ws.batch_update(updates, raw=True)
+    return len(updates)
+
+
 def _append_prediction_logs(log_ws, records):
     existing_keys = {
         str(value).strip()
@@ -556,6 +643,7 @@ def publish():
     # This backfills predictions that were generated correctly but missed a
     # delayed Sheets refresh after their deadline.
     logged_count = _append_prediction_logs(log_ws, _all_prediction_records())
+    result_backfill_count = _backfill_prediction_results(log_ws)
 
     rows = [HELPER_HEADERS]
     if payloads:
@@ -597,6 +685,7 @@ def publish():
         "options": options,
         "sheet": SHEET_NAME,
         "logged_count": logged_count,
+        "result_backfill_count": result_backfill_count,
         "log_sheet": LOG_SHEET_NAME,
     }, ensure_ascii=False))
     return 0
