@@ -1,0 +1,65 @@
+name: PT2 Auto Learning
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'pt2_auto_learning.py'
+      - 'prototype12_delivery.py'
+      - 'prototype_scoreboard.py'
+      - 'pt2_sheet_db.py'
+      - 'data/prototype12_delivery/predictions/**'
+      - 'data/prototype_scoreboard/**'
+      - 'tests/test_pt2_auto_learning.py'
+      - '.github/workflows/pt2-auto-learning.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pt2-auto-learning
+  cancel-in-progress: true
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate PT2 learning loop
+        run: |
+          python -m py_compile pt2_auto_learning.py
+          python -m unittest discover -s tests -p 'test_pt2_auto_learning.py' -v
+
+      - name: Rebuild PT2 learning state
+        env:
+          TZ: Asia/Tokyo
+        run: python -u pt2_auto_learning.py
+
+      - name: Persist PT2 learning state
+        run: |
+          mkdir -p data/pt2_learning
+          git config user.name 'pt2-learning-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add data/pt2_learning/
+          if git diff --cached --quiet; then
+            echo 'No PT2 learning changes'
+            exit 0
+          fi
+          git commit -m 'Update PT2 automatic learning state'
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep $((attempt * 2))
+          done
+          exit 1
