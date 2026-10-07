@@ -59,8 +59,12 @@ def _deadline_at(record):
         return None
 
 
-def _active_records(now=None):
-    now = now or datetime.now(JST)
+def _all_prediction_records():
+    """Return every valid PT2 prediction currently persisted on disk.
+
+    This is intentionally independent of deadline state so the permanent
+    prediction log can backfill a race even when the Sheets refresh runs late.
+    """
     out = []
     if not PREDICTION_ROOT.exists():
         return out
@@ -76,6 +80,17 @@ def _active_records(now=None):
             created_at = datetime.fromisoformat(created).astimezone(JST)
         except (TypeError, ValueError):
             continue
+        out.append((created_at, str(record.get("key") or ""), record))
+    out.sort(key=lambda item: (item[0], item[1]))
+    return [item[2] for item in out]
+
+
+def _active_records(now=None):
+    now = now or datetime.now(JST)
+    out = []
+    for record in _all_prediction_records():
+        created = str(record.get("created_at") or "")
+        created_at = datetime.fromisoformat(created).astimezone(JST)
         deadline_at = _deadline_at(record)
         if deadline_at is None:
             continue
@@ -533,7 +548,10 @@ def publish():
 
     records = _active_records()
     payloads = [build_payload(record) for record in records]
-    logged_count = _append_prediction_logs(log_ws, records)
+    # Permanent logging is not limited to races that are still selectable.
+    # This backfills predictions that were generated correctly but missed a
+    # delayed Sheets refresh after their deadline.
+    logged_count = _append_prediction_logs(log_ws, _all_prediction_records())
 
     rows = [HELPER_HEADERS]
     if payloads:
