@@ -28,8 +28,9 @@ LOG_HEADERS = [
     "総合型", "本命型", "妙味型", "高配当型",
     "激絞り", "穴特化", "逃げ穴", "BOX型",
     "軸候補", "相手上位", "穴警戒", "DB一致度", "AI一致度", "万舟候補",
-    "model_version", "strategy_version", "予想生成時刻",
+    "model_version", "strategy_version",
     "結果", "払戻", "総合型的中", "本命型的中", "妙味型的中", "高配当型的中",
+    "予想生成時刻",
 ]
 
 HELPER_HEADERS = [
@@ -442,8 +443,8 @@ def _prediction_log_row(record, payload, saved_at=None):
         *row[19:25],
         row[25],
         row[26],
-        row[27],
         "", "", "", "", "", "",
+        row[27],
     ]
 
 
