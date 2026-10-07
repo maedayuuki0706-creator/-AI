@@ -56,6 +56,12 @@ class PT2SheetDatabaseTests(unittest.TestCase):
         ))
         self.assertAlmostEqual(sum(row["probability"] for row in result["trifecta"]), 1.0, places=9)
         self.assertGreater(result["heads"][1], 1 / 6)
+        audit = result["sheet_database"]["probability_audit"]
+        self.assertIn("1", audit["head_delta_pp"])
+        self.assertEqual(len(audit["base_probability"]), 120)
+        self.assertEqual(len(audit["probability_delta_pp"]), 120)
+        self.assertLessEqual(len(audit["top_combination_shifts"]), 12)
+        self.assertGreater(audit["head_delta_pp"]["1"], 0)
 
     def test_missing_snapshot_falls_back_without_breaking_prediction(self):
         result = pt2_sheet_db.enhance_analysis(

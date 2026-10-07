@@ -157,6 +157,20 @@ def enhance_analysis(analysis, jcd, database=None):
         motor_matches += int(m_used)
 
     rows = copied.get("trifecta") or []
+    base_probability = {}
+    for row in rows:
+        try:
+            combo = str(row["combination"])
+            base_probability[combo] = float(row["probability"])
+        except (KeyError, TypeError, ValueError):
+            continue
+    base_heads = {
+        lane: sum(
+            probability for combo, probability in base_probability.items()
+            if combo.startswith(f"{lane}-")
+        )
+        for lane in range(1, 7)
+    }
     if player_matches == 0 and motor_matches == 0:
         copied["sheet_database"] = {
             "enabled": False,
@@ -234,6 +248,28 @@ def enhance_analysis(analysis, jcd, database=None):
     top = heads[ranking[0]]
     gap = top - heads[ranking[1]]
     copied["grade"] = "A" if top >= .45 and gap >= .20 else "B" if top >= .30 and gap >= .08 else "C"
+    probability_delta_pp = {
+        row["combination"]: round(
+            (float(row["probability"]) - base_probability.get(row["combination"], float(row["probability"]))) * 100,
+            4,
+        )
+        for row in rebuilt
+    }
+    top_combination_shifts = sorted(
+        (
+            {
+                "combination": row["combination"],
+                "base_probability": round(base_probability.get(row["combination"], 0.0), 6),
+                "adjusted_probability": round(float(row["probability"]), 6),
+                "delta_pp": probability_delta_pp[row["combination"]],
+                "odds": _number(row.get("odds")),
+                "adjusted_ev": _number(row.get("expected_value")),
+            }
+            for row in rebuilt
+        ),
+        key=lambda item: (-abs(item["delta_pp"]), item["combination"]),
+    )[:12]
+
     copied["sheet_database"] = {
         "enabled": True,
         "source": meta.get("source") or "Google Sheets 競艇AI データベース",
@@ -253,5 +289,19 @@ def enhance_analysis(analysis, jcd, database=None):
         "venue_match": bool(venue),
         "venue_volatility": venue.get("volatility"),
         "lane_factors": detail,
+        "probability_audit": {
+            "base_heads": {str(lane): round(base_heads[lane], 6) for lane in range(1, 7)},
+            "adjusted_heads": {str(lane): round(heads[lane], 6) for lane in range(1, 7)},
+            "head_delta_pp": {
+                str(lane): round((heads[lane] - base_heads[lane]) * 100, 4)
+                for lane in range(1, 7)
+            },
+            "base_probability": {
+                combo: round(probability, 6)
+                for combo, probability in sorted(base_probability.items())
+            },
+            "probability_delta_pp": dict(sorted(probability_delta_pp.items())),
+            "top_combination_shifts": top_combination_shifts,
+        },
     }
     return copied

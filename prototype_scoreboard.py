@@ -261,6 +261,51 @@ def fetch_official(day: str, race: dict, refresh_settled: bool = False):
     return value
 
 
+def pt2_learning_outcome(model: dict, result: dict) -> dict | None:
+    audit = model.get("learning_audit") or {}
+    if not audit:
+        return None
+    payouts = result.get("payouts") or {}
+    winners = [
+        combo for combo, payout in payouts.items()
+        if combo in trial.COMBINATIONS and int(payout or 0) > 0
+    ]
+    winner = winners[0] if winners else None
+    if not winner:
+        return {
+            "audit_version": audit.get("audit_version"),
+            "winning_combination": None,
+        }
+
+    retained = set(audit.get("retained_after_db") or [])
+    added = set(audit.get("added_by_db") or [])
+    removed = set(audit.get("removed_by_db") or [])
+    final = set(model.get("picks") or [])
+    db = model.get("database") or {}
+    probability_audit = db.get("probability_audit") or {}
+    base_probability = probability_audit.get("base_probability") or {}
+    delta_pp = probability_audit.get("probability_delta_pp") or {}
+    adjusted = {
+        str(row.get("combination")): row.get("probability")
+        for row in model.get("trifecta") or []
+        if row.get("combination")
+    }
+    return {
+        "audit_version": audit.get("audit_version"),
+        "winning_combination": winner,
+        "winner_in_baseline_candidates": winner in retained or winner in removed,
+        "winner_in_db_candidates": winner in retained or winner in added,
+        "winner_in_final_picks": winner in final,
+        "winner_added_by_db": winner in added,
+        "winner_removed_by_db": winner in removed,
+        "winner_retained_after_db": winner in retained,
+        "winner_base_probability": base_probability.get(winner),
+        "winner_adjusted_probability": adjusted.get(winner),
+        "winner_delta_pp": delta_pp.get(winner),
+        "head_delta_pp": audit.get("head_delta_pp") or {},
+    }
+
+
 def score_race(day: str, race: dict, result: dict):
     models = {}
     model_metadata = {}
@@ -279,6 +324,7 @@ def score_race(day: str, race: dict, result: dict):
                     "db_player_matches": db.get("player_matches"),
                     "db_motor_matches": db.get("motor_matches"),
                     "db_enabled": bool(db.get("enabled")),
+                    "learning_outcome": pt2_learning_outcome(model, result),
                 }
     if not models:
         return None
@@ -426,6 +472,26 @@ def build_summary(day: str, races: dict, predicted: dict, delivered: dict):
         })
         pt2_versions[version] = stats
 
+    learning_rows = []
+    for row in result_rows:
+        meta = ((row.get("model_metadata") or {}).get("prototype2") or {})
+        if (meta.get("model_version") or PT2_LEGACY_VERSION) != PT2_NEW_VERSION:
+            continue
+        outcome = meta.get("learning_outcome")
+        if isinstance(outcome, dict) and outcome.get("winning_combination"):
+            learning_rows.append(outcome)
+
+    pt2_learning_summary = {
+        "audited_results": len(learning_rows),
+        "winner_added_by_db": sum(bool(row.get("winner_added_by_db")) for row in learning_rows),
+        "winner_removed_by_db": sum(bool(row.get("winner_removed_by_db")) for row in learning_rows),
+        "winner_retained_after_db": sum(bool(row.get("winner_retained_after_db")) for row in learning_rows),
+        "winner_in_final_picks": sum(bool(row.get("winner_in_final_picks")) for row in learning_rows),
+        "winner_not_in_db_candidates": sum(
+            not bool(row.get("winner_in_db_candidates")) for row in learning_rows
+        ),
+    }
+
     new_stats = pt2_versions.get(PT2_NEW_VERSION) or {}
     old_stats = pt2_versions.get(PT2_LEGACY_VERSION) or {}
     pt2_comparison = {
@@ -470,6 +536,7 @@ def build_summary(day: str, races: dict, predicted: dict, delivered: dict):
         "race_keys_with_any_delivery": len(races),
         "totals": totals,
         "pt2_version_comparison": pt2_comparison,
+        "pt2_learning_summary": pt2_learning_summary,
         "common_cohort": {
             "judged_races": len(common_rows),
             "keys": [row["key"] for row in common_rows],

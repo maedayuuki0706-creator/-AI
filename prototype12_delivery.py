@@ -87,6 +87,62 @@ def pt2_rollout_metadata(model):
     }
 
 
+def pt2_learning_audit(official, pt2_official, baseline_candidates, db_candidates, model):
+    db = pt2_official.get("sheet_database") or {}
+    probability_audit = db.get("probability_audit") or {}
+    base_probability = probability_audit.get("base_probability") or {}
+    adjusted_rows = {
+        str(row.get("combination")): row
+        for row in pt2_official.get("trifecta") or []
+        if row.get("combination")
+    }
+    baseline_set = set(baseline_candidates or [])
+    db_set = set(db_candidates or [])
+    final_picks = list(model.get("picks") or [])
+    main_set = set(model.get("main_picks") or [])
+
+    pick_explanations = []
+    for combo in final_picks:
+        row = adjusted_rows.get(combo) or {}
+        base_p = base_probability.get(combo)
+        adjusted_p = row.get("probability")
+        try:
+            delta_pp = round((float(adjusted_p) - float(base_p)) * 100, 4)
+        except (TypeError, ValueError):
+            delta_pp = None
+        try:
+            base_ev = round(float(base_p) * float(row.get("odds")), 3)
+        except (TypeError, ValueError):
+            base_ev = None
+        pick_explanations.append({
+            "combination": combo,
+            "bucket": "main" if combo in main_set else "cover",
+            "in_baseline_candidates": combo in baseline_set,
+            "in_db_candidates": combo in db_set,
+            "added_by_db": combo in db_set and combo not in baseline_set,
+            "base_probability": base_p,
+            "adjusted_probability": adjusted_p,
+            "delta_pp": delta_pp,
+            "odds": row.get("odds"),
+            "base_ev": base_ev,
+            "adjusted_ev": row.get("expected_value"),
+        })
+
+    return {
+        "audit_version": "pt2-learning-audit-v1",
+        "baseline_candidate_count": len(baseline_set),
+        "db_candidate_count": len(db_set),
+        "final_pick_count": len(final_picks),
+        "added_by_db": sorted(db_set - baseline_set),
+        "removed_by_db": sorted(baseline_set - db_set),
+        "retained_after_db": sorted(baseline_set & db_set),
+        "head_delta_pp": probability_audit.get("head_delta_pp") or {},
+        "top_combination_shifts": probability_audit.get("top_combination_shifts") or [],
+        "lane_factors": db.get("lane_factors") or {},
+        "pick_explanations": pick_explanations,
+    }
+
+
 def post_webhook(url, payload):
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
@@ -197,6 +253,13 @@ def build_record(day, jcd, rno, deadline):
     }
     pt2_meta = pt2_rollout_metadata(models["prototype2"])
     models["prototype2"].update(pt2_meta)
+    models["prototype2"]["learning_audit"] = pt2_learning_audit(
+        official,
+        pt2_official,
+        existing_native,
+        pt2_existing_native,
+        models["prototype2"],
+    )
 
     key = key_for(day, jcd, rno)
     record = {
