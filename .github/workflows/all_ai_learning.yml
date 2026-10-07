@@ -1,0 +1,59 @@
+name: All AI Historical Learning
+
+on:
+  schedule:
+    # 01:20 JST = 16:20 UTC. Runs after the race day has settled.
+    - cron: "20 16 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "all_ai_learning.py"
+      - ".github/workflows/all_ai_learning.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: all-ai-historical-learning
+  cancel-in-progress: false
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate learner
+        run: python -m py_compile all_ai_learning.py
+
+      - name: Backfill and update all-AI learning state
+        run: python all_ai_learning.py
+
+      - name: Persist learning evidence
+        run: |
+          if [ -z "$(git status --porcelain data/all_ai_learning/)" ]; then
+            echo "No all-AI learning updates"
+            exit 0
+          fi
+          git config user.name "boat-ai-learning-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/all_ai_learning/
+          git commit -m "Update all-AI historical learning" || exit 0
+          for attempt in 1 2 3 4; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep $((attempt * 2))
+          done
+          exit 1
