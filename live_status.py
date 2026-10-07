@@ -35,6 +35,13 @@ LABELS = {
     "prototype2": "PT2",
     "prototype3": "PT3",
 }
+PT2_NEW_VERSION = "new-pt2-full-sheet-db-v2"
+PT2_LEGACY_VERSION = "legacy-pt2-pre-full-db"
+PT2_VERSION_LABELS = {
+    PT2_LEGACY_VERSION: "旧PT2",
+    PT2_NEW_VERSION: "新PT2",
+}
+PT2_ROLLOUT_COMMIT = "4a54ebb113ae8dbb938f9724d34290f0b0c249ba"
 
 
 def read_json(path: Path, default=None):
@@ -204,7 +211,7 @@ def prototype_streams(day: str):
             picks = unique_picks(model.get("picks") or [])
             if not picks:
                 continue
-            out[stream][key] = {
+            item = {
                 "key": key,
                 "day": day,
                 "jcd": str(race.get("jcd") or "").zfill(2),
@@ -214,6 +221,18 @@ def prototype_streams(day: str):
                 "picks": picks,
                 "sent_at": (race.get("receipts") or {}).get(stream, {}).get("delivered_at"),
             }
+            if stream == "prototype2":
+                db = model.get("database") or {}
+                item.update({
+                    "model_version": model.get("model_version") or PT2_LEGACY_VERSION,
+                    "version_label": model.get("version_label") or PT2_VERSION_LABELS[PT2_LEGACY_VERSION],
+                    "rollout_commit": model.get("rollout_commit"),
+                    "db_snapshot_at": db.get("snapshot_at"),
+                    "db_player_matches": db.get("player_matches"),
+                    "db_motor_matches": db.get("motor_matches"),
+                    "db_enabled": bool(db.get("enabled")),
+                })
+            out[stream][key] = item
     return out
 
 
@@ -455,6 +474,53 @@ def build(day: str):
     official = refresh_official(day, streams)
     metrics = {name: aggregate(name, records, official) for name, records in streams.items()}
 
+    pt2_versions = {}
+    for version in sorted({
+        record.get("model_version") or PT2_LEGACY_VERSION
+        for record in streams["prototype2"].values()
+    }):
+        subset = {
+            key: record
+            for key, record in streams["prototype2"].items()
+            if (record.get("model_version") or PT2_LEGACY_VERSION) == version
+        }
+        stats = aggregate("prototype2", subset, official)
+        ordered = sorted(subset.values(), key=lambda row: str(row.get("sent_at") or ""))
+        stats.update({
+            "label": PT2_VERSION_LABELS.get(version, version),
+            "model_version": version,
+            "first_delivery": ordered[0] if ordered else None,
+            "last_delivery": ordered[-1] if ordered else None,
+        })
+        pt2_versions[version] = stats
+
+    new_stats = pt2_versions.get(PT2_NEW_VERSION) or {}
+    old_stats = pt2_versions.get(PT2_LEGACY_VERSION) or {}
+    pt2_version_comparison = {
+        "baseline_version": PT2_LEGACY_VERSION,
+        "new_version": PT2_NEW_VERSION,
+        "rollout_commit": PT2_ROLLOUT_COMMIT,
+        "first_new_delivery": new_stats.get("first_delivery"),
+        "versions": pt2_versions,
+        "delta_new_minus_old": {
+            "hit_rate_points": (
+                new_stats["hit_rate"] - old_stats["hit_rate"]
+                if new_stats.get("hit_rate") is not None and old_stats.get("hit_rate") is not None
+                else None
+            ),
+            "roi_points": (
+                new_stats["roi"] - old_stats["roi"]
+                if new_stats.get("roi") is not None and old_stats.get("roi") is not None
+                else None
+            ),
+            "avg_points": (
+                new_stats["avg_points"] - old_stats["avg_points"]
+                if new_stats.get("avg_points") is not None and old_stats.get("avg_points") is not None
+                else None
+            ),
+        },
+    }
+
     venues = {}
     venue_names = sorted({
         str(record.get("venue") or base.VENUES.get(str(record.get("jcd") or "").zfill(2)) or "")
@@ -481,6 +547,7 @@ def build(day: str):
         "basis": "delivered predictions only; flat 100 yen per disclosed pick; pending excluded",
         "unit_yen": UNIT_YEN,
         "streams": metrics,
+        "pt2_version_comparison": pt2_version_comparison,
         "venues": venues,
         "totals": {
             "stream_count": len(metrics),
