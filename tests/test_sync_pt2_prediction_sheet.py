@@ -69,6 +69,22 @@ class PT2PredictionSheetTests(unittest.TestCase):
             ["1-3-246"],
         )
 
+    def test_balanced_card_can_show_all_points(self):
+        card = {
+            "main_picks": ["1-2-3", "1-2-4", "1-3-2", "1-3-4", "1-4-2"],
+            "cover_picks": ["1-4-3", "1-5-2", "1-5-3", "1-6-2", "1-6-3", "2-1-3", "2-1-4"],
+            "picks": [
+                "1-2-3", "1-2-4", "1-3-2", "1-3-4", "1-4-2",
+                "1-4-3", "1-5-2", "1-5-3", "1-6-2", "1-6-3",
+                "2-1-3", "2-1-4",
+            ],
+            "point_count": 12,
+        }
+        text = view._card_text(card, show_all=True)
+        self.assertIn("1-4-2", text)
+        self.assertIn("2-1-34", text)
+        self.assertIn("計12点", text)
+
     def test_payload_contains_four_strategy_panels(self):
         payload = view.build_payload(self.record())["values"]
         self.assertIn("1-3-246", payload["B7"])
