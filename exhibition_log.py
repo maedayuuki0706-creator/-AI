@@ -139,6 +139,8 @@ def record_analysis(day: str, jcd: str, rno: int, analysis: dict | None) -> bool
             "parts_exchange": boat.get("parts_exchange"),
             "actual_st": None, "finish": None, "method": None,
             "wind_m": preview.get("wind_speed"), "wave_cm": preview.get("wave_cm"),
+            "air_temp_c": preview.get("air_temp_c"),
+            "water_temp_c": preview.get("water_temp_c"),
         })
 
     path = _race_path(day, jcd, rno)
