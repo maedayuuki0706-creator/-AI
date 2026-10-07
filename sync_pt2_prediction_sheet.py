@@ -19,8 +19,19 @@ SPREADSHEET_ID = os.getenv(
 )
 SHEET_NAME = os.getenv("PT2_VIEW_SHEET", "PT2予想シート")
 HELPER_SHEET_NAME = os.getenv("PT2_VIEW_HELPER_SHEET", "PT2予想候補")
+LOG_SHEET_NAME = os.getenv("PT2_VIEW_LOG_SHEET", "PT2予想ログ")
 PREDICTION_ROOT = Path("data/prototype12_delivery/predictions")
 JST = ZoneInfo("Asia/Tokyo")
+LOG_HEADERS = [
+    "保存日時", "開催日", "場", "R", "締切", "key",
+    "1号艇指数", "2号艇指数", "3号艇指数", "4号艇指数", "5号艇指数", "6号艇指数",
+    "総合型", "本命型", "妙味型", "高配当型",
+    "激絞り", "穴特化", "逃げ穴", "BOX型",
+    "軸候補", "相手上位", "穴警戒", "DB一致度", "AI一致度", "万舟候補",
+    "model_version", "strategy_version", "予想生成時刻",
+    "結果", "払戻", "総合型的中", "本命型的中", "妙味型的中", "高配当型的中",
+]
+
 HELPER_HEADERS = [
     "選択", "key", "締切", "更新", "荒れ指数",
     "1号艇指数", "2号艇指数", "3号艇指数", "4号艇指数", "5号艇指数", "6号艇指数",
@@ -389,6 +400,58 @@ def _ensure_helper(book):
     return helper
 
 
+def _ensure_log(book):
+    import gspread
+
+    try:
+        log = book.worksheet(LOG_SHEET_NAME)
+    except gspread.WorksheetNotFound:
+        log = book.add_worksheet(title=LOG_SHEET_NAME, rows=5000, cols=len(LOG_HEADERS))
+        log.update([LOG_HEADERS], "A1", raw=True)
+    return log
+
+
+def _prediction_log_row(record, payload, saved_at=None):
+    saved_at = saved_at or datetime.now(JST)
+    row = payload["helper_row"]
+    return [
+        saved_at.strftime("%Y-%m-%d %H:%M:%S"),
+        str(record.get("day") or ""),
+        str(record.get("venue") or ""),
+        str(record.get("rno") or ""),
+        str(record.get("deadline") or ""),
+        str(record.get("key") or ""),
+        *row[5:11],
+        *row[11:15],
+        *row[15:19],
+        *row[19:25],
+        row[25],
+        row[26],
+        row[27],
+        "", "", "", "", "", "",
+    ]
+
+
+def _append_prediction_logs(log_ws, records):
+    existing_keys = {
+        str(value).strip()
+        for value in log_ws.col_values(6)[1:]
+        if str(value).strip()
+    }
+    rows = []
+    now = datetime.now(JST)
+    for record in records:
+        key = str(record.get("key") or "").strip()
+        if not key or key in existing_keys:
+            continue
+        payload = build_payload(record)
+        rows.append(_prediction_log_row(record, payload, saved_at=now))
+        existing_keys.add(key)
+    if rows:
+        log_ws.append_rows(rows, value_input_option="RAW")
+    return len(rows)
+
+
 def _install_selector_formulas(book, ws, helper):
     formulas = {
         "D3": '="締切："&' + _lookup_formula(3),
@@ -466,9 +529,11 @@ def publish():
     book = gspread.authorize(creds).open_by_key(SPREADSHEET_ID)
     ws = book.worksheet(SHEET_NAME)
     helper = _ensure_helper(book)
+    log_ws = _ensure_log(book)
 
     records = _active_records()
     payloads = [build_payload(record) for record in records]
+    logged_count = _append_prediction_logs(log_ws, records)
 
     rows = [HELPER_HEADERS]
     if payloads:
@@ -509,6 +574,8 @@ def publish():
         "selected": desired,
         "options": options,
         "sheet": SHEET_NAME,
+        "logged_count": logged_count,
+        "log_sheet": LOG_SHEET_NAME,
     }, ensure_ascii=False))
     return 0
 
