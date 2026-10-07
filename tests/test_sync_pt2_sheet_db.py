@@ -35,6 +35,22 @@ class PT2SheetDbSyncTests(unittest.TestCase):
         self.assertEqual(motors["24:11"]["top2"], 13.8)
         self.assertEqual(motors["24:11"]["stretch"], "A")
 
+    def test_venue_parser_keeps_first_canonical_duplicate(self):
+        headers = list(sync.VENUE_HEADERS.keys())
+        canonical = [
+            "24","大村","海水","あり","58.0%","13.7%","11.4%","9.9%","6.1%","1.5%",
+            "55.1%","12.8%","14.1%","12.2%","42.0%","中","1C優勢","canonical",
+        ]
+        auxiliary = [
+            "24","大村","下げ潮","0","","","","","","",
+            "","","","","","","","auxiliary",
+        ]
+        venues = sync._parse_venues([headers, canonical, auxiliary])
+        self.assertEqual(venues["24"]["water"], "海水")
+        self.assertEqual(venues["24"]["course_win"][0], 58.0)
+        self.assertEqual(venues["24"]["escape"], 55.1)
+        self.assertEqual(venues["24"]["volatility"], 42.0)
+
     def test_venue_parser_uses_two_digit_codes(self):
         headers = list(sync.VENUE_HEADERS.keys())
         row = [
