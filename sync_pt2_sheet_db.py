@@ -133,6 +133,10 @@ def _record(headers, row):
     return {headers[i]: row[i] if i < len(row) else "" for i in range(len(headers))}
 
 
+def _compact(value):
+    return {k: v for k, v in value.items() if v not in (None, "")}
+
+
 def _require_headers(headers, required, sheet):
     missing = [name for name in required if name not in headers]
     if missing:
@@ -152,7 +156,7 @@ def _parse_players(values):
         if not rid or not name:
             continue
         course = [_number(raw.get(f"{i}コース1着率")) for i in range(1, 7)]
-        item = {
+        item = _compact({
             "name": name,
             "class": _text(raw.get("級別")),
             "branch": _text(raw.get("支部")),
@@ -163,9 +167,7 @@ def _parse_players(values):
             "makuri": _number(raw.get("まくり率")),
             "makurisashi": _number(raw.get("まくり差し率")),
             "avg_st": _number(raw.get("平均ST")),
-            "former_a": _text(raw.get("元A級")),
-            "best_method": _text(raw.get("得意決まり手")),
-            "overall_grade": _text(raw.get("総合評価")).upper(),
+            # These sparse ratings are used only as small PT2 tie-breaker factors.
             "maintenance_grade": _number(raw.get("モーター整備力")),
             "propeller_grade": _number(raw.get("ペラ調整力")),
             "weak_motor_recovery": _number(raw.get("弱機立て直し力")),
@@ -174,9 +176,7 @@ def _parse_players(values):
             "propeller_improvement": _number(raw.get("ペラ改善値")),
             "maintenance_samples": _integer(raw.get("整備サンプル数")),
             "propeller_samples": _integer(raw.get("ペラサンプル数")),
-            "latest_adjustment_comment": _text(raw.get("最新調整コメント")),
-            "memo": _text(raw.get("メモ")),
-        }
+        })
         out[rid] = item
     return out
 
@@ -195,7 +195,7 @@ def _parse_motors(values):
         if jcd is None or motor is None or not venue:
             continue
         key = f"{jcd:02d}:{motor}"
-        out[key] = {
+        out[key] = _compact({
             "venue": venue,
             "motor": motor,
             "start": _text(raw.get("使用開始日")),
@@ -216,10 +216,7 @@ def _parse_motors(values):
             "stretch": _text(raw.get("伸び足評価")).upper(),
             "exhibition": _text(raw.get("展示気配評価")).upper(),
             "grade": _text(raw.get("総合評価")).upper(),
-            "last_racer": _text(raw.get("直近使用選手")),
-            "parts_exchange": _text(raw.get("交換部品")),
-            "memo": _text(raw.get("メモ")),
-        }
+        })
     return out
 
 
