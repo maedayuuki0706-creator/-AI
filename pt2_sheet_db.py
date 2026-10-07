@@ -145,11 +145,20 @@ def enhance_analysis(analysis, jcd, database=None):
         motor_matches += int(m_used)
 
     rows = copied.get("trifecta") or []
-    if player_matches == 0 and motor_matches == 0 and not venue:
+    if player_matches == 0 and motor_matches == 0:
         copied["sheet_database"] = {
-            "enabled": False, "reason": "snapshot_has_no_matching_signals",
-            "snapshot_at": meta.get("snapshot_at"), "player_matches": 0,
-            "motor_matches": 0, "venue_match": False,
+            "enabled": False,
+            "reason": "snapshot_has_no_matching_individual_signals",
+            "source": meta.get("source") or "Google Sheets 競艇AI データベース",
+            "snapshot_at": meta.get("snapshot_at"),
+            "spreadsheet_id": meta.get("spreadsheet_id"),
+            "player_matches": 0,
+            "motor_matches": 0,
+            "player_coverage_pct": 0.0,
+            "motor_coverage_pct": 0.0,
+            "venue_match": bool(venue),
+            "venue_volatility": venue.get("volatility"),
+            "lane_factors": detail,
         }
         return copied
     if len(factors) != 6 or not rows:
@@ -203,6 +212,11 @@ def enhance_analysis(analysis, jcd, database=None):
         "spreadsheet_id": meta.get("spreadsheet_id"),
         "player_matches": player_matches,
         "motor_matches": motor_matches,
+        "player_coverage_pct": round(player_matches / 6 * 100, 1),
+        "motor_coverage_pct": round(motor_matches / 6 * 100, 1),
+        "matched_lanes": [
+            lane for lane, item in detail.items() if item.get("signals")
+        ],
         "venue_match": bool(venue),
         "venue_volatility": venue.get("volatility"),
         "lane_factors": detail,
