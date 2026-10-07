@@ -14,8 +14,6 @@ from pathlib import Path
 import tempfile
 from zoneinfo import ZoneInfo
 
-import gspread
-from google.oauth2.service_account import Credentials
 
 SPREADSHEET_ID = os.getenv(
     "BOAT_SHEET_ID",
@@ -283,6 +281,9 @@ def _write_json(path, value):
 
 
 def main():
+    import gspread
+    from google.oauth2.service_account import Credentials
+
     raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if not raw:
         raise RuntimeError("GOOGLE_SERVICE_ACCOUNT_JSON secret is required")
