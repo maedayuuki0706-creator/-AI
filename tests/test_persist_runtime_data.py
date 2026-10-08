@@ -52,8 +52,8 @@ class RuntimePersistenceTests(unittest.TestCase):
     def test_exhibition_csv_conflicting_field_still_fails_closed(self):
         header = "日付,場,R,枠,選手," + ",".join(f"column{i}" for i in range(17))
         base = (header + "\n2026/10/08,桐生,2,3,選手A" + "," * 17 + "\n").encode()
-        remote = base.replace("選手A", "選手B")
-        local = base.replace("選手A", "選手C")
+        remote = base.replace("選手A".encode(), "選手B".encode())
+        local = base.replace("選手A".encode(), "選手C".encode())
         with self.assertRaises(RuntimeError):
             runtime.merge("data/exhibition_log/recent.csv", base, remote, local)
 
