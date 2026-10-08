@@ -8,6 +8,7 @@ on:
     branches: [main]
     paths:
       - 'sync_foot_trend_sheet.py'
+      - 'sync_st_analysis_sheet.py'
       - 'exhibition_log.py'
       - 'data/exhibition_log/**'
       - '.github/workflows/foot-trend-sheet-sync.yml'
@@ -32,8 +33,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Verify foot trend sync
-        run: python -m py_compile sync_foot_trend_sheet.py exhibition_log.py direct_discord_notify.py
+      - name: Verify sheet sync scripts
+        run: python -m py_compile sync_foot_trend_sheet.py sync_st_analysis_sheet.py exhibition_log.py direct_discord_notify.py race_context.py
 
       - name: Install Google Sheets client
         run: pip install "gspread>=6,<7" "google-auth>=2,<3"
@@ -45,3 +46,12 @@ jobs:
           BOAT_SHEET_ID: "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo"
           FOOT_TREND_SHEET: "足回り推移"
         run: python -u sync_foot_trend_sheet.py
+
+      - name: Sync live ST analysis data
+        env:
+          TZ: Asia/Tokyo
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          BOAT_SHEET_ID: "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo"
+          ST_TODAY_SHEET: "ST当日出走_RAW"
+          ST_RESULT_SHEET: "ST節間結果_RAW"
+        run: python -u sync_st_analysis_sheet.py
