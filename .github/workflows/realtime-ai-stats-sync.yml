@@ -8,12 +8,11 @@ on:
         required: false
         default: ""
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '1-56/5 * * * *'
   push:
     branches: [main]
     paths:
       - 'sync_realtime_ai_stats.py'
-      - 'data/prototype_scoreboard/**'
       - '.github/workflows/realtime-ai-stats-sync.yml'
 
 permissions:
