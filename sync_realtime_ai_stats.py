@@ -233,16 +233,41 @@ def build_recent_races(rows: list[list], limit: int = 20) -> list[list]:
 
 
 def write_log(ws, day: str, rows: list[list]) -> None:
+    """Only rewrite changed rows; preserve the hidden log and other days.
+
+    The official results can be corrected after first settlement, so compare
+    complete rows rather than assuming that today's data is append-only.
+    A single contiguous suffix write also avoids per-row Sheets requests.
+    """
     old = ws.get_all_values()
     keep = [LOG_HEADER]
     for row in old[1:] if old else []:
         if row and str(row[0]).strip() and str(row[0]).strip() != day:
             keep.append(row[:len(LOG_HEADER)])
     final = keep + rows
-    ws.clear()
+    width = len(LOG_HEADER)
+
+    def cells(row):
+        # Sheets returns displayed strings; new payloads contain int/float.
+        return ["" if value is None else str(value) for value in (row + [""] * width)[:width]]
+
+    # Do not rewrite hundreds of already-settled races every five minutes.
+    first_changed = 0
+    while first_changed < min(len(old), len(final)):
+        if cells(old[first_changed]) != cells(final[first_changed]):
+            break
+        first_changed += 1
+    if first_changed == len(old) == len(final):
+        return
+
     if len(final) + 20 > ws.row_count:
         ws.add_rows(len(final) + 20 - ws.row_count)
-    ws.update(final, "A1", raw=True)
+    if first_changed < len(final):
+        # Explicit blanks clear stale values in a row that gets shorter.
+        suffix = [(row + [""] * width)[:width] for row in final[first_changed:]]
+        ws.update(suffix, f"A{first_changed + 1}", raw=True)
+    if len(old) > len(final):
+        ws.batch_clear([f"A{len(final) + 1}:T{len(old)}"])
 
 
 def write_view(ws, day: str, rows: list[list], summary: list[list]) -> None:
