@@ -57,9 +57,10 @@
   "x_result_attempts": {
     "20261008:14:5": {
       "at": "2026-10-08T12:05:42.607382+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "04c80b696b2e4923b7542e11e8296341",
-      "status": "reserved"
+      "retry_at": "2026-10-08T12:06:14.932344+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {
@@ -1000,6 +1001,7 @@
       "attempt": 1,
       "claimed_at": "2026-10-08T12:05:42.607382+09:00",
       "content_sha256": "10cc177fe88e5430cb4e267b92e619639ab32aff726f8658281381a72e82007d",
+      "error_type": "DefiniteRejection",
       "key": "result:20261008:14:5",
       "owner": "04c80b696b2e4923b7542e11e8296341",
       "parent_post_id": "2108001814394372452",
@@ -1046,7 +1048,8 @@
         "source": "配当期待本線",
         "venue": "鳴門"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "updated_at": "2026-10-08T12:05:44.932344+09:00"
     },
     "result:20261008:14:8": {
       "attempt": 1,
