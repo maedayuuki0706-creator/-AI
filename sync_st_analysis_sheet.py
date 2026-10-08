@@ -28,6 +28,7 @@ SPREADSHEET_ID = os.getenv(
 )
 TODAY_SHEET = os.getenv("ST_TODAY_SHEET", "ST当日出走_RAW")
 RESULT_SHEET = os.getenv("ST_RESULT_SHEET", "ST節間結果_RAW")
+ANALYSIS_SHEET = os.getenv("ST_ANALYSIS_SHEET", "ST展開分析")
 ACTIVE_SHEET = "開催中会場"
 
 TODAY_HEADER = [
@@ -39,6 +40,22 @@ RESULT_HEADER = [
     "3連単", "3連単払戻", "2連単", "2連単払戻", "確定",
 ]
 VENUE_CODES = {name: code for code, name in base.VENUES.items()}
+
+ANALYSIS_HEADER = [
+    "日付", "場", "R", "締切", "枠", "登録番号", "級別", "F数", "L数", "公式平均ST", "元展開材料",
+    "節間平均ST", "直近3走平均", "節間走数", "最新ST", "最新展示ST", "節間ST推移",
+    "予測ST(仮)", "ST順位", "内隣予測ST", "内隣差(+＝自分早い)", "外隣予測ST", "外隣差(+＝自分早い)",
+    "ST信頼度", "スリット判定", "展開フラグ", "AI入力キー", "AI入力要約",
+]
+
+
+def _number(value):
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _norm_day(value: str) -> str:
@@ -196,6 +213,181 @@ def _write_full(ws, header: list[str], rows: list[list]) -> None:
     ws.update(payload, "A1", raw=True)
 
 
+
+def _build_series_stats(result_map: dict) -> dict:
+    grouped = {}
+    for key, row in result_map.items():
+        if len(row) < 9:
+            continue
+        venue = str(row[1]).strip()
+        reg = str(row[4]).strip()
+        st = _number(row[8])
+        if not venue or not reg or st is None:
+            continue
+        grouped.setdefault((venue, reg), []).append((key[0], int(key[2]), st))
+    out = {}
+    for key, values in grouped.items():
+        values.sort(key=lambda x: (x[0], x[1]))
+        sts = [x[2] for x in values]
+        out[key] = {
+            "avg": sum(sts) / len(sts),
+            "last3": sum(sts[-3:]) / min(3, len(sts)),
+            "n": len(sts),
+            "latest": sts[-1],
+            "sequence": " → ".join(f"{x:.2f}" for x in sts),
+        }
+    return out
+
+
+def _predicted_st(official, stats):
+    sec = stats.get("avg") if stats else None
+    last3 = stats.get("last3") if stats else None
+    n = int(stats.get("n") or 0) if stats else 0
+    if official is None and sec is None:
+        return None
+    if official is None:
+        return round(sec, 3)
+    if sec is None:
+        return round(official, 3)
+    recent = last3 if last3 is not None else sec
+    if n <= 1:
+        value = 0.75 * official + 0.25 * sec
+    elif n <= 3:
+        value = 0.55 * official + 0.25 * sec + 0.20 * recent
+    else:
+        value = 0.40 * official + 0.35 * sec + 0.25 * recent
+    return round(value, 3)
+
+
+def _confidence(n: int) -> str:
+    if n >= 4:
+        return "高"
+    if n >= 2:
+        return "中"
+    if n == 1:
+        return "低"
+    return "基準のみ"
+
+
+def _slit_judgment(lane: int, pred, inner_gap, outer_gap) -> str:
+    if pred is None:
+        return "判定不可"
+    if lane == 1:
+        if outer_gap is not None and outer_gap <= -0.05:
+            return "外圧強"
+        if outer_gap is not None and outer_gap >= 0.03:
+            return "イン先行"
+        return "互角"
+    if lane == 6:
+        if inner_gap is not None and inner_gap >= 0.05:
+            return "内へ強く先行"
+        if inner_gap is not None and inner_gap <= -0.05:
+            return "内に遅れ"
+        return "互角"
+    if inner_gap is not None and outer_gap is not None:
+        if inner_gap >= 0.04 and outer_gap >= -0.01:
+            return "攻め先行"
+        if inner_gap <= -0.03 and outer_gap <= -0.03:
+            return "凹み警戒"
+    if inner_gap is not None and inner_gap >= 0.03:
+        return "内へ圧"
+    if outer_gap is not None and outer_gap <= -0.03:
+        return "外圧注意"
+    return "互角"
+
+
+def _development_flag(lane: int, f_count: int, pred, inner_gap, outer_gap) -> str:
+    flags = []
+    if f_count >= 1:
+        flags.append("F持ち")
+    if pred is None:
+        flags.append("ST不足")
+        return "｜".join(flags)
+    if lane == 1:
+        if outer_gap is not None and outer_gap <= -0.04:
+            flags.append("イン受け圧")
+    elif lane == 6:
+        if inner_gap is not None and inner_gap >= 0.05:
+            flags.append("6のぞき注意")
+        elif inner_gap is not None and inner_gap <= -0.05:
+            flags.append("6遅れ")
+    else:
+        if inner_gap is not None and inner_gap >= 0.05:
+            flags.append("攻め起点候補")
+        elif inner_gap is not None and outer_gap is not None and inner_gap <= -0.03 and outer_gap <= -0.03:
+            flags.append("凹み候補")
+        elif outer_gap is not None and outer_gap <= -0.05:
+            flags.append("外から攻められ")
+    return "｜".join(flags)
+
+
+def _build_analysis_rows(today_rows: list[list], result_map: dict) -> list[list]:
+    stats_map = _build_series_stats(result_map)
+    base_rows = []
+    by_race = {}
+    for row in today_rows:
+        if len(row) < 15:
+            continue
+        day, venue = str(row[0]), str(row[1])
+        rno, lane = int(row[2]), int(row[4])
+        reg = str(row[5])
+        official = _number(row[11])
+        stats = stats_map.get((venue, reg), {})
+        pred = _predicted_st(official, stats)
+        item = {
+            "day": day, "venue": venue, "rno": rno, "deadline": row[3],
+            "lane": lane, "reg": reg, "class": row[6], "f": int(_number(row[8]) or 0),
+            "l": int(_number(row[12]) or 0), "official": official, "material": row[7],
+            "stats": stats, "pred": pred,
+        }
+        base_rows.append(item)
+        by_race.setdefault((day, venue, rno), {})[lane] = item
+
+    output = []
+    for item in base_rows:
+        race = by_race[(item["day"], item["venue"], item["rno"])]
+        lane, pred = item["lane"], item["pred"]
+        valid_preds = [x["pred"] for x in race.values() if x["pred"] is not None]
+        rank = 1 + sum(1 for value in valid_preds if pred is not None and value < pred) if pred is not None else ""
+        inner = race.get(lane - 1, {}).get("pred") if lane > 1 else None
+        outer = race.get(lane + 1, {}).get("pred") if lane < 6 else None
+        inner_gap = round(inner - pred, 3) if inner is not None and pred is not None else None
+        outer_gap = round(outer - pred, 3) if outer is not None and pred is not None else None
+        stats = item["stats"]
+        n = int(stats.get("n") or 0)
+        confidence = _confidence(n)
+        slit = _slit_judgment(lane, pred, inner_gap, outer_gap)
+        flag = _development_flag(lane, item["f"], pred, inner_gap, outer_gap)
+        key = f'{item["day"]}|{item["venue"]}|{item["rno"]:02d}|{lane}'
+        def st_text(value, digits=2):
+            return "-" if value is None else f"{value:.{digits}f}"
+        summary = (
+            f'{lane}号艇 ST[公式:{st_text(item["official"])}/節間:{st_text(stats.get("avg"))}/'
+            f'予測:{st_text(pred,3)}] 隣差[内:{st_text(inner_gap,3)}/外:{st_text(outer_gap,3)}] '
+            f'{slit} 信頼:{confidence}'
+        )
+        output.append([
+            item["day"], item["venue"], item["rno"], item["deadline"], lane, item["reg"], item["class"],
+            item["f"], item["l"], item["official"] if item["official"] is not None else "", item["material"],
+            round(stats["avg"], 3) if stats.get("avg") is not None else "",
+            round(stats["last3"], 3) if stats.get("last3") is not None else "",
+            n if n else "", stats.get("latest") if stats.get("latest") is not None else "",
+            "", stats.get("sequence") or "", pred if pred is not None else "", rank,
+            inner if inner is not None else "", inner_gap if inner_gap is not None else "",
+            outer if outer is not None else "", outer_gap if outer_gap is not None else "",
+            confidence, slit, flag, key, summary,
+        ])
+    output.sort(key=lambda r: (int(VENUE_CODES.get(r[1], "99")), int(r[2]), int(r[4])))
+    return output
+
+
+def _write_analysis(book, rows: list[list]) -> None:
+    ws = book.worksheet(ANALYSIS_SHEET)
+    ws.batch_clear(["A2:AB2000"])
+    if rows:
+        ws.update(rows, f"A2:AB{len(rows)+1}", raw=True)
+
+
 def main() -> int:
     raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if not raw:
@@ -286,6 +478,9 @@ def main() -> int:
     result_rows = [result_map[k] for k in sorted(result_map, key=lambda x: (x[0], int(VENUE_CODES[x[1]]), x[2], x[3]))]
     _write_full(result_ws, RESULT_HEADER, result_rows)
 
+    analysis_rows = _build_analysis_rows(today_rows, result_map)
+    _write_analysis(book, analysis_rows)
+
     print(json.dumps({
         "ok": True,
         "active_venues": sorted(active_names),
@@ -293,6 +488,7 @@ def main() -> int:
         "today_races_fetched": len(lineup_tasks),
         "section_result_rows": len(result_rows),
         "result_races_fetched": len(result_tasks),
+        "analysis_rows": len(analysis_rows),
     }, ensure_ascii=False))
     return 0
 
