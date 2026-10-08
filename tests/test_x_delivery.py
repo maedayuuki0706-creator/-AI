@@ -57,6 +57,9 @@ class XDeliveryTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         for p in (patch.object(delivery, "STATE_DIR", Path(self.tmp.name) / "outbox"),
+                  # Legacy integration is intentionally disabled in production to avoid
+                  # competing with X Delivery V2. Enable only inside offline tests.
+                  patch.object(delivery, "STANDARD_X_FEED_ENABLED", True),
                   patch.object(delivery, "datetime", Clock), patch.object(policy, "datetime", Clock),
                   patch.dict(os.environ, {}, clear=True),
                   contextlib.redirect_stdout(io.StringIO()),
