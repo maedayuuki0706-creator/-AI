@@ -134,7 +134,9 @@ class XDeliveryTests(unittest.TestCase):
     def test_format_preserves_all_tickets_and_follow_invitation(self):
         post = delivery._build_post("ボートレースびわこ", 12, "12:10", row()["main"], label="厳選くん")
         self.assertIn("フォローお願いします", post)
-        self.assertNotIn("#", post)
+        self.assertIn("#競艇", post)
+        self.assertIn("#無料予想", post)
+        self.assertIn("#びわこ", post)
         self.assertLessEqual(policy.weighted_length(post), 280)
         expanded = set()
         for line in post.splitlines():

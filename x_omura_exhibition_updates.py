@@ -161,16 +161,12 @@ def make_post(rno: int, deadline: str, main: list[str], cover: list[str], analys
         "",
         f"👀 {rationale(analysis)}",
     ]
-    text = "\n".join(lines)
-    if weighted_length(text) <= 280:
-        return text
-
-    # If the exact list is too long, compact only the rationale, never the tickets.
-    lines[-1] = "👀展示・ST・モーター・頭確率を反映"
-    text = "\n".join(lines)
-    if weighted_length(text) > 280:
-        raise ValueError("exhibition update exceeds X limit")
-    return text
+    try:
+        return xpost._fit_post(lines, venue="大村")
+    except ValueError:
+        # Compact the explanation but preserve all picks.
+        lines[-1] = "👀展示・ST・モーター反映"
+        return xpost._fit_post(lines, venue="大村")
 
 
 def write_local(day: str, row: dict, state: dict) -> None:

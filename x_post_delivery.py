@@ -24,8 +24,8 @@ import x_delivery_store as outbox
 
 STATE_DIR = Path("data/x_post_delivery")
 WEBHOOK_ENV = "X_POST_DISCORD_WEBHOOK_URL"
-BASE_HASHTAGS = "#競艇 #ボートレース #競艇予想 #無料予想"
-FORMAT_VERSION = "v2-formation"
+BASE_HASHTAGS = ("#競艇", "#ボートレース", "#競艇予想", "#ボートレース予想", "#無料予想")
+FORMAT_VERSION = "v3-venue-hashtags"
 RENDER_SYNC_URL = "https://boat-ai-navi-public.onrender.com/api/x-sync"
 RENDER_RESULT_URL = "https://boat-ai-navi-public.onrender.com/api/x-result"
 STANDARD_X_FEED_ENABLED = os.getenv("X_STANDARD_FEED_ENABLED", "0") == "1"
@@ -38,10 +38,41 @@ _WORKER: threading.Thread | None = None
 _PENDING_DAYS: set[str] = set()
 _LAST_WARM = 0.0
 
+# All 24 official stadium codes; archives can contain a code instead of a name.
+VENUE_BY_CODE = {
+    "01":"桐生", "02":"戸田", "03":"江戸川", "04":"平和島",
+    "05":"多摩川", "06":"浜名湖", "07":"蒲郡", "08":"常滑",
+    "09":"津", "10":"三国", "11":"びわこ", "12":"住之江",
+    "13":"尼崎", "14":"鳴門", "15":"丸亀", "16":"児島",
+    "17":"宮島", "18":"徳山", "19":"下関", "20":"若松",
+    "21":"芦屋", "22":"福岡", "23":"唐津", "24":"大村",
+}
+
+
+def _venue_tag(venue: str = "") -> str:
+    value = re.sub(r"\\s+", "", str(venue or "").strip())
+    value = re.sub(r"^(?:ボートレース|BOATRACE)", "", value, flags=re.IGNORECASE)
+    if value.isdigit():
+        value = VENUE_BY_CODE.get(value.zfill(2), "")
+    return f"#{value}" if value and re.fullmatch(r"[一-龯ぁ-んァ-ンーa-zA-Z0-9]+", value) else ""
+
+
 def _hashtags(venue: str = "") -> str:
-    venue = str(venue or "").strip()
-    local = f" #{venue} #ボートレース{venue}" if venue else ""
-    return BASE_HASHTAGS + local
+    location = _venue_tag(venue)
+    return " ".join([*BASE_HASHTAGS, *([location] if location else [])])
+
+
+def _hashtag_options(venue: str = "") -> list[str]:
+    location = _venue_tag(venue)
+    name = location[1:] if location else ""
+    required = ["#競艇", "#ボートレース", "#無料予想", *([location] if location else [])]
+    candidates = [
+        [*BASE_HASHTAGS, *([location, f"#ボートレース{name}"] if location else [])],
+        [*BASE_HASHTAGS, *([location] if location else [])],
+        ["#競艇", "#ボートレース", "#競艇予想", "#無料予想", *([location] if location else [])],
+        required,
+    ]
+    return list(dict.fromkeys(" ".join(tags) for tags in candidates))
 
 
 def _state_path(day: str) -> Path:
@@ -287,20 +318,25 @@ def _compact_picks(values) -> list[str]:
     return out
 
 
-def _fit_post(lines: list[str]) -> str:
-    text = "\n".join(lines).strip()
-    if weighted_length(text) <= 280:
-        return text
-    trimmed = [line for line in lines if "展示・気象" not in line and not line.startswith("#")]
-    text = "\n".join(trimmed).strip()
-    if weighted_length(text) <= 280:
-        return text
-    trimmed = [line for line in trimmed if line and not line.startswith("🔔")]
-    text = "\n".join(trimmed).strip()
-    if weighted_length(text) <= 280:
-        return text
-    # Never silently remove tickets or the requested follow invitation.
-    raise ValueError("X prediction exceeds 280 weighted characters")
+def _fit_post(lines: list[str], *, venue: str = "") -> str:
+    """Fit venue and free prediction hashtags without dropping actual picks."""
+    versions = [
+        list(lines),
+        [line for line in lines if "展示・気象" not in line and not line.startswith("📊 ")],
+        [line for line in lines if "展示・気象" not in line and not line.startswith("📊 ") and not line.startswith("🔔")],
+    ]
+    versions.append([
+        "フォローお願いします！" if line == "結果も自動投稿｜フォローお願いします！" else line
+        for line in versions[-1]
+    ])
+    for lineset in versions:
+        content = "\n".join(lineset).strip()
+        for tags in _hashtag_options(venue):
+            post = content + "\n\n" + tags
+            if weighted_length(post) <= 280:
+                return post
+    # Do not discard a ticket, the venue tag, #無料予想 or the follow invitation.
+    raise ValueError("X post exceeds 280 weighted characters with required hashtags")
 
 
 def _wrap_for_discord(post: str, source: str) -> str:
@@ -385,7 +421,7 @@ def _build_post(venue: str, rno: int, deadline: str, picks, *, label: str, score
         "",
         "🔔 次の無料予想も配信します",
         "ぜひフォローお願いします！",
-    ])
+    ], venue=venue)
 
 
 def send_selected_record(record: dict) -> bool:
@@ -469,7 +505,7 @@ def build_featured_post(
         # Keep all tickets and the follow invitation; detailed model reasons
         # remain in the source record and delivery receipt.
         lines = ["📊 展示反映" if line.startswith("📊 ") else line for line in lines]
-    return _fit_post(lines), raw_picks
+    return _fit_post(lines, venue=venue), raw_picks
 
 
 def send_featured_record(record: dict, picks=None, *, source: str, note: str = "",

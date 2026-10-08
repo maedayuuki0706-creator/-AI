@@ -274,6 +274,8 @@ class XProductionTests(unittest.TestCase):
                                                cover_picks=cover,note="展示反映｜AI頭評価 2=15%・3=12%・4=10%・5=5%・6=2%")
         self.assertLessEqual(weighted_length(text),280)
         self.assertIn("フォローお願いします",text)
+        self.assertIn("#無料予想",text)
+        self.assertIn("#多摩川",text)
         self.assertEqual(api_server._archived_pick_set({"post":text}),set(main+cover))
         self.assertEqual(set(picks),set(main+cover))
 
@@ -305,6 +307,12 @@ class XProductionTests(unittest.TestCase):
         self.assertIn("39.4倍",result["text"])
         api_server._X_RESULT_POSTED.clear(); api_server._X_RESULT_UNCERTAIN.clear()
 
+    def test_venue_tags_all_stadiums_and_official_codes(self):
+        for code, venue in formatter.VENUE_BY_CODE.items():
+            self.assertIn(f"#{venue}", formatter._hashtags(code))
+            self.assertIn(f"#{venue}", formatter._hashtags("ボートレース" + venue))
+        self.assertNotIn("#ボートレースボートレース", formatter._hashtags("ボートレース常滑"))
+
     def test_follow_invitation_is_in_all_x_result_types(self):
         hit = api_server._result_text(self.row, "5-6-1", 27010, True)
         miss = api_server._result_text(self.row, "1-2-3", 3940, False)
@@ -312,6 +320,8 @@ class XProductionTests(unittest.TestCase):
         for post in (hit, miss, void):
             with self.subTest(post=post[:20]):
                 self.assertIn("フォローお願いします！", post)
+                self.assertIn("#無料予想", post)
+                self.assertIn("#多摩川", post)
                 self.assertIn("次の無料予想も配信中", post)
                 self.assertLessEqual(weighted_length(post), 280)
         self.assertIn("270.1倍", hit)

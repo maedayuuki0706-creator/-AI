@@ -19,6 +19,7 @@ from discord_formation import expand_formation
 from prediction_engine_v2 import analyze_race_v2
 from x_api_client import post_text as post_to_x, verify_user_context, credentials_configured, XPostRejected
 from x_delivery_policy import validate_live_row, weighted_length
+from x_post_delivery import _fit_post
 
 ROOT = Path(__file__).resolve().parent
 WEB_ROOT = ROOT / "web"
@@ -154,7 +155,6 @@ def sync_archived_exhibition_to_x(day: str, jcd: str, rno: int, archive_ref: str
         row = _x_archive_update_row(day, jcd, rno, archive_ref)
         validate_live_row(row)
         post = str(row.get("post") or "").strip()
-        post = "\n".join(line for line in post.splitlines() if not line.lstrip().startswith("#")).strip()
         if not post or weighted_length(post) > 280:
             raise ValueError("archived exhibition update is empty or too long")
 
@@ -207,9 +207,6 @@ def sync_archived_prediction_to_x(day: str, jcd: str, rno: int, archive_ref: str
 
         row = _x_sync_post_row(day, jcd, rno, archive_ref)
         post = str(row.get("post") or "").strip()
-        # Keep the first production rollout conservative: hashtag-free posts
-        # are known to pass the account's current X write policy.
-        post = "\n".join(line for line in post.splitlines() if not line.lstrip().startswith("#")).strip()
         if not post or weighted_length(post) > 280:
             raise ValueError("archived X post is empty or too long")
         validate_live_row(row)
@@ -275,10 +272,7 @@ def _result_text(row: dict, winner: str, payout: int, hit: bool) -> str:
             "的中もハズレも結果公開します。",
         ]
     lines.extend(["", *RESULT_FOLLOW_LINES])
-    text = "\n".join(lines).strip()
-    if weighted_length(text) > 280:
-        raise ValueError("X result text is too long")
-    return text
+    return _fit_post(lines, venue=venue)
 
 
 def _void_result_text(row: dict, refund_lanes) -> str:
@@ -290,10 +284,7 @@ def _void_result_text(row: dict, refund_lanes) -> str:
     if lanes:
         lines.append("返還対象艇：" + "・".join(f"{lane}号艇" for lane in lanes))
     lines.extend(["", "※的中・不的中の判定対象外", "公式結果に基づくご案内です。", "", *RESULT_FOLLOW_LINES])
-    message = "\n".join(lines)
-    if weighted_length(message) > 280:
-        raise ValueError("X void result text is too long")
-    return message
+    return _fit_post(lines, venue=venue)
 
 
 def sync_archived_result_to_x(day: str, jcd: str, rno: int, archive_ref: str = "", attempt_id: str = "") -> dict:
