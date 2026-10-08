@@ -161,20 +161,6 @@ def verify(state, archive):
     return verified
 
 
-def confirmed_void_result(day, jcd, rno):
-    """Only the committed official snapshot can exempt a void trifecta from posting.
-
-    Never fabricate a payout or call X for an invalid three-number result.
-    Unknown/missing snapshots preserve the existing guarded result path.
-    """
-    path = Path(f"data/prototype_scoreboard/{day}/official/{day}_{jcd}_{int(rno):02d}.json")
-    try:
-        snapshot = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, TypeError):
-        return False
-    return snapshot.get("status") == "void" and not snapshot.get("payouts")
-
-
 def run_once(*, store=None, clock=None, transport=render_send, mode="all", budget_seconds=90,
              monotonic=time.monotonic, ready=formatter.check_render_ready, candidates=None):
     clock = clock or (lambda:datetime.now(JST))
@@ -216,13 +202,6 @@ def run_once(*, store=None, clock=None, transport=render_send, mode="all", budge
                 if not str((previous.get("x_post_ids") or {}).get(race, "")).isdigit() or race in (previous.get("x_result_races") or []):
                     continue
                 if clock() <= close_time(row):
-                    continue
-                # An officially void trifecta has no winner or odds to announce.
-                # Preserve its posted prediction and prevent an endless pending
-                # result loop without fabricating a settlement or re-posting.
-                if confirmed_void_result(result_day, row["jcd"], row["rno"]):
-                    events.append({"key": receipt_key(row, "result"),
-                                   "status": "void_official", "post_id": None})
                     continue
                 try:
                     events.append(send(row, "result"))
