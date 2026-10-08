@@ -8,15 +8,11 @@ on:
         required: false
         default: ""
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '13,28,43,58 * * * *'
   push:
     branches: [main]
     paths:
       - 'sync_x_reason_log.py'
-      - 'data/x_post_delivery/**'
-      - 'data/prototype_scoreboard/**'
-      - 'data/prototype12_delivery/predictions/**'
-      - 'data/prototype3_delivery/predictions/**'
       - '.github/workflows/x-reason-log-sync.yml'
 
 permissions:
