@@ -267,6 +267,12 @@ def main() -> int:
                         continue
                 result_tasks.append((day, venue, sec["jcd"], rno))
 
+    # First backfill can contain hundreds of historical races. Cap each run so
+    # the 15-minute workflow stays well inside its timeout, prioritizing the
+    # newest/current races; later scheduled runs fill the remainder.
+    result_tasks.sort(key=lambda x: (x[0], x[3], x[2]), reverse=True)
+    result_tasks = result_tasks[:int(os.getenv("ST_RESULT_FETCH_CAP", "72"))]
+
     with ThreadPoolExecutor(max_workers=12) as pool:
         futures = {pool.submit(_fetch_result, *task): task for task in result_tasks}
         for future in as_completed(futures):
