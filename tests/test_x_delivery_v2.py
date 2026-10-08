@@ -191,23 +191,24 @@ class XProductionTests(unittest.TestCase):
             self.now += timedelta(seconds=31)
         self.assertEqual(self.sender.call_count,6)
 
-    def test_official_void_trifecta_is_not_posted_as_result(self):
+    def test_official_void_result_is_delivered_once_with_acknowledgement(self):
         self.now += timedelta(minutes=31)
         race = key(self.row)
         self.store.states[self.row["day"]] = {
             "x_posted_races": [race],
             "x_post_ids": {race: "2345678901234567890"},
         }
-        with patch.object(dispatcher, "confirmed_void_result", return_value=True) as checked:
-            report = dispatcher.run_once(
-                store=self.store, clock=lambda: self.now,
-                transport=self.sender, candidates=[], ready=Mock(),
-            )
-        self.assertEqual(report["counts"], {"void_official": 1})
+        self.sender.return_value = {"ok": True, "post_id": "1234567890123456789",
+                                    "winner": "不成立", "odds": None, "hit": None, "void": True}
+        report = dispatcher.run_once(store=self.store, clock=lambda:self.now,
+                                      transport=self.sender, candidates=[], ready=Mock())
+        self.assertEqual(report["counts"], {"sent": 1})
         self.assertEqual(report["status"], "checked")
-        checked.assert_called_once_with("20261006", "05", 1)
-        self.sender.assert_not_called()
-        self.assertEqual(self.store.state(self.row["day"]).get("x_result_post_ids"), None)
+        self.assertEqual(self.store.state(self.row["day"])["x_result_post_ids"][race], "1234567890123456789")
+        self.assertEqual(self.sender.call_args.args[0], "result")
+        dispatcher.run_once(store=self.store, clock=lambda:self.now,
+                            transport=self.sender, candidates=[], ready=Mock())
+        self.sender.assert_called_once()
 
     def test_midnight_catchup_publishes_only_previous_days_pending_result(self):
         self.now=datetime(2026,10,7,0,3,tzinfo=JST)
@@ -302,6 +303,28 @@ class XProductionTests(unittest.TestCase):
         self.assertEqual(result["text"],post.call_args.args[0])
         self.assertIsNone(result["reply_to"])
         self.assertIn("39.4倍",result["text"])
+        api_server._X_RESULT_POSTED.clear(); api_server._X_RESULT_UNCERTAIN.clear()
+
+    def test_official_void_result_posts_refund_notice_not_fake_winner(self):
+        api_server._X_RESULT_POSTED.clear(); api_server._X_RESULT_UNCERTAIN.clear()
+        race = key(self.row); owner = "a"*32
+        state = {"x_posted_races": [race], "x_post_ids": {race: "2345678901234567890"},
+                 "x_result_attempts": {race: {"id": owner, "status": "reserved"}}}
+        with patch.object(api_server, "_x_sync_state", return_value=state), \\
+             patch.object(api_server, "_x_result_prediction_row", return_value=self.row), \\
+             patch.object(api_server, "_load_official_result", return_value={
+                 "status": "void", "payouts": {}, "refund_lanes": [2, 4]}), \\
+             patch.object(api_server, "post_to_x", return_value="1234567890123456789") as post:
+            result = api_server.sync_archived_result_to_x(
+                self.row["day"], self.row["jcd"], self.row["rno"], "a"*40, owner)
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["void"])
+        self.assertIsNone(result["odds"])
+        self.assertIsNone(result["hit"])
+        self.assertIn("返還対象艇：2号艇・4号艇", result["text"])
+        self.assertIn("払戻なし", result["text"])
+        self.assertIn("\\n", result["text"])
+        self.assertEqual(post.call_args.kwargs["reply_to"], "2345678901234567890")
         api_server._X_RESULT_POSTED.clear(); api_server._X_RESULT_UNCERTAIN.clear()
 
 
