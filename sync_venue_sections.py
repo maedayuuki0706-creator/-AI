@@ -40,7 +40,7 @@ def section_window(today, raw):
     text = official.textify(raw)
     matches = []
     for word in ("初日", "最終日"):
-        m = re.search(r"(\d{1,2})月(\d{1,2})日" + word, text)
+        m = re.search(r"(\d{1,2})月(\d{1,2})日\s*" + word, text)
         if not m:
             return None
         this = datetime.strptime(today, "%Y%m%d").date()
@@ -67,6 +67,13 @@ def series_title(raw):
             value = official.textify(match[1]).strip()
             if 2 <= len(value) <= 120:
                 return value
+    text = official.textify(raw)
+    # Standard BOAT RACE race heading: "本日のレース / <event> / 出走表".
+    m = re.search(r"本日のレース\\n([^\\n]{2,120})\\n出走表(?:\\n|$)", text)
+    if m:
+        value = m.group(1).strip()
+        if value not in {"本日のレース", "出走表"}:
+            return value
     return ""
 
 
