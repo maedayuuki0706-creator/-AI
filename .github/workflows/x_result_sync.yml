@@ -3,7 +3,10 @@ name: X Result Auto Post
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    # X Delivery V2 already checks both predictions and settled results every 5 minutes.
+    # Keep this independent result-only fallback every 15 minutes to prevent
+    # competing runs in the shared x-delivery-production concurrency group.
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
   push:
     branches: [main]
