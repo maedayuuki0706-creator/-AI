@@ -305,6 +305,19 @@ class XProductionTests(unittest.TestCase):
         self.assertIn("39.4倍",result["text"])
         api_server._X_RESULT_POSTED.clear(); api_server._X_RESULT_UNCERTAIN.clear()
 
+    def test_follow_invitation_is_in_all_x_result_types(self):
+        hit = api_server._result_text(self.row, "5-6-1", 27010, True)
+        miss = api_server._result_text(self.row, "1-2-3", 3940, False)
+        void = api_server._void_result_text(self.row, [2, 4])
+        for post in (hit, miss, void):
+            with self.subTest(post=post[:20]):
+                self.assertIn("フォローお願いします！", post)
+                self.assertIn("次の無料予想も配信中", post)
+                self.assertLessEqual(weighted_length(post), 280)
+        self.assertIn("270.1倍", hit)
+        self.assertIn("❌ 不的中", miss)
+        self.assertIn("返還対象艇：2号艇・4号艇", void)
+
     def test_official_void_result_posts_refund_notice_not_fake_winner(self):
         api_server._X_RESULT_POSTED.clear(); api_server._X_RESULT_UNCERTAIN.clear()
         race = key(self.row); owner = "a"*32
