@@ -287,7 +287,7 @@ def _void_result_text(row: dict, refund_lanes) -> str:
     if lanes:
         lines.append("返還対象艇：" + "・".join(f"{lane}号艇" for lane in lanes))
     lines.extend(["", "※的中・不的中の判定対象外", "公式結果に基づくご案内です。"])
-    message = "\\n".join(lines).replace("\\\\n", "\\n")
+    message = "\n".join(lines)
     if weighted_length(message) > 280:
         raise ValueError("X void result text is too long")
     return message
