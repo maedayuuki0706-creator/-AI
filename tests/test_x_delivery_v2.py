@@ -191,6 +191,24 @@ class XProductionTests(unittest.TestCase):
             self.now += timedelta(seconds=31)
         self.assertEqual(self.sender.call_count,6)
 
+    def test_official_void_trifecta_is_not_posted_as_result(self):
+        self.now += timedelta(minutes=31)
+        race = key(self.row)
+        self.store.states[self.row["day"]] = {
+            "x_posted_races": [race],
+            "x_post_ids": {race: "2345678901234567890"},
+        }
+        with patch.object(dispatcher, "confirmed_void_result", return_value=True) as checked:
+            report = dispatcher.run_once(
+                store=self.store, clock=lambda: self.now,
+                transport=self.sender, candidates=[], ready=Mock(),
+            )
+        self.assertEqual(report["counts"], {"void_official": 1})
+        self.assertEqual(report["status"], "checked")
+        checked.assert_called_once_with("20261006", "05", 1)
+        self.sender.assert_not_called()
+        self.assertEqual(self.store.state(self.row["day"]).get("x_result_post_ids"), None)
+
     def test_midnight_catchup_publishes_only_previous_days_pending_result(self):
         self.now=datetime(2026,10,7,0,3,tzinfo=JST)
         race=key(self.row)
