@@ -32,14 +32,14 @@ def at(row, idx):
 
 def day(value):
     text = re.sub(r"[^0-9]", "", str(value or ""))[:8]
-    return text if re.fullmatch(r"20\\d{6}", text) else ""
+    return text if re.fullmatch(r"20\d{6}", text) else ""
 
 
 def section_window(today, raw):
     text = official.textify(raw)
     matches = []
     for word in ("初日", "最終日"):
-        m = re.search(r"(\\d{1,2})月(\\d{1,2})日" + word, text)
+        m = re.search(r"(\d{1,2})月(\d{1,2})日" + word, text)
         if not m:
             return None
         this = datetime.strptime(today, "%Y%m%d").date()
@@ -59,7 +59,7 @@ def section_window(today, raw):
 def series_title(raw):
     for pat in (
         r'heading2_titleName[^>]*>(.*?)</[^>]+>',
-        r'class=["\\'][^"\\']*(?:titleName|raceTitle|eventTitle)[^"\\']*["\\'][^>]*>(.*?)</[^>]+>',
+        r"""class=["'][^"']*(?:titleName|raceTitle|eventTitle)[^"']*["'][^>]*>(.*?)</[^>]+>""",
     ):
         match = re.search(pat, raw, re.I | re.S)
         if match:
