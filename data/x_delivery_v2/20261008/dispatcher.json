@@ -1,19 +1,31 @@
 {
-  "audit": {},
-  "checked_at": "2026-10-08T10:56:31.740048+09:00",
+  "audit": {
+    "already_selected": 3,
+    "eligible": 1,
+    "inside_cutoff": 17,
+    "prediction_files": 21
+  },
+  "checked_at": "2026-10-08T10:59:32.615256+09:00",
   "counts": {
-    "waiting_result": 2
+    "sent": 2,
+    "waiting_result": 1
   },
   "day": "20261008",
   "errors": [],
   "events": [
+    {
+      "key": "prediction:20261008:05:2",
+      "post_id": "2108014304364781741",
+      "status": "sent"
+    },
     {
       "key": "result:20261008:14:5",
       "status": "waiting_result"
     },
     {
       "key": "result:20261008:08:2",
-      "status": "waiting_result"
+      "post_id": "2108014345934508438",
+      "status": "sent"
     }
   ],
   "held": [
@@ -22,8 +34,16 @@
       "status": "blocked"
     }
   ],
-  "mode": "results",
+  "mode": "all",
   "production_verification": [
+    {
+      "content_sha256": "ed77b881cf41b468de90e4782d125d49dc5509b523cb6489ed5eb95a5f0a3a6f",
+      "key": "prediction:20261008:05:2",
+      "post_id": "2108014304364781741",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-08T10:59:10.167931+09:00",
+      "verified": true
+    },
     {
       "content_sha256": "d79eb3d4ae830af470a2a11e7b3901ee637019f88e5d3de583c86864e511e036",
       "key": "prediction:20261008:08:2",
@@ -46,6 +66,14 @@
       "post_id": "2108001814394372452",
       "restart_duplicate_guard_verified": true,
       "sent_at": "2026-10-08T10:09:32.307874+09:00",
+      "verified": true
+    },
+    {
+      "content_sha256": "d79eb3d4ae830af470a2a11e7b3901ee637019f88e5d3de583c86864e511e036",
+      "key": "result:20261008:08:2",
+      "post_id": "2108014345934508438",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-08T10:59:20.054149+09:00",
       "verified": true
     },
     {
@@ -218,6 +246,6 @@
     }
   ],
   "status": "degraded",
-  "trigger_event": "schedule",
-  "workflow_run_id": "37715352181"
+  "trigger_event": "workflow_dispatch",
+  "workflow_run_id": "37715580015"
 }
