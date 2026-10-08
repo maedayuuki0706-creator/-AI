@@ -271,12 +271,16 @@ def main() -> int:
     # the 15-minute workflow stays well inside its timeout, prioritizing the
     # newest/current races; later scheduled runs fill the remainder.
     result_tasks.sort(key=lambda x: (x[0], x[3], x[2]), reverse=True)
-    result_tasks = result_tasks[:int(os.getenv("ST_RESULT_FETCH_CAP", "72"))]
+    result_tasks = result_tasks[:int(os.getenv("ST_RESULT_FETCH_CAP", "48"))]
 
     with ThreadPoolExecutor(max_workers=12) as pool:
         futures = {pool.submit(_fetch_result, *task): task for task in result_tasks}
         for future in as_completed(futures):
-            for row in future.result():
+            try:
+                fetched_rows = future.result()
+            except Exception:
+                fetched_rows = []
+            for row in fetched_rows:
                 result_map[(_norm_day(row[0]), row[1], int(row[2]), int(row[3]))] = row
 
     result_rows = [result_map[k] for k in sorted(result_map, key=lambda x: (x[0], int(VENUE_CODES[x[1]]), x[2], x[3]))]
