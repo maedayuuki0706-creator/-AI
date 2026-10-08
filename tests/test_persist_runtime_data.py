@@ -38,7 +38,7 @@ class RuntimePersistenceTests(unittest.TestCase):
         remote = row.copy()
         remote[17] = "0.13"  # A newly confirmed race-start result
         local = row.copy()
-        local[16] = "リング×2\\nシリンダ"  # Quoted multiline part replacement
+        local[16] = "リング×2\nシリンダ"  # Quoted multiline part replacement
         new = ["2026/10/08", "桐生", "2", "4"] + [""] * 18
         new[5] = "6.83"
         merged = runtime.merge("data/exhibition_log/recent.csv", base,
@@ -46,12 +46,12 @@ class RuntimePersistenceTests(unittest.TestCase):
         result = list(csv.reader(io.StringIO(merged.decode("utf-8"), newline="")))
         self.assertEqual(len(result), 3)
         self.assertEqual(result[1][17], "0.13")
-        self.assertEqual(result[1][16], "リング×2\\nシリンダ")
+        self.assertEqual(result[1][16], "リング×2\nシリンダ")
         self.assertEqual(result[2][:4], new[:4])
 
     def test_exhibition_csv_conflicting_field_still_fails_closed(self):
         header = "日付,場,R,枠,選手," + ",".join(f"column{i}" for i in range(17))
-        base = (header + "\\n2026/10/08,桐生,2,3,選手A" + "," * 17 + "\\n").encode()
+        base = (header + "\n2026/10/08,桐生,2,3,選手A" + "," * 17 + "\n").encode()
         remote = base.replace("選手A", "選手B")
         local = base.replace("選手A", "選手C")
         with self.assertRaises(RuntimeError):
