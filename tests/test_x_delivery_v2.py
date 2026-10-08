@@ -310,10 +310,10 @@ class XProductionTests(unittest.TestCase):
         race = key(self.row); owner = "a"*32
         state = {"x_posted_races": [race], "x_post_ids": {race: "2345678901234567890"},
                  "x_result_attempts": {race: {"id": owner, "status": "reserved"}}}
-        with patch.object(api_server, "_x_sync_state", return_value=state), \\
-             patch.object(api_server, "_x_result_prediction_row", return_value=self.row), \\
+        with patch.object(api_server, "_x_sync_state", return_value=state), \
+             patch.object(api_server, "_x_result_prediction_row", return_value=self.row), \
              patch.object(api_server, "_load_official_result", return_value={
-                 "status": "void", "payouts": {}, "refund_lanes": [2, 4]}), \\
+                 "status": "void", "payouts": {}, "refund_lanes": [2, 4]}), \
              patch.object(api_server, "post_to_x", return_value="1234567890123456789") as post:
             result = api_server.sync_archived_result_to_x(
                 self.row["day"], self.row["jcd"], self.row["rno"], "a"*40, owner)
