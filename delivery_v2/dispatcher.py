@@ -236,9 +236,11 @@ def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yu
     errors = []
     if schedules is None:
         schedules, errors = discover(day, (previous or {}).get('schedules'))
-    # Prime only immutable acknowledgement reads. Mutable claim reads remain
-    # fresh inside the delivery guard; the post-generation audit takes a new snapshot.
-    store.list_day(day)
+    # Do not preload the entire day's growing receipt tree before generation.
+    # Each live candidate is checked against its exact durable receipt by the
+    # delivery guard; the full pinned snapshot is only needed for the audit
+    # after the time-critical delivery pass. This keeps late races from being
+    # crowded out by hundreds of historical receipts.
     generation = {}
     if engine is not None:
         engine(day, schedules, store, clock=clock)
@@ -273,7 +275,7 @@ def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yu
               'day':day, 'stream':'dispatcher', 'jcd':'01', 'rno':1, 'phase':'check',
               'started_at':now.isoformat(), 'checked_at':clock().isoformat(),
               'previous_successful_check':(previous or {}).get('last_successful_check'),
-              'last_successful_check':clock().isoformat() if not errors and not ERRORS else (previous or {}).get('last_successful_check'),
+              'last_successful_check':clock().isoformat() if not errors and not ERRORS and not active_missed else (previous or {}).get('last_successful_check'),
               'active_streams':list(active), 'schedules':schedules, 'counts':counts,
               'schedule_errors':errors, 'delivery_errors':dict(ERRORS), 'deliveries':rows}
     report['production_verification'] = verification
