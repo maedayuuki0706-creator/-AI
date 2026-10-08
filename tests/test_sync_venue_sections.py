@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 from sync_venue_sections import (
     day, section_window, official_result_records, calculated_cells,
-    valid_runs, build_new_roster, VENUES,
+    valid_runs, build_new_roster, series_grade, VENUES,
 )
 
 
@@ -31,6 +31,12 @@ class VenueSyncTests(unittest.TestCase):
         self.assertEqual(section_window("20261008", "10月7日 初日\\n10月12日 最終日"),
                          ("20261007", "20261012"))
         self.assertIsNone(section_window("20261008", "10月6日初日"))
+
+    def test_generic_cup_does_not_become_g1_from_site_navigation(self):
+        self.assertEqual(series_grade("第8回日本一しょうゆ杯"), "一般")
+        self.assertEqual(series_grade("幸田町長杯争奪 秋の美味 筆柿レース"), "一般")
+        self.assertEqual(series_grade("G1 全日本選手権"), "G1")
+        self.assertEqual(series_grade("オールレディース"), "G3")
 
     def test_new_finished_race_updates_only_summary_and_slot(self):
         row = existing()
