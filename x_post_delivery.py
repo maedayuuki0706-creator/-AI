@@ -50,7 +50,7 @@ VENUE_BY_CODE = {
 
 
 def _venue_tag(venue: str = "") -> str:
-    value = re.sub(r"\\s+", "", str(venue or "").strip())
+    value = re.sub(r"\s+", "", str(venue or "").strip())
     value = re.sub(r"^(?:ボートレース|BOATRACE)", "", value, flags=re.IGNORECASE)
     if value.isdigit():
         value = VENUE_BY_CODE.get(value.zfill(2), "")
