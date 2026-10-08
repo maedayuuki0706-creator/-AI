@@ -101,7 +101,7 @@ def merge_exhibition_csv(base: bytes | None, remote: bytes | None, local: bytes)
             merged[key] = chosen
 
     output = io.StringIO(newline="")
-    writer = csv.writer(output, lineterminator="\\n")
+    writer = csv.writer(output, lineterminator="\n")
     writer.writerow(headers[0])
     writer.writerows(merged.values())
     return output.getvalue().encode("utf-8")
