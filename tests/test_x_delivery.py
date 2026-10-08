@@ -222,7 +222,8 @@ class XDeliveryTests(unittest.TestCase):
             "x_post_ids": {KEY: "2105651010316488732"},
             "x_result_attempts": {KEY: {"id": ATTEMPT, "status": "reserved"}},
         }
-        archived = row(deadline="11:50", picks=["3-1-4"],\n                       post="常滑 1R\n3-1-4\nぜひフォローお願いします！")
+        archived = row(deadline="11:50", picks=["3-1-4"],
+                       post="常滑 1R\n3-1-4\nぜひフォローお願いします！")
         with patch.object(api, "_x_sync_state", return_value=state), \
              patch.object(api, "_x_archive_post_row", return_value=archived), \
              patch.object(api, "_load_official_result", return_value={
