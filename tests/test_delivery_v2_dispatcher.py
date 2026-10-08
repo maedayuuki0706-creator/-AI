@@ -80,9 +80,23 @@ class DispatcherTests(unittest.TestCase):
             report = dispatcher.run_once(store=FileStore(),clock=lambda:now, schedules={'01':['08:30']},
                 engine=lambda *args,**kwargs:None, active=('yuuki',), activation_at=activation)
             self.assertEqual(report['status'],'degraded')
+            self.assertIsNone(report['last_successful_check'])
             self.assertEqual(report['active_since']['yuuki'],activation.isoformat())
             self.assertEqual([row['stream'] for row in report['active_missed']],['yuuki'])
             notify.assert_called_once()
+
+    def test_live_dispatch_starts_before_full_receipt_snapshot(self):
+        now = datetime(2026,10,8,17,30,tzinfo=JST)
+        with tempfile.TemporaryDirectory() as temp, patch.object(receipts,'ROOT',Path(temp)/'state'), \
+             patch.object(dispatcher,'SUMMARY',Path(temp)/'report.json'), \
+             patch.object(dispatcher,'legacy_state',return_value=({},[])), \
+             patch.object(dispatcher,'notify_failure'):
+            store = FileStore()
+            with patch.object(store,'list_day', wraps=store.list_day) as scan:
+                dispatcher.run_once(store=store, clock=lambda:now,
+                    schedules={'01':['17:40']}, engine=lambda *args,**kw:None,
+                    active=('yuuki',))
+                scan.assert_called_once_with('20261008')
 
     def test_actual_receipt_verification_rejects_a_different_report_prediction(self):
         import prototype3_delivery as yuuki
