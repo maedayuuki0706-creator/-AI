@@ -6,6 +6,8 @@ journals and X receipt sets, then fast-forward with bounded contention retries.
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import json
 import os
 from pathlib import Path
@@ -36,11 +38,82 @@ def content(ref, path):
     return result.stdout
 
 
+def merge_exhibition_csv(base: bytes | None, remote: bytes | None, local: bytes) -> bytes:
+    """Merge a concurrent exhibition snapshot by race/lane, without dropping edits.
+
+    Exhibition part replacements can include quoted multiline notes. Use the CSV
+    parser, not splitlines(), and merge only independent cell-level changes.
+    A conflicting edit to the same nonempty field remains a visible conflict
+    rather than silently replacing another runner's observation.
+    """
+    def parse(source):
+        if source is None:
+            return None, {}
+        try:
+            reader = csv.reader(io.StringIO(source.decode("utf-8-sig"), newline=""), strict=True)
+            records = list(reader)
+        except (UnicodeError, csv.Error) as exc:
+            raise ValueError("Unreadable exhibition CSV") from exc
+        if not records or len(records[0]) != 22 or records[0][:4] != ["日付", "場", "R", "枠"]:
+            raise ValueError("Unexpected exhibition CSV header")
+        header = records[0]
+        indexed = {}
+        for record in records[1:]:
+            if len(record) != len(header) or not all(record[:4]):
+                raise ValueError("Malformed exhibition CSV row")
+            key = tuple(record[:4])
+            if key in indexed:
+                raise ValueError("Duplicate exhibition CSV race/lane")
+            indexed[key] = record
+        return header, indexed
+
+    base_header, before = parse(base)
+    remote_header, current = parse(remote)
+    local_header, incoming = parse(local)
+    headers = [header for header in (base_header, remote_header, local_header) if header is not None]
+    if not headers or any(header != headers[0] for header in headers):
+        raise ValueError("Exhibition CSV columns changed concurrently")
+
+    merged = {}
+    for key in dict.fromkeys([*current, *incoming, *before]):
+        original = before.get(key)
+        theirs = current.get(key)
+        ours = incoming.get(key)
+        if ours == original:
+            chosen = theirs
+        elif theirs == original or theirs == ours:
+            chosen = ours
+        elif theirs is None or ours is None:
+            raise RuntimeError(f"Exhibition CSV row changed and removed concurrently: {key}")
+        else:
+            if original is None:
+                original = [""] * len(headers[0])
+                original[:4] = list(key)
+            chosen = []
+            for previous, rvalue, lvalue in zip(original, theirs, ours):
+                if rvalue == lvalue or lvalue == previous:
+                    chosen.append(rvalue)
+                elif rvalue == previous:
+                    chosen.append(lvalue)
+                else:
+                    raise RuntimeError(f"Exhibition CSV field changed concurrently: {key}")
+        if chosen is not None:
+            merged[key] = chosen
+
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\\n")
+    writer.writerow(headers[0])
+    writer.writerows(merged.values())
+    return output.getvalue().encode("utf-8")
+
+
 def merge(path, base, remote, local):
     if remote == local or local == base:
         return remote
     if remote == base:
         return local
+    if path == "data/exhibition_log/recent.csv":
+        return merge_exhibition_csv(base, remote, local)
     if path.endswith(".jsonl"):
         # Keep remote order, and append distinct local records. Validate first;
         # a broken JSONL must never poison all future deduplication reads.
