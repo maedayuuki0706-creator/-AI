@@ -323,7 +323,7 @@ class XProductionTests(unittest.TestCase):
         self.assertIsNone(result["hit"])
         self.assertIn("返還対象艇：2号艇・4号艇", result["text"])
         self.assertIn("払戻なし", result["text"])
-        self.assertIn("\\n", result["text"])
+        self.assertIn("\n", result["text"])
         self.assertEqual(post.call_args.kwargs["reply_to"], "2345678901234567890")
         api_server._X_RESULT_POSTED.clear(); api_server._X_RESULT_UNCERTAIN.clear()
 
