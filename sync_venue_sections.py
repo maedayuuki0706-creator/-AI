@@ -79,7 +79,7 @@ def series_title(raw):
 
 def series_grade(title):
     """Read a grade from the verified event title, NOT from the site's G1/G2 nav."""
-    upper = re.sub(r"\\s+", "", title or "").upper()
+    upper = re.sub(r"\s+", "", title or "").upper()
     if re.search(r"(?<![A-Z])SG(?![A-Z])", upper):
         return "SG"
     if re.search(r"(?<![A-Z])(?:PG1|G1|GI)(?![A-Z])", upper):
