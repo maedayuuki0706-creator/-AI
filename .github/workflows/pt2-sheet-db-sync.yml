@@ -55,9 +55,10 @@ jobs:
           PT2_DB_MIN_PLAYERS: "1200"
           PT2_DB_MIN_MOTORS: "1000"
           PT2_DB_MIN_VENUES: "24"
-        run: |
-          python sync_pt2_sheet_db.py
-          python sync_pt2_prediction_sheet.py
+        # Keep database snapshot refresh independent of the PT2 prediction
+        # view/log. The existing 5-minute PT2 Sheet Log Sync and prototype12
+        # after-delivery job already own that view; avoid a third concurrent writer.
+        run: python sync_pt2_sheet_db.py
 
       - name: Persist snapshot only when source data changed
         run: |
