@@ -87,30 +87,51 @@ def _deadline_dt(day: str, hhmm: str | None):
         return None
 
 
-def _active_sections(book, today: str) -> dict[str, dict]:
-    ws = book.worksheet(ACTIVE_SHEET)
-    names = []
-    for row in ws.get("C2:C50"):
-        name = str(row[0]).strip() if row else ""
-        if name and name not in names and name in VENUE_CODES:
-            names.append(name)
+def _meeting_date(day: str, month: int, date: int) -> str:
+    base_day = datetime.strptime(day, "%Y%m%d").date()
+    year = base_day.year
+    candidate = datetime(year, month, date).date()
+    # Handle year-crossing meetings such as late December -> early January.
+    if (candidate - base_day).days > 30:
+        candidate = datetime(year - 1, month, date).date()
+    elif (base_day - candidate).days > 330:
+        candidate = datetime(year + 1, month, date).date()
+    return candidate.strftime("%Y%m%d")
 
+
+def _official_meeting_window(day: str, jcd: str) -> tuple[str, str]:
+    try:
+        raw = base.fetch(base.official_url("racelist", day, jcd, 1))
+        text = base.textify(raw)
+    except Exception:
+        return day, day
+    start_match = re.search(r"(\d{1,2})月(\d{1,2})日初日", text)
+    end_match = re.search(r"(\d{1,2})月(\d{1,2})日最終日", text)
+    start = _meeting_date(day, int(start_match.group(1)), int(start_match.group(2))) if start_match else day
+    end = _meeting_date(day, int(end_match.group(1)), int(end_match.group(2))) if end_match else day
+    return start, end
+
+
+def _active_sections(book, today: str) -> dict[str, dict]:
+    # Official calendar is the source of truth. The sheet-side 開催中会場 can lag
+    # behind on section changes, which would drop valid ST rows from analysis.
+    try:
+        codes = base.discover_venues(today)
+    except Exception:
+        codes = []
     out = {}
-    for name in names:
-        try:
-            venue_ws = book.worksheet(name)
-            values = venue_ws.get("C3:D3")
-            row = values[0] if values else []
-            start = _norm_day(row[0] if len(row) > 0 else "")
-            end = _norm_day(row[1] if len(row) > 1 else "")
-        except Exception:
+    for jcd in codes:
+        name = base.VENUES.get(str(jcd).zfill(2))
+        if not name:
             continue
+        start, end = _official_meeting_window(today, str(jcd).zfill(2))
         if not (re.fullmatch(r"20\d{6}", start) and re.fullmatch(r"20\d{6}", end)):
-            continue
-        capped_end = min(end, today)
-        if start > capped_end:
-            continue
-        out[name] = {"jcd": VENUE_CODES[name], "start": start, "end": capped_end}
+            start = end = today
+        out[name] = {
+            "jcd": str(jcd).zfill(2),
+            "start": min(start, today),
+            "end": min(max(end, today), today),
+        }
     return out
 
 
