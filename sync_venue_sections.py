@@ -269,16 +269,30 @@ def main():
         if len(rows) < 2 or at(rows[1], 0) != "選手名" or at(rows[1], 1) != "登録番号":
             stats["skipped"].append(f"{venue}: schema mismatch")
             continue
-        try:
-            raw = official.fetch(official.official_url("racelist", today, code, 1))
-        except Exception:
-            stats["skipped"].append(f"{venue}: official meeting unavailable")
-            continue
-        window = section_window(today, raw)
-        if not window:
-            stats["skipped"].append(f"{venue}: official start/end not verified")
-            continue
-        start, end = window
+        # For an already-established current meeting, trust the sheet's
+        # verified start/end dates. Official event headings are inconsistent
+        # between venues and must not block settled result updates.
+        known = [(day(at(row, 2)), day(at(row, 3)))
+                 for row in rows[2:]
+                 if at(row, 1).isdigit() and
+                 day(at(row, 2)) <= today <= day(at(row, 3))]
+        raw = ""
+        if known:
+            start, end = max(known)
+        else:
+            try:
+                raw = official.fetch(official.official_url("racelist", today, code, 1))
+            except Exception:
+                stats["skipped"].append(f"{venue}: official meeting unavailable")
+                continue
+            window = section_window(today, raw)
+            if not window:
+                stats["skipped"].append(f"{venue}: official start/end not verified")
+                if code in {"01", "04"}:
+                    print("Venue heading diagnostics " + venue + ": " +
+                          repr(official.textify(raw)[:700]), flush=True)
+                continue
+            start, end = window
         present = [row for row in rows[2:] if day(at(row, 2)) == start
                    and at(row, 1).isdigit()]
         latest = max((day(at(row, 2)) for row in rows[2:] if day(at(row, 2))), default="")
