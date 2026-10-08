@@ -69,7 +69,7 @@ def series_title(raw):
                 return value
     text = official.textify(raw)
     # Standard BOAT RACE race heading: "本日のレース / <event> / 出走表".
-    m = re.search(r"本日のレース\\n([^\\n]{2,120})\\n出走表(?:\\n|$)", text)
+    m = re.search(r"本日のレース\n([^\n]{2,120})\n出走表(?:\n|$)", text)
     if m:
         value = m.group(1).strip()
         if value not in {"本日のレース", "出走表"}:
