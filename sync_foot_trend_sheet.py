@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
+from functools import lru_cache
 import os
 from pathlib import Path
 
@@ -174,7 +175,30 @@ def _section_starts(values: list[list[str]]) -> dict[str, list[str]]:
     return {venue: sorted(days) for venue, days in starts.items()}
 
 
-def _section_info(venue: str, day: str, starts: dict[str, list[str]]) -> tuple[str, str]:
+VENUE_CODES = {name: code for code, name in base.VENUES.items()}
+
+
+@lru_cache(maxsize=512)
+def _official_section_start(day: str, jcd: str) -> str:
+    """Best-effort current-meeting start from consecutive official race days."""
+    try:
+        current = datetime.strptime(day, "%Y%m%d").date()
+    except ValueError:
+        return ""
+    start = current
+    for _ in range(7):
+        prev = start - timedelta(days=1)
+        prev_day = prev.strftime("%Y%m%d")
+        try:
+            if str(jcd).zfill(2) not in base.discover_venues(prev_day):
+                break
+        except Exception:
+            break
+        start = prev
+    return start.strftime("%Y%m%d")
+
+
+def _section_info(venue: str, day: str, starts: dict[str, list[str]], jcd: str = "") -> tuple[str, str]:
     try:
         d = datetime.strptime(day, "%Y%m%d").date()
     except ValueError:
@@ -188,10 +212,21 @@ def _section_info(venue: str, day: str, starts: dict[str, list[str]]) -> tuple[s
         delta = (d - s).days
         if 0 <= delta <= 7:
             eligible.append((s, delta))
-    if not eligible:
-        return "", ""
-    s, delta = max(eligible, key=lambda x: x[0])
-    return s.strftime("%Y/%m/%d"), str(delta + 1)
+    if eligible:
+        s, delta = max(eligible, key=lambda x: x[0])
+        return s.strftime("%Y/%m/%d"), str(delta + 1)
+
+    code = str(jcd or VENUE_CODES.get(venue, "")).zfill(2)
+    if code and code in base.VENUES:
+        raw_start = _official_section_start(day, code)
+        try:
+            s = datetime.strptime(raw_start, "%Y%m%d").date()
+            delta = (d - s).days
+            if 0 <= delta <= 7:
+                return s.strftime("%Y/%m/%d"), str(delta + 1)
+        except ValueError:
+            pass
+    return "", ""
 
 
 def _needs_enrichment(rec: dict, existing_row: list[str] | None) -> bool:
@@ -321,13 +356,41 @@ def main() -> int:
 
     missing = []
     existing_updates = []
+
+    # Repair recent rows that already have official ST/results but missed their
+    # meeting start/day. This is intentionally limited to recent rows so old
+    # curated history is not rewritten.
+    today_date = datetime.now(base.JST).date()
+    for rowno, row in enumerate(values[1:], start=2):
+        def rv(index):
+            return row[index - 1] if index - 1 < len(row) else ""
+        venue = str(rv(COL["venue"]) or "").strip()
+        day = _norm_day(rv(COL["day"]))
+        if not venue or not re.fullmatch(r"20\d{6}", day):
+            continue
+        try:
+            age = (today_date - datetime.strptime(day, "%Y%m%d").date()).days
+        except ValueError:
+            continue
+        if not 0 <= age <= 14:
+            continue
+        if str(rv(COL["section_start"]) or "").strip() and str(rv(COL["section_day"]) or "").strip():
+            continue
+        section_start, section_day = _section_info(venue, day, starts, VENUE_CODES.get(venue, ""))
+        if not section_start:
+            continue
+        if not str(rv(COL["section_start"]) or "").strip():
+            existing_updates.append({"range": f"B{rowno}", "values": [[section_start]]})
+        if not str(rv(COL["section_day"]) or "").strip():
+            existing_updates.append({"range": f"D{rowno}", "values": [[section_day]]})
+
     for rec in records:
         k = _key(rec["day"], rec["venue"], rec["rno"], rec["racer_id"])
         if not k:
             continue
         rowno = existing.get(k)
         if rowno is None:
-            section_start, section_day = _section_info(rec["venue"], rec["day"], starts)
+            section_start, section_day = _section_info(rec["venue"], rec["day"], starts, rec.get("jcd") or "")
             missing.append((rec, section_start, section_day))
             continue
 
