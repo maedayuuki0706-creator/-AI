@@ -77,6 +77,22 @@ def series_title(raw):
     return ""
 
 
+def series_grade(title):
+    """Read a grade from the verified event title, NOT from the site's G1/G2 nav."""
+    upper = re.sub(r"\\s+", "", title or "").upper()
+    if re.search(r"(?<![A-Z])SG(?![A-Z])", upper):
+        return "SG"
+    if re.search(r"(?<![A-Z])(?:PG1|G1|GI)(?![A-Z])", upper):
+        return "G1"
+    if re.search(r"(?<![A-Z])(?:G2|GII)(?![A-Z])", upper):
+        return "G2"
+    if re.search(r"(?<![A-Z])(?:G3|GIII)(?![A-Z])", upper):
+        return "G3"
+    if "オールレディース" in title or "マスターズリーグ" in title:
+        return "G3"
+    return "一般"
+
+
 def official_result_records(foot, raw):
     """Use vetted settled results only; ST RAW wins over exhibition-side log."""
     races = {}
@@ -311,7 +327,7 @@ def main():
             if not title:
                 stats["skipped"].append(f"{venue}: no verified official series title")
                 continue
-            grade = official.detect_event_grade(raw) or "一般"
+            grade = series_grade(title)
             new_rows = build_new_roster(today, code, start, end, title, grade, motor_map, player_map)
             if not new_rows:
                 stats["skipped"].append(f"{venue}: incomplete official roster")
@@ -329,6 +345,21 @@ def main():
             continue
         edits = []
         updated = 0
+        # Correct only two explicitly verified general-class meetings that a
+        # prior release mistakenly tagged G1 after reading site-wide menus.
+        verified_grade_fixes = {
+            ("01", "20261007"): ("日本一しょうゆ杯", "一般"),
+            ("07", "20261007"): ("幸田町長杯", "一般"),
+        }
+        fix = verified_grade_fixes.get((code, start))
+        if fix:
+            for idx, row in enumerate(rows[2:], start=3):
+                if (day(at(row, 2)) == start and fix[0] in at(row, 4)
+                        and at(row, 5) == "G1"):
+                    if not DRY_RUN:
+                        edits.append({"range": f"F{idx}", "values": [[fix[1]]]})
+                    stats.setdefault("grade_corrections", []).append(f"{venue} F{idx}")
+
         for index, row in enumerate(rows[2:], start=3):
             if day(at(row, 2)) != start or not at(row, 1).isdigit():
                 continue
