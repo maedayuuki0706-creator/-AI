@@ -3,14 +3,12 @@ name: PT2 Sheet Log Sync
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '3-58/5 * * * *'
   push:
     branches: [main]
     paths:
       - 'sync_pt2_prediction_sheet.py'
       - 'pt2_strategy_cards.py'
-      - 'data/prototype12_delivery/predictions/**'
-      - 'data/prototype_scoreboard/**'
       - '.github/workflows/pt2-sheet-log-sync.yml'
 
 permissions:
