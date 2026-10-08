@@ -278,6 +278,21 @@ def _result_text(row: dict, winner: str, payout: int, hit: bool) -> str:
     return text
 
 
+def _void_result_text(row: dict, refund_lanes) -> str:
+    """Post an official non-result transparently, never invent trifecta odds."""
+    venue = str(row.get("venue") or row.get("jcd") or "")
+    rno = int(row.get("rno") or 0)
+    lanes = sorted({int(lane) for lane in (refund_lanes or []) if str(lane).isdigit() and 1 <= int(lane) <= 6})
+    lines = [f"📢 結果｜{venue} {rno}R", "3連単の払戻なし・不成立"]
+    if lanes:
+        lines.append("返還対象艇：" + "・".join(f"{lane}号艇" for lane in lanes))
+    lines.extend(["", "※的中・不的中の判定対象外", "公式結果に基づくご案内です。"])
+    message = "\\n".join(lines).replace("\\\\n", "\\n")
+    if weighted_length(message) > 280:
+        raise ValueError("X void result text is too long")
+    return message
+
+
 def sync_archived_result_to_x(day: str, jcd: str, rno: int, archive_ref: str = "", attempt_id: str = "") -> dict:
     day = str(day or "").strip()
     jcd = str(jcd or "").zfill(2)
@@ -318,24 +333,29 @@ def sync_archived_result_to_x(day: str, jcd: str, rno: int, archive_ref: str = "
 
         row = _x_result_prediction_row(day, jcd, rno, archive_ref, state)
         result = _load_official_result(day, jcd, rno)
-        if result.get("status") != "settled":
+        is_void = result.get("status") == "void" and not (result.get("payouts") or {})
+        if not is_void and result.get("status") != "settled":
             return {
                 "ok": False,
                 "error": "official result pending",
                 "definitely_not_posted": True,
                 "retryable": True,
             }
-        payouts = result.get("payouts") or {}
-        if not payouts:
-            return {
-                "ok": False,
-                "error": "official payout unavailable",
-                "definitely_not_posted": True,
-                "retryable": True,
-            }
-        winner, payout = max(((str(combo), int(yen)) for combo, yen in payouts.items()), key=lambda item: item[1])
-        hit = winner in _archived_pick_set(row)
-        text = _result_text(row, winner, payout, hit)
+        if is_void:
+            winner, payout, hit = "不成立", None, None
+            text = _void_result_text(row, result.get("refund_lanes"))
+        else:
+            payouts = result.get("payouts") or {}
+            if not payouts:
+                return {
+                    "ok": False,
+                    "error": "official payout unavailable",
+                    "definitely_not_posted": True,
+                    "retryable": True,
+                }
+            winner, payout = max(((str(combo), int(yen)) for combo, yen in payouts.items()), key=lambda item: item[1])
+            hit = winner in _archived_pick_set(row)
+            text = _result_text(row, winner, payout, hit)
         posted_text, posted_reply_to = text, original_post_id
 
         _X_RESULT_UNCERTAIN.add(key)
@@ -361,15 +381,16 @@ def sync_archived_result_to_x(day: str, jcd: str, rno: int, archive_ref: str = "
                 raise
         _X_RESULT_POSTED[key] = post_id
         _X_RESULT_UNCERTAIN.discard(key)
-        print(f"X result sent: {key} winner={winner} odds={payout / 100:.1f} hit={hit} post_id={post_id}", flush=True)
+        print(f"X result sent: {key} winner={winner} odds={'void' if is_void else f'{payout / 100:.1f}'} hit={hit} post_id={post_id}", flush=True)
         return {
             "ok": True,
             "already": False,
             "key": key,
             "post_id": post_id,
             "winner": winner,
-            "odds": payout / 100.0,
+            "odds": None if is_void else payout / 100.0,
             "hit": hit,
+            "void": is_void,
             "text": posted_text,
             "reply_to": posted_reply_to,
         }
