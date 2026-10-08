@@ -39,9 +39,10 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_delivery_v2*.py' -v
       - name: Mark production wake-up time
         run: echo "DELIVERY_V2_RUN_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" >> "$GITHUB_ENV"
-      # Wake critical legacy channels BEFORE the 150-second scan and reporting,
-      # then reserve the next V2 pass; durable claims prevent duplicate messages.
-      - name: Prime core channels and next guarded delivery pass
+      # Wake critical legacy channels before the scan. The existing scheduled
+      # trigger and final continuation step own the next V2 pass; do not queue
+      # a duplicate continuation before today's delivery has finished.
+      - name: Prime critical legacy channels
         if: github.ref == 'refs/heads/main' && steps.guards.conclusion == 'success'
         continue-on-error: true
         env:
@@ -49,15 +50,12 @@ jobs:
         run: |
           python - <<'PY'
           import os
-          from delivery_v2.wakeup import DISPATCHER, wake
+          from delivery_v2.wakeup import wake
           for workflow in ('discord_notify.yml', 'sokuhou-delivery.yml', 'x-delivery-v2-production.yml'):
               try:
                   print('Delivery V2 preflight: ' + str(wake(workflow)), flush=True)
               except Exception as exc:
                   print('::warning::Delivery preflight ' + workflow + ' ' + type(exc).__name__, flush=True)
-          print('Delivery V2 next pass: ' + str(wake(
-              DISPATCHER, current_run_id=os.getenv('GITHUB_RUN_ID', ''), continuation=True
-          )), flush=True)
           PY
       - name: Confirm production transport and restart deduplication
         # A normal code push must not add an unsolicited Discord probe.
