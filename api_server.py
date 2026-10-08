@@ -251,6 +251,9 @@ def _archived_pick_set(row: dict) -> set[str]:
     return picks
 
 
+RESULT_FOLLOW_LINES = ("🔔 次の無料予想も配信中！", "フォローお願いします！")
+
+
 def _result_text(row: dict, winner: str, payout: int, hit: bool) -> str:
     venue = str(row.get("venue") or row.get("jcd") or "")
     rno = int(row.get("rno") or 0)
@@ -262,7 +265,6 @@ def _result_text(row: dict, winner: str, payout: int, hit: bool) -> str:
             f"{winner}　{odds:.1f}倍",
             "",
             f"✅ {source} 的中！",
-            "次の無料予想も配信します。",
         ]
     else:
         lines = [
@@ -272,6 +274,7 @@ def _result_text(row: dict, winner: str, payout: int, hit: bool) -> str:
             "❌ 不的中",
             "的中もハズレも結果公開します。",
         ]
+    lines.extend(["", *RESULT_FOLLOW_LINES])
     text = "\n".join(lines).strip()
     if weighted_length(text) > 280:
         raise ValueError("X result text is too long")
@@ -286,7 +289,7 @@ def _void_result_text(row: dict, refund_lanes) -> str:
     lines = [f"📢 結果｜{venue} {rno}R", "3連単の払戻なし・不成立"]
     if lanes:
         lines.append("返還対象艇：" + "・".join(f"{lane}号艇" for lane in lanes))
-    lines.extend(["", "※的中・不的中の判定対象外", "公式結果に基づくご案内です。"])
+    lines.extend(["", "※的中・不的中の判定対象外", "公式結果に基づくご案内です。", "", *RESULT_FOLLOW_LINES])
     message = "\n".join(lines)
     if weighted_length(message) > 280:
         raise ValueError("X void result text is too long")
