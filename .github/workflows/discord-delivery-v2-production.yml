@@ -25,7 +25,8 @@ concurrency:
 jobs:
   dispatch:
     runs-on: ubuntu-latest
-    timeout-minutes: 7
+    # Large prediction journals can make checkout slow; avoid losing the continuation on a slow runner.
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,6 +39,22 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_delivery_v2*.py' -v
       - name: Mark production wake-up time
         run: echo "DELIVERY_V2_RUN_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" >> "$GITHUB_ENV"
+      # Queue the next V2 pass BEFORE the 150-second delivery scan and reporting.
+      # Otherwise a checkout/scoreboard timeout at the tail breaks the entire chain.
+      # wake() sees active/queued runs and will never enqueue a duplicate.
+      - name: Prime next guarded delivery pass
+        if: github.ref == 'refs/heads/main' && steps.guards.conclusion == 'success'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os
+          from delivery_v2.wakeup import DISPATCHER, wake
+          print('Delivery V2 preflight: ' + str(wake(
+              DISPATCHER, current_run_id=os.getenv('GITHUB_RUN_ID', ''), continuation=True
+          )), flush=True)
+          PY
       - name: Confirm production transport and restart deduplication
         # A normal code push must not add an unsolicited Discord probe.
         if: github.event_name == 'workflow_dispatch' && inputs.wake_reason == 'canary'
