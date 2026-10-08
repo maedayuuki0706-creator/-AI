@@ -180,17 +180,31 @@ VENUE_CODES = {name: code for code, name in base.VENUES.items()}
 
 @lru_cache(maxsize=512)
 def _official_section_start(day: str, jcd: str) -> str:
-    """Best-effort current-meeting start from consecutive official race days."""
+    """Current-meeting start from the official race page, with calendar fallback."""
     try:
         current = datetime.strptime(day, "%Y%m%d").date()
     except ValueError:
         return ""
+    try:
+        raw = base.fetch(base.official_url("racelist", day, str(jcd).zfill(2), 1))
+        text = base.textify(raw)
+        match = re.search(r"(\d{1,2})月(\d{1,2})日初日", text)
+        if match:
+            year = current.year
+            start = datetime(year, int(match.group(1)), int(match.group(2))).date()
+            if (start - current).days > 30:
+                start = datetime(year - 1, int(match.group(1)), int(match.group(2))).date()
+            elif (current - start).days > 330:
+                start = datetime(year + 1, int(match.group(1)), int(match.group(2))).date()
+            return start.strftime("%Y%m%d")
+    except Exception:
+        pass
+
     start = current
     for _ in range(7):
         prev = start - timedelta(days=1)
-        prev_day = prev.strftime("%Y%m%d")
         try:
-            if str(jcd).zfill(2) not in base.discover_venues(prev_day):
+            if str(jcd).zfill(2) not in base.discover_venues(prev.strftime("%Y%m%d")):
                 break
         except Exception:
             break
