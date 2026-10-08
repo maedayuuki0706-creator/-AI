@@ -154,6 +154,34 @@ def aggregate(rows: list[list]) -> list[list]:
     return out
 
 
+
+RECENT_AI_ORDER = ["PT1","PT2","PT3／ゆうき","PT2 総合型","PT2 本命型","PT2 妙味型","PT2 高配当型"]
+
+
+def build_recent_races(rows: list[list], limit: int = 20) -> list[list]:
+    races = {}
+    for r in rows:
+        key = r[17]
+        item = races.setdefault(key, {
+            "time": r[1], "venue": r[2], "rno": r[3], "result": r[15],
+            "odds": r[16], "ais": {},
+        })
+        if str(r[1]) > str(item["time"]):
+            item["time"] = r[1]
+        item["ais"][r[4]] = r[10]
+    ordered = sorted(races.values(), key=lambda x: str(x["time"]), reverse=True)[:limit]
+    out = []
+    for x in ordered:
+        time_text = str(x["time"])
+        if "T" in time_text:
+            time_text = time_text.split("T", 1)[1][:5]
+        out.append([
+            time_text, x["venue"], x["rno"], x["result"], x["odds"],
+            *[x["ais"].get(ai, "") for ai in RECENT_AI_ORDER],
+        ])
+    return out
+
+
 def write_log(ws, day: str, rows: list[list]) -> None:
     old = ws.get_all_values()
     keep = [LOG_HEADER]
@@ -169,11 +197,14 @@ def write_log(ws, day: str, rows: list[list]) -> None:
 
 def write_view(ws, day: str, rows: list[list], summary: list[list]) -> None:
     now = datetime.now(JST).isoformat()
-    ws.batch_clear(["A7:O300"])
-    ws.update([[day]], "B3", raw=True)
+    recent = build_recent_races(rows)
+    ws.batch_clear(["A7:O35", "A42:L80"])
+    ws.update([[f"{day[:4]}/{day[4:6]}/{day[6:]}"]], "B3", raw=True)
     ws.update([[now]], "E3", raw=True)
     if summary:
         ws.update(summary, f"A7:O{6+len(summary)}", raw=True)
+    if recent:
+        ws.update(recent, f"A42:L{41+len(recent)}", raw=True)
 
 
 def main() -> int:
