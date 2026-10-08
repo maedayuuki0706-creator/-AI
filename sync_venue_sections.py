@@ -21,6 +21,7 @@ JST = ZoneInfo("Asia/Tokyo")
 VENUES = official.VENUES
 ID = os.getenv("BOAT_SHEET_ID", "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo")
 MAX_NEW_MEETINGS = max(0, min(3, int(os.getenv("VENUE_NEW_MEETINGS_CAP", "2"))))
+DRY_RUN = os.getenv("VENUE_SYNC_DRY_RUN", "0") == "1"
 MAX_RUNS = 6  # Existing native venue tab schema; do not alter columns/layout.
 RUN_COLS = 6
 CLASS_ORDER = {"A1": 0, "A2": 1, "B1": 2, "B2": 3}
@@ -256,7 +257,7 @@ def main():
         active = set(official.discover_venues(today))
     except Exception:
         active = set()
-    stats = {"day": today, "active": len(active), "updated_venues": {},
+    stats = {"day": today, "dry_run": DRY_RUN, "active": len(active), "updated_venues": {},
              "new_meetings": [], "conflicts": [], "skipped": [], "source_records": sum(
                  len(records) for venue in source.values() for records in venue.values())}
     additions = 0
@@ -295,10 +296,11 @@ def main():
                 stats["skipped"].append(f"{venue}: incomplete official roster")
                 continue
             # Insert new section above history; never sort or rewrite old entries.
-            ws.insert_rows(new_rows, row=3, value_input_option="RAW", inherit_from_before=False)
+            if not DRY_RUN:
+                ws.insert_rows(new_rows, row=3, value_input_option="RAW", inherit_from_before=False)
             additions += 1
             stats["new_meetings"].append(f"{venue} {start} ({len(new_rows)} racers)")
-            rows = ws.get_all_values()
+            rows = (ws.get_all_values() if not DRY_RUN else rows[:2] + new_rows + rows[2:])
             present = [row for row in rows[2:] if day(at(row, 2)) == start
                        and at(row, 1).isdigit()]
         if not present:
@@ -317,7 +319,7 @@ def main():
             if payload is not None:
                 edits.append({"range": f"N{index}:BC{index}", "values": [payload]})
                 updated += 1
-        if edits:
+        if edits and not DRY_RUN:
             for i in range(0, len(edits), 80):
                 ws.batch_update(edits[i:i+80], value_input_option="RAW")
         stats["updated_venues"][venue] = updated
