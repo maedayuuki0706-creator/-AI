@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import os
 from pathlib import Path
@@ -21,6 +23,39 @@ class RuntimePersistenceTests(unittest.TestCase):
         result = runtime.merge('data/hit_alert_deliveries.jsonl', b'{"key":"0"}\n',
                                b'{"key":"0"}\n{"key":"A"}\n', b'{"key":"0"}\n{"key":"B"}\n')
         self.assertEqual([json.loads(line)['key'] for line in result.splitlines()], ['0','A','B'])
+
+    def test_exhibition_csv_merges_disjoint_changes_and_multiline_parts(self):
+        header = ["日付", "場", "R", "枠"] + [f"column{i}" for i in range(18)]
+        row = ["2026/10/08", "桐生", "2", "3"] + [""] * 18
+        row[5] = "6.81"
+        def csv_bytes(*data):
+            buffer = io.StringIO(newline="")
+            writer = csv.writer(buffer, lineterminator="\n")
+            writer.writerow(header)
+            writer.writerows(data)
+            return buffer.getvalue().encode("utf-8")
+        base = csv_bytes(row)
+        remote = row.copy()
+        remote[17] = "0.13"  # A newly confirmed race-start result
+        local = row.copy()
+        local[16] = "リング×2\\nシリンダ"  # Quoted multiline part replacement
+        new = ["2026/10/08", "桐生", "2", "4"] + [""] * 18
+        new[5] = "6.83"
+        merged = runtime.merge("data/exhibition_log/recent.csv", base,
+                               csv_bytes(remote), csv_bytes(local, new))
+        result = list(csv.reader(io.StringIO(merged.decode("utf-8"), newline="")))
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result[1][17], "0.13")
+        self.assertEqual(result[1][16], "リング×2\\nシリンダ")
+        self.assertEqual(result[2][:4], new[:4])
+
+    def test_exhibition_csv_conflicting_field_still_fails_closed(self):
+        header = "日付,場,R,枠,選手," + ",".join(f"column{i}" for i in range(17))
+        base = (header + "\\n2026/10/08,桐生,2,3,選手A" + "," * 17 + "\\n").encode()
+        remote = base.replace("選手A", "選手B")
+        local = base.replace("選手A", "選手C")
+        with self.assertRaises(RuntimeError):
+            runtime.merge("data/exhibition_log/recent.csv", base, remote, local)
 
     def test_conflicting_unknown_document_is_not_overwritten(self):
         with self.assertRaises(RuntimeError):
