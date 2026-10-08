@@ -34,6 +34,8 @@ MODEL_LABELS = {
     "prototype2": ("PT2", "PT"),
     "prototype3": ("PT3／ゆうき", "PT"),
 }
+LEGACY_LABELS = {"main": "メインくん", "mid_odds": "中穴くん", "longshot": "穴くん"}
+VENUE_NAMES = ["桐生","戸田","江戸川","平和島","多摩川","浜名湖","蒲郡","常滑","津","三国","びわこ","住之江","尼崎","鳴門","丸亀","児島","宮島","徳山","下関","若松","芦屋","福岡","唐津","大村"]
 STRATEGY_LABELS = {
     "balanced": ("PT2 総合型", "PT2戦略"),
     "probability": ("PT2 本命型", "PT2戦略"),
@@ -91,6 +93,52 @@ def make_row(day: str, data: dict, ai_name: str, ai_type: str, m: dict, version:
     ]
 
 
+def build_legacy_rows(day: str) -> list[list]:
+    """Score existing Discord main/mid-odds/longshot against confirmed official payouts.
+
+    No predictions are generated or sent here. Race-level journal entries are
+    compared with the already persisted official-results cache. Missing or
+    unresolved races are excluded; zero deliveries are never reported as 0% ROI.
+    """
+    import live_status
+
+    main, _ = live_status.base_streams(day)
+    opportunities = live_status.opportunity_streams(day)
+    official = live_status.load_official_cache(day)
+    streams = {
+        "main": main,
+        "mid_odds": opportunities["mid_odds"],
+        "longshot": opportunities["longshot"],
+    }
+    rows = []
+    for stream, records in streams.items():
+        for record in records.values():
+            result = official.get(record["key"])
+            score = live_status.score_one(record, result)
+            if not score or not score["eligible"]:
+                continue
+            payouts = result.get("payouts") or {}
+            if not payouts:
+                continue
+            winner, payout = max(payouts.items(), key=lambda item: int(item[1]))
+            ret = int(score["return_yen"])
+            stake = int(score["stake_yen"])
+            jcd = str(record["jcd"]).zfill(2)
+            rno = int(record["rno"])
+            venue = record.get("venue") or live_status.base.VENUES.get(jcd) or jcd
+            rows.append([
+                day, result.get("checked_at") or record.get("sent_at") or "",
+                venue, rno, LEGACY_LABELS[stream], "既存AI",
+                score["point_count"], stake, ret, ret - stake,
+                "○" if score["hit"] else "×", "—", "—",
+                "○" if score["manshu"] else "×",
+                "○" if score["torigami"] else "×",
+                winner, round(int(payout) / 100, 1),
+                f"{day}_{jcd}_{rno:02d}", "live_status_official", "既存AI",
+            ])
+    return rows
+
+
 def build_day_rows(day: str) -> list[list]:
     rows = []
     for path in result_files(day):
@@ -110,6 +158,7 @@ def build_day_rows(day: str) -> list[list]:
                     if not sm or sm.get("eligible") is False:
                         continue
                     rows.append(make_row(day, data, sname, stype, sm, model_version(data, key)))
+    rows.extend(build_legacy_rows(day))
     rows.sort(key=lambda r: (r[1], r[2], r[3], r[4]))
     return rows
 
@@ -149,13 +198,14 @@ def aggregate(rows: list[list]) -> list[list]:
         out.append([
             idx, a["ai"], a["type"], a["races"], a["hits"], a["hit_rate"],
             a["stake"], a["ret"], a["roi"], a["profit"], a["manshu"], a["max_odds"],
-            a["main"], a["cover"], a["latest"],
+            a["main"] if a["type"] != "既存AI" else "",
+            a["cover"] if a["type"] != "既存AI" else "", a["latest"],
         ])
     return out
 
 
 
-RECENT_AI_ORDER = ["PT1","PT2","PT3／ゆうき","PT2 総合型","PT2 本命型","PT2 妙味型","PT2 高配当型"]
+RECENT_AI_ORDER = ["メインくん","中穴くん","穴くん","PT1","PT2","PT3／ゆうき","PT2 総合型","PT2 本命型","PT2 妙味型","PT2 高配当型"]
 
 
 def build_recent_races(rows: list[list], limit: int = 20) -> list[list]:
@@ -198,13 +248,14 @@ def write_log(ws, day: str, rows: list[list]) -> None:
 def write_view(ws, day: str, rows: list[list], summary: list[list]) -> None:
     now = datetime.now(JST).isoformat()
     recent = build_recent_races(rows)
-    ws.batch_clear(["A7:O35", "A42:L80"])
+    # The venue selector / formula table lives below row 64. Never clear it.
+    ws.batch_clear(["A7:O35", "A42:O61"])
     ws.update([[f"{day[:4]}/{day[4:6]}/{day[6:]}"]], "B3", raw=True)
     ws.update([[now]], "E3", raw=True)
     if summary:
         ws.update(summary, f"A7:O{6+len(summary)}", raw=True)
     if recent:
-        ws.update(recent, f"A42:L{41+len(recent)}", raw=True)
+        ws.update(recent, f"A42:O{41+len(recent)}", raw=True)
 
 
 def main() -> int:
