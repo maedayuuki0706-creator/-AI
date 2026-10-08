@@ -28,6 +28,8 @@ class VenueSyncTests(unittest.TestCase):
     def test_meeting_window_requires_full_official_proof(self):
         self.assertEqual(section_window("20261008", "10月6日初日 10月11日最終日"),
                          ("20261006", "20261011"))
+        self.assertEqual(section_window("20261008", "10月7日 初日\\n10月12日 最終日"),
+                         ("20261007", "20261012"))
         self.assertIsNone(section_window("20261008", "10月6日初日"))
 
     def test_new_finished_race_updates_only_summary_and_slot(self):
