@@ -78,9 +78,9 @@ jobs:
           PT3_SELECTED_DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_SELECTED_WEBHOOK_URL }}
           DISCORD_REPORT_WEBHOOK_URL: ${{ secrets.DISCORD_REPORT_WEBHOOK_URL }}
         run: python -u -m delivery_v2.dispatcher --budget-seconds 150 --recheck-seconds 20
-      - name: Refresh delivered-only PT standings
-        if: always()
-        run: python -u prototype_scoreboard.py
+      # PT1-3 settled scoring belongs to prototype3-delivery.yml's
+      # "Score delivered PT1-3 results" job. Do not refetch and recompute it
+      # again in this deadline-critical dispatcher.
       - name: Save legacy reporting mirrors
         if: always()
         continue-on-error: true
