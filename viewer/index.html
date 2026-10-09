@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111c32">
+<title>BOAT AI NAVI | 閲覧専用レースビュー</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif;color:#e8edf8;background:#0d1425;--muted:#96a5bd;--panel:#16233b;--line:#2b3b57;--accent:#6fd5ed}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 15% 0%,#25395e 0,transparent 35%),#0d1425}
+main{max-width:1100px;margin:0 auto;padding:22px 16px 76px}
+h1,h2,h3,p{margin:0}a{color:#9eddfc}button,select,input{font:inherit}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 24px}
+.brand{font-size:11px;font-weight:800;color:#88daf4;letter-spacing:.2em;text-transform:uppercase}
+h1{font-size:clamp(23px,5vw,35px);letter-spacing:-.04em;line-height:1.3;margin-top:5px}
+small,.small{font-size:12px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;padding:8px 12px;border-radius:999px;border:1px solid #427b82;background:#1b383f;color:#b0f6e2;font-size:12px;white-space:nowrap}
+.hero{padding:21px 23px;border-radius:21px;border:1px solid #314965;background:linear-gradient(125deg,#1c3054,#14253d 70%);margin-bottom:18px}
+.hero p{line-height:1.6;margin-top:7px;color:#bbcee4;font-size:14px}
+.selectors{display:grid;grid-template-columns:1.1fr 1.4fr 1fr auto;gap:10px;margin-bottom:12px;align-items:end}
+label{display:block;color:#bbcee4;font-size:12px;font-weight:700;margin-bottom:7px}
+input,select{width:100%;border-radius:12px;background:#16233b;border:1px solid #425371;color:#fff;padding:13px 12px;min-height:48px;outline-offset:3px}
+button{border:0;border-radius:12px;cursor:pointer;min-height:48px}
+.refresh{padding:12px 22px;background:#81d7ef;color:#09243a;font-weight:900;white-space:nowrap}
+.status{min-height:27px;color:#a9bfd8;font-size:12px;margin-bottom:10px}
+.tabs{display:flex;gap:10px;margin:15px 0 18px}
+.tab{padding:12px 17px;background:#1b2a44;border:1px solid #334969;color:#adc0db;font-weight:800;flex:1}
+.tab[aria-selected="true"]{background:#2c5671;border-color:#77d3e9;color:white}
+.panel{background:#15233b;border:1px solid #2d405d;border-radius:17px;padding:18px;margin-bottom:13px}
+.panel h2{font-size:19px;margin-bottom:7px}
+.panel p{font-size:13px;color:#b1c1d8;line-height:1.6}
+.section-head{display:flex;justify-content:space-between;align-items:start;gap:10px;margin-bottom:13px}
+.notice{background:#222f42;border:1px solid #4b5971;border-radius:12px;padding:12px 14px;color:#cbd7e9;font-size:12px;line-height:1.6;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{background:#172740;border:1px solid #304463;border-radius:16px;padding:16px}
+.card h3{font-size:16px;margin-bottom:8px}
+.card .hint{color:#95b2cf;font-size:12px;margin-bottom:10px}
+.kv{display:flex;justify-content:space-between;gap:9px;margin-bottom:12px;font-size:12px;color:#c5d1e2}
+.picks{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
+.pick{border:1px solid #425976;background:#203550;padding:7px 10px;border-radius:9px;font-size:13px;font-weight:750;font-variant-numeric:tabular-nums}
+.subhead{color:#86d9ea;font-weight:750;font-size:12px;margin-top:11px}
+.lanes{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:15px 0 5px}
+.lane{display:grid;gap:7px;justify-items:center;border:1px solid #3d4b65;border-radius:12px;padding:12px 3px;background:#1b2b45;font-size:12px}
+.lane b{font-size:18px}
+.lane strong{font-size:16px}
+.lane-1{color:#f5f7ff}.lane-2{color:#b4caff}.lane-3{color:#f58b9c}.lane-4{color:#8ec7ff}.lane-5{color:#f3d88d}.lane-6{color:#9be5b1}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:13px 8px;border-bottom:1px solid #30445e;text-align:left;vertical-align:middle}
+th{color:#93aecb;font-weight:700;font-size:11px;white-space:nowrap}
+td strong{font-size:14px}.table-wrap{overflow-x:auto}
+.num{white-space:nowrap;font-variant-numeric:tabular-nums}
+.boat{display:inline-flex;min-width:27px;height:27px;border-radius:7px;align-items:center;justify-content:center;font-weight:900;border:1px solid #536580;background:#263b55}
+.boat-1{background:#fff;color:#111}.boat-2{background:#1c2330;color:#fff}.boat-3{background:#ed444e;color:#fff}.boat-4{background:#3778c9;color:#fff}.boat-5{background:#e7d847;color:#1c1c1c}.boat-6{background:#3ba772;color:#fff}
+.error{color:#ffc0c1;background:#3b2733;border:1px solid #704451;border-radius:12px;padding:15px;line-height:1.6}
+.empty{text-align:center;padding:26px 12px;color:#9eb1ce}
+.ext{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:12px}
+.foot{padding-top:16px;border-top:1px solid #31445d;color:#91a4bd;font-size:11px;line-height:1.8;margin-top:28px}
+.hidden{display:none!important}
+footer a{margin-right:12px}
+@media(max-width:680px){main{padding:17px 11px 66px}header{align-items:start}.pill{padding:6px 8px;font-size:10px}.hero{padding:16px}.selectors{grid-template-columns:1fr 1fr}.selectors .date-group{grid-column:1/2}.selectors .venue-group{grid-column:2/3}.selectors .race-group{grid-column:1/2}.selectors .refresh{grid-column:2/3}.grid{grid-template-columns:1fr}.card{padding:14px}.lanes{gap:3px}.lane{padding:10px 2px}.lane strong{font-size:13px}.lane b{font-size:16px}th,td{padding:10px 6px}.panel{padding:13px}.hero p{font-size:12px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div><div class="brand">BOAT AI NAVI / Read-only</div><h1>レース予想ビュー</h1></div>
+<span class="pill">🔒 データ書き込みなし</span>
+</header>
+<section class="hero">
+<div class="brand">独立した閲覧専用ページ</div>
+<p>好きな競艇場とレースを選んで、PT2の予想と出走情報をチェック。選択はあなたの画面内だけで完結するため、他の閲覧者や元のスプレッドシートには影響しません。</p>
+</section>
+<section class="selectors" aria-label="レースの選択">
+<div class="date-group"><label for="day">開催日（JST）</label><input id="day" type="date"></div>
+<div class="venue-group"><label for="venue">競艇場</label><select id="venue"></select></div>
+<div class="race-group"><label for="race">レース番号</label><select id="race"></select></div>
+<button class="refresh" id="refresh" type="button">↻ 更新する</button>
+</section>
+<div class="status" id="status" role="status" aria-live="polite">データソースを確認しています…</div>
+<nav class="tabs" aria-label="情報切り替え">
+<button class="tab" id="tab-pt2" type="button" aria-selected="true">🎯 PT2予想</button>
+<button class="tab" id="tab-race" type="button" aria-selected="false">🚤 出走表</button>
+</nav>
+<section id="view-pt2" aria-labelledby="tab-pt2"><div class="panel empty">予想を取得しています…</div></section>
+<section id="view-race" class="hidden" aria-labelledby="tab-race"><div class="panel empty">出走表を取得しています…</div></section>
+<footer class="foot">公開GitHubのPT2保存済み予想データと、既存の出走情報フィードを読み込む閲覧専用サービスです。Googleスプレッドシートへのログイン・編集権限は不要です。元シートのセルや配信ジョブを変更する機能はありません。更新は保存・取得元の反映状況に依存し、遅延する場合があります。<br><a href="https://docs.google.com/spreadsheets/d/1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo/edit" rel="noopener noreferrer" target="_blank">元のデータベース</a><a id="official" target="_blank" rel="noopener noreferrer">公式出走表</a></footer>
+</main>
+<script>
+'use strict';
+const VENUES=[['01','桐生'],['02','戸田'],['03','江戸川'],['04','平和島'],['05','多摩川'],['06','浜名湖'],['07','蒲郡'],['08','常滑'],['09','津'],['10','三国'],['11','びわこ'],['12','住之江'],['13','尼崎'],['14','鳴門'],['15','丸亀'],['16','児島'],['17','宮島'],['18','徳山'],['19','下関'],['20','若松'],['21','芦屋'],['22','福岡'],['23','唐津'],['24','大村']];
+const API='https://boat-sheet-feed.onrender.com';
+const RAW='https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/main/data/prototype12_delivery/predictions/';
+const $=id=>document.getElementById(id);
+const state={day:'',venue:'20',race:8,tab:'pt2',token:0,prediction:null,raceRows:[],rosterRows:[],active:null};
+const safe=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const jstToday=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const yyyymmdd=()=>state.day.replace(/-/g,'');
+const number=(v,d=1)=>Number.isFinite(Number(v))?Number(v).toFixed(d):'—';
+function csv(text) {
+ const rows=[];let row=[],part='',quoted=false;
+ text=String(text||'').replace(/^\uFEFF/,'');
+ for(let i=0;i<text.length;i++){
+  const c=text[i];
+  if(quoted){if(c==='"'&&text[i+1]==='"'){part+='"';i++;}else if(c==='"'){quoted=false;}else{part+=c;}}
+  else if(c==='"'){quoted=true;}
+  else if(c===','){row.push(part);part='';}
+  else if(c==='\n'){row.push(part.replace(/\r$/,''));if(row.some(x=>x!==''))rows.push(row);row=[];part='';}
+  else{part+=c;}
+ }
+ if(row.length||part){row.push(part.replace(/\r$/,''));if(row.some(x=>x!==''))rows.push(row);}
+ return rows;
+}
+async function getText(url) {
+ const c=new AbortController();const timer=setTimeout(()=>c.abort(),18000);
+ try{const r=await fetch(url,{signal:c.signal,cache:'no-store'});
+ if(!r.ok){const e=new Error('HTTP '+r.status);e.status=r.status;throw e;}
+ return await r.text();}finally{clearTimeout(timer);}
+}
+async function getJson(url){return JSON.parse(await getText(url));}
+function setStatus(x){$('status').textContent=x;}
+function updateAddress() {
+ const params=new URLSearchParams();params.set('date',state.day);params.set('venue',state.venue);params.set('race',String(state.race));
+ try{history.replaceState({},'',location.pathname+'?'+params.toString());}catch(e){}
+ $('official').href='https://www.boatrace.jp/owpc/pc/race/racelist?hd='+yyyymmdd()+'&jcd='+state.venue+'&rno='+state.race;
+}
+function venueOptions(){
+ $('venue').innerHTML=VENUES.map(v=>'<option value="'+v[0]+'">'+safe(v[1])+(Array.isArray(state.active)&&!state.active.includes(v[0])?'（本日非開催・要確認）':'')+'</option>').join('');
+ $('venue').value=state.venue;
+}
+function raceOptions(){$('race').innerHTML=Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'R</option>').join('');$('race').value=String(state.race);}
+function setTab(tab){
+ state.tab=tab;
+ for(const name of ['pt2','race']){$('tab-'+name).setAttribute('aria-selected',String(tab===name));$('view-'+name).classList.toggle('hidden',tab!==name);}
+}
+function inside(section){return '<section class="panel">'+section+'</section>';}
+function predictionHtml(j){
+ if(!j||!j.models||!j.models.prototype2)return inside('<div class="empty">このレースのPT2予想は保存されていません。</div>');
+ if(j.day!==yyyymmdd()||String(j.jcd)!==state.venue||Number(j.rno)!==state.race)return inside('<div class="error">別レースの予想が返されたため表示を止めました。</div>');
+ const p=j.models.prototype2,cards=p.strategy_cards&&p.strategy_cards.cards||{},time=j.created_at||'—';
+ const labels=[['balanced','総合型'],['probability','本命型'],['value','妙味型'],['longshot','高配当型']];
+ let h='<div class="panel"><div class="section-head"><div><h2>'+safe(j.venue)+' '+safe(j.rno)+'R ／ PT2</h2><p>締切 '+safe(j.deadline||'—')+'・生成 '+safe(time.replace('T',' ').slice(0,19))+'（JST）</p></div><span class="pill">'+safe(p.grade||'PT2')+' 評価</span></div>';
+ h+='<div class="notice">予想はGitHubへ保存された時点のスナップショットです。オッズや出走情報は生成後に変わる場合があります。PT2予想シートの全表示項目と完全同一ではありません。</div>';
+ h+='<p class="subhead">1着推定確率（モデル値・保証なし）</p><div class="lanes">';
+ for(let n=1;n<=6;n++)h+='<div class="lane lane-'+n+'"><b>'+n+'号艇</b><strong>'+number((p.heads||{})[String(n)]*100,1)+'%</strong></div>';
+ h+='</div></div><div class="grid">';
+ let count=0;
+ for(const entry of labels){const c=cards[entry[0]];if(!c)continue;count++;
+ const main=(c.main_picks||[]),cover=(c.cover_picks||[]);
+ h+='<article class="card"><h3>'+safe(entry[1])+'</h3><div class="kv"><span>'+safe(c.point_count||main.length+cover.length)+'点</span><span>'+safe(c.selection_policy||'')+'</span></div>';
+ h+='<div class="subhead">本線 '+main.length+'点</div><div class="picks">'+main.map(k=>'<span class="pick">'+safe(k)+'</span>').join('')+'</div>';
+ if(cover.length)h+='<div class="subhead">抑え '+cover.length+'点</div><div class="picks">'+cover.map(k=>'<span class="pick">'+safe(k)+'</span>').join('')+'</div>';
+ h+='</article>';
+ }
+ h+='</div>';
+ if(!count)h+=inside('<div class="empty">予想候補を確認できませんでした。</div>');
+ h+=inside('<p>「激絞り」など元のスプレッドシート側で別計算される項目は、同一データが公開保存されていない場合は表示しません。全点数を機械的に増やしたり、別モデルと混同したりしないための措置です。</p>');
+ return h;
+}
+function tableData(rows){
+ if(rows.length<2)return [];
+ const head=rows[0];return rows.slice(1).map(r=>Object.fromEntries(head.map((k,i)=>[k,(r[i]||'')]))).filter(obj=>Object.values(obj).some(Boolean));
+}
+function raceHtml(){
+ const roster=state.rosterRows,data=state.raceRows;
+ if(!roster.length&&!data.length)return inside('<h2>出走表</h2><div class="empty">このレースの出走データを確認できませんでした。非開催・取得遅延の可能性があります。</div>');
+ const title=VENUES.find(v=>v[0]===state.venue)?.[1]||'場';
+ const byRacer=new Map(roster.map((r,i)=>[String(r['登録番号']||''),r]));
+ const rows=data.length?data:roster.map((r,i)=>({...r,'枠':String(i+1)}));
+ let h='<section class="panel"><div class="section-head"><div><h2>'+safe(title)+' '+state.race+'R ／ 出走表</h2><p>選手・機力と直近の出走情報をまとめて表示</p></div></div><div class="notice">この表示は元のGoogleスプレッドシートの計算セルではなく、公式出走情報を収集する既存の閲覧用フィードです。元シート独自の「頭確率」「3連内率」「モーター評価」は移植していません。</div><div class="table-wrap"><table><thead><tr><th>艇</th><th>選手</th><th>級別</th><th>全国勝率</th><th>平均ST</th><th>モーター</th><th>2連率</th><th>展開材料</th></tr></thead><tbody>';
+ rows.forEach((r,i)=>{
+ const lane=Number(r['枠']||i+1);if(lane<1||lane>6)return;
+ const reg=String(r['登録番号']||'');const d=byRacer.get(reg)||roster[lane-1]||{};
+ h+='<tr><td><span class="boat boat-'+lane+'">'+lane+'</span></td><td><strong>'+safe(d['選手名']||'未取得')+'</strong><div class="small">'+safe(reg||d['登録番号']||'')+'</div></td><td>'+safe(r['級別']||d['級別']||'—')+'</td><td class="num">'+safe(r['全国勝率']||'—')+'</td><td class="num">'+safe(r['平均ST']||'—')+'</td><td>'+safe(d['モーターNo.']||'—')+'</td><td>'+safe(d['モーター2連率']||'—')+'</td><td>'+safe(r['展開材料']||'—')+'</td></tr>';
+ });
+ h+='</tbody></table></div></section>';
+ const deadline=rows[0]?.['締切']||'';
+ h+=inside('<p>締切情報：'+safe(deadline||'確認中')+' ／ データ取得日は '+safe(state.day)+'。出走表はフィード取得時点の情報であり、欠場や進入変更は公式で最終確認してください。</p><div class="ext"><a target="_blank" rel="noopener noreferrer" href="'+safe($('official').href)+'">公式出走表を開く ↗</a></div>');
+ return h;
+}
+function errorsInPart(name,e) {
+ return e&&e.status===404 ? name+'がまだ公開されていません。':name+'の取得に失敗しました（'+safe(e.message||'通信エラー')+'）。';
+}
+async function loadRace(){
+ const token=++state.token;
+ updateAddress();
+ setStatus('データを読み込んでいます…');
+ $('view-pt2').innerHTML=inside('<div class="empty">PT2予想を取得しています…</div>');
+ $('view-race').innerHTML=inside('<div class="empty">出走表を取得しています…</div>');
+ const args='date='+yyyymmdd()+'&jcd='+state.venue+'&rno='+state.race;
+ const key=yyyymmdd()+'_'+state.venue+'_'+String(state.race).padStart(2,'0');
+ const predictionUrl=RAW+key+'.json';
+ const [pt2,race,roster]=await Promise.allSettled([getJson(predictionUrl),getText(API+'/race.csv?'+args),getText(API+'/race_roster.csv?'+args)]);
+ if(token!==state.token)return;
+ state.prediction=pt2.status==='fulfilled'?pt2.value:null;
+ state.raceRows=race.status==='fulfilled'?tableData(csv(race.value)):[];
+ state.rosterRows=roster.status==='fulfilled'?tableData(csv(roster.value)):[];
+ $('view-pt2').innerHTML=state.prediction?predictionHtml(state.prediction):inside('<h2>PT2予想</h2><div class="error">'+errorsInPart('PT2保存済み予想',pt2.reason)+'</div><p>この日・場・Rに対応するJSONが公開GitHub上に保存されると閲覧できます。元シートや本番配信には影響しません。</p>');
+ $('view-race').innerHTML=raceHtml();
+ const messages=[];
+ if(!state.prediction)messages.push('PT2未取得');
+ if(!state.raceRows.length)messages.push('出走情報未取得');
+ if(!state.rosterRows.length)messages.push('選手名未取得');
+ setStatus(messages.length?'一部データ未取得：'+messages.join('・')+'。日時・開催状況をご確認ください。':'更新完了（'+new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'}).format(new Date())+' JST）');
+}
+async function loadVenues(keepSelection) {
+ const requestDay=yyyymmdd();
+ try{
+ const rows=csv(await getText(API+'/venues.csv?date='+requestDay)).slice(1);
+ if(requestDay!==yyyymmdd())return;
+ const active=rows.map(r=>String(r[0]).padStart(2,'0')).filter(code=>VENUES.some(v=>v[0]===code));
+ state.active=active.length?active:null;
+ if(!keepSelection&&state.active&&!state.active.includes(state.venue))state.venue=state.active[0];
+ }catch(e){state.active=null;}
+ venueOptions();await loadRace();
+}
+function selectRace(){
+ state.venue=$('venue').value;state.race=Number($('race').value);loadRace();
+}
+function boot(){
+ const params=new URLSearchParams(location.search);
+ const day=params.get('date')||jstToday();state.day=/^20\d{2}-\d\d-\d\d$/.test(day)?day:jstToday();
+ const venue=params.get('venue');state.venue=VENUES.some(x=>x[0]===venue)?venue:'20';
+ const race=Number(params.get('race'));state.race=Number.isInteger(race)&&race>=1&&race<=12?race:8;
+ $('day').value=state.day;venueOptions();raceOptions();
+ $('tab-pt2').addEventListener('click',()=>setTab('pt2'));
+ $('tab-race').addEventListener('click',()=>setTab('race'));
+ $('day').addEventListener('change',()=>{if(!$('day').value)return;state.day=$('day').value;loadVenues(false);});
+ $('venue').addEventListener('change',selectRace);
+ $('race').addEventListener('change',selectRace);
+ $('refresh').addEventListener('click',()=>loadRace());
+ loadVenues(Boolean(venue));
+}
+boot();
+</script>
+</body>
+</html>
