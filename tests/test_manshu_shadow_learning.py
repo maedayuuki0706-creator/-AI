@@ -65,6 +65,19 @@ class MissedManshuLearningTests(unittest.TestCase):
         self.assertEqual(result["tag_comparisons"]["低風波"]["manshu"], 1)
         self.assertFalse(result["tag_comparisons"]["低風波"]["minimum_20_race_sample"])
 
+    def test_unobserved_official_manshu_is_not_mislabeled_rule_miss(self):
+        missing = {
+            "16:7": {"status":"settled","payouts":{"5-2-3":167940}},
+            "16:8": {"status":"settled","payouts":{"1-2-3":1400}},
+        }
+        actual = export_learning("20261010", {}, missing)
+        self.assertEqual(actual["missed_manshu_count"], 0)
+        self.assertEqual(actual["unobserved_official_manshu_count"], 1)
+        self.assertEqual(actual["unobserved_official_resolved_races"], 2)
+        self.assertEqual(actual["total_unalerted_or_unobserved_manshu_cases"], 1)
+        self.assertIsNone(actual["unobserved_official_manshu_cases"][0]["pre_race_features"])
+        self.assertFalse(actual["unobserved_official_manshu_cases"][0]["eligible_for_signal_learning"])
+
     def test_missing_result_never_looks_like_no_manshu(self):
         entry = shadow.classify(self.snapshot, self.now)
         result = export_learning("20261010", {entry["key"]: entry})
