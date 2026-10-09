@@ -126,17 +126,33 @@ def summarize(day, entries):
         by_type[name] = {"alert_races": len(t), "resolved_races": len(tr),
                          "manshu_races": len(mans(tr)), "manshu_keys": [e["key"] for e in mans(tr)],
                          "manshu_rate_pct": rate(len(mans(tr)), len(tr))}
+    all_resolved = yes + no
+    all_manshu = len(mans(yes)) + len(mans(no))
+    baseline_rate = rate(all_manshu, len(all_resolved))
+    precision = rate(len(mans(yes)), len(yes))
+    # A warning is not a successful 3-ren-tan prediction or a winning bet.
+    # Every metric uses only pre-race observed records; unknown outcomes stay pending.
     return {
         "day": day, "version": VERSION, "discord_posts": 0, "x_posts": 0,
         "observed_races": len(a), "alert_races": len(alert),
+        "alert_rate_pct": rate(len(alert), len(a)),
+        "resolved_races": len(all_resolved),
+        "observed_baseline_manshu_races": all_manshu,
+        "observed_baseline_manshu_rate_pct": baseline_rate,
         "resolved_alert_races": len(yes), "pending_alert_races": len(alert)-len(yes),
         "alert_manshu_races": len(mans(yes)),
         "alert_manshu_keys": [e["key"] for e in mans(yes)],
-        "alert_manshu_rate_pct": rate(len(mans(yes)), len(yes)),
+        "alert_manshu_rate_pct": precision,
+        "alert_false_positive_races": len(yes) - len(mans(yes)),
+        "alert_capture_rate_pct": rate(len(mans(yes)), all_manshu),
+        "alert_lift_vs_observed_baseline": (
+            round(precision / baseline_rate, 2)
+            if precision is not None and baseline_rate else None
+        ),
         "nonalert_resolved_races": len(no), "nonalert_manshu_races": len(mans(no)),
         "nonalert_manshu_rate_pct": rate(len(mans(no)), len(no)),
         "by_type": by_type,
-        "note": "Retrospective result joins; unobserved races excluded. Type counts can overlap."
+        "note": "Shadow alert evaluates manshu occurrence only, NOT winning picks. Coverage is observed pre-race snapshots; unobserved races excluded. Overlapping types counted once."
     }
 
 def run(source, payouts, out, now, lookback=3):
