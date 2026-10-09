@@ -160,6 +160,10 @@ def summarize(day, entries):
         by_type[name] = {"alert_races": len(t), "resolved_races": len(tr),
                          "manshu_races": len(mans(tr)), "manshu_keys": [e["key"] for e in mans(tr)],
                          "manshu_rate_pct": rate(len(mans(tr)), len(tr))}
+    venue_suppressed = [e for e in a if e.get("baseline_in_loss_suppressed")]
+    venue_suppressed_noalert = [e for e in venue_suppressed if not e["alert"]]
+    venue_suppressed_judged = resolved(venue_suppressed_noalert)
+    venue_exceptions = [e for e in a if (e.get("venue_context") or {}).get("strong_exception")]
     all_resolved = yes + no
     all_manshu = len(mans(yes)) + len(mans(no))
     baseline_rate = rate(all_manshu, len(all_resolved))
@@ -186,6 +190,11 @@ def summarize(day, entries):
         "nonalert_resolved_races": len(no), "nonalert_manshu_races": len(mans(no)),
         "missed_manshu_races": len(mans(no)),
         "missed_manshu_keys": [e["key"] for e in mans(no)],
+        "venue_ordinary_in_loss_suppressed_races": len(venue_suppressed),
+        "venue_suppressed_entire_alert_races": len(venue_suppressed_noalert),
+        "venue_suppressed_noalert_manshu_races": len(mans(venue_suppressed_judged)),
+        "venue_suppressed_noalert_manshu_keys": [e["key"] for e in mans(venue_suppressed_judged)],
+        "venue_a1_strong_exception_races": len(venue_exceptions),
         "missed_manshu_rate_of_all_observed_manshu_pct": rate(len(mans(no)), all_manshu),
         "nonalert_manshu_rate_pct": rate(len(mans(no)), len(no)),
         "target_alert_manshu_rate_pct": 30.0,
