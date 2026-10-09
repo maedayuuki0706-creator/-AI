@@ -35,7 +35,12 @@ class WatchTests(unittest.TestCase):
         self.assertFalse(m.adjudicate(x, {}))
         self.assertTrue(m.adjudicate(x, {"16:5": {"status":"settled","payouts":{"3-4-5":12660}}}))
         self.assertFalse(m.adjudicate(x, {"16:5": {"status":"settled","payouts":{"3-4-5":12660}}}))
-        self.assertEqual(m.summarize("20261010", {x["key"]:x})["alert_manshu_races"], 1)
+        report = m.summarize("20261010", {x["key"]:x})
+        self.assertEqual(report["alert_manshu_races"], 1)
+        self.assertEqual(report["alert_rate_pct"], 100.0)
+        self.assertEqual(report["alert_capture_rate_pct"], 100.0)
+        self.assertEqual(report["alert_lift_vs_observed_baseline"], 1.0)
+        self.assertEqual(report["alert_false_positive_races"], 0)
     def test_idempotent_and_unmodified_history(self):
         with tempfile.TemporaryDirectory() as td:
             base=Path(td)
