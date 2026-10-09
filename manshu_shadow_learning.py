@@ -241,6 +241,8 @@ def export_learning(day, entries, official_results=None):
     unobserved_count, unobserved_manshu = _unobserved_official_manshu(
         day, entries, official_results
     )
+    from manshu_weak_in_study import analyze_weak_in
+    weak_in_study = analyze_weak_in(settled)
     return {
         "day": day,
         "schema": SCHEMA_VERSION,
@@ -257,6 +259,9 @@ def export_learning(day, entries, official_results=None):
         "unobserved_official_manshu_cases": unobserved_manshu,
         "alert_manshu_count": len(alert_manshu),
         "negative_control_count": len(ordinary),
+        "weak_in_venue_study": weak_in_study,
+        "weak_in_venue_manshu_count": len(weak_in_study["manshu_cases"]),
+        "weak_in_venue_non_manshu_control_count": len(weak_in_study["non_manshu_controls"]),
         "missed_manshu_keys": [x["key"] for x in misses],
         "missed_manshu_shape_counts": dict(sorted(shapes.items())),
         "missed_manshu_winning_head_counts": dict(sorted(heads.items())),
