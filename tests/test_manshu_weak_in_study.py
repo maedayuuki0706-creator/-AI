@@ -61,7 +61,7 @@ class WeakInStudyTests(unittest.TestCase):
         data = analyze_weak_in([self.edogawa_escape_manshu])
         self.assertEqual(data["one_head_manshu_count"], 1)
         self.assertEqual(data["base"]["manshu_1_head_with_5_or_6"], 1)
-        self.assertEqual(data["manshu_cases"][0]["outcome_pattern"], "イン艇頭_ヒモ荒れ")
+        self.assertEqual(data["manshu_cases"][0]["outcome_pattern"], "イン艇頭_5_6号艇がヒモ")
 
     def test_unverified_venues_do_not_automatically_become_weak(self):
         other = deepcopy(self.toda_outer_manshu)
