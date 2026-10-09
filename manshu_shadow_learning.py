@@ -25,6 +25,15 @@ def pre_race_tags(entry):
     rank = _n(entry.get("pre_lane1_rank"))
     fifth, sixth = _n(entry.get("pre_lane5_rank")), _n(entry.get("pre_lane6_rank"))
     tags = []
+    venue = entry.get("venue_context") or {}
+    if venue.get("weak_in_baseline"):
+        tags.append("公式弱イン場（1コース1着率50%未満）")
+    if venue.get("a1_2or3_lanes"):
+        tags.append("2・3号艇にA1級あり")
+    if venue.get("in_loss_suppressed_as_baseline"):
+        tags.append("場の通常のイン敗北として警戒抑制")
+    if venue.get("strong_exception"):
+        tags.append("弱イン場で上乗せ異常あり")
     if wind is not None:
         tags.append("風3m以上" if wind >= 3 else "風3m未満")
     if wave is not None:
@@ -58,6 +67,11 @@ def reasons_alert_not_triggered(entry):
     rank = _n(entry.get("pre_lane1_rank"))
     r5, r6 = _n(entry.get("pre_lane5_rank")), _n(entry.get("pre_lane6_rank"))
     reasons = []
+    venue = entry.get("venue_context") or {}
+    if venue.get("in_loss_suppressed_as_baseline"):
+        reasons.append("公式弱イン場のため通常のイン敗北シグナルを抑制")
+    if venue.get("a1_2or3_lanes") and not venue.get("strong_exception"):
+        reasons.append("2・3号艇A1の通常頭候補だけでは万舟イン敗北警戒に不足")
     if wind is not None and wave is not None and wind < 3 and wave < 3:
         reasons.append("気象ゲート不成立（風<3m・波<3cm）")
     if gap is not None and gap < 0.13:
@@ -90,6 +104,8 @@ def _pre_fields(entry):
         "lane6_ex_rank": entry.get("pre_lane6_rank"),
         "inner_dip_s": entry.get("pre_inner_dip_s"),
         "outside_ex_time_advantage_s": entry.get("pre_outer_fast_gap_s"),
+        "venue_context": entry.get("venue_context"),
+        "weak_in_baseline_suppression": bool(entry.get("baseline_in_loss_suppressed")),
         "six_boat_exhibition": entry.get("pre_boats"),
         "features_complete": bool(entry.get("pre_boats")) and len(entry.get("pre_boats") or []) == 6,
         "tags": pre_race_tags(entry),
@@ -115,6 +131,9 @@ def _case(entry):
             "alert": bool(entry.get("alert")),
             "types": entry.get("types") or [],
             "rule": entry.get("rule"),
+            "venue_policy_version": entry.get("venue_policy_version"),
+            "in_loss_suppressed_as_baseline": bool(entry.get("baseline_in_loss_suppressed")),
+            "context_reason": (entry.get("venue_context") or {}).get("decision_reason"),
             "not_triggered_reasons": reasons_alert_not_triggered(entry),
         },
         "observed_result": {
