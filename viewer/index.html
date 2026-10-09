@@ -3,88 +3,239 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#111c32">
-<title>BOAT AI NAVI | 閲覧専用レースビュー</title>
+<meta name="theme-color" content="#132336">
+<title>RACE VIEW | BOAT AI NAVI - レース情報</title>
 <style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif;color:#e8edf8;background:#0d1425;--muted:#96a5bd;--panel:#16233b;--line:#2b3b57;--accent:#6fd5ed}
+:root{
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",Meiryo,sans-serif;
+  color:#19283b;background:#f3f5f7;
+  --ink:#172536;--navy:#122439;--slate:#425267;--muted:#637284;
+  --accent:#df343c;--accent-dark:#ba2830;--paper:#fff;--line:#dbe0e6;
+  --soft:#f5f7f9;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace
+}
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 15% 0%,#25395e 0,transparent 35%),#0d1425}
-main{max-width:1100px;margin:0 auto;padding:22px 16px 76px}
-h1,h2,h3,p{margin:0}a{color:#9eddfc}button,select,input{font:inherit}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 24px}
-.brand{font-size:11px;font-weight:800;color:#88daf4;letter-spacing:.2em;text-transform:uppercase}
-h1{font-size:clamp(23px,5vw,35px);letter-spacing:-.04em;line-height:1.3;margin-top:5px}
+html{scroll-behavior:smooth}
+body{margin:0;min-height:100vh;background:linear-gradient(180deg,#eef2f5 0,#f6f7f9 380px,#f5f6f8 100%);-webkit-font-smoothing:antialiased}
+button,select,input{font:inherit}
+button{cursor:pointer}
+a{color:#1f5276;text-underline-offset:3px}
+button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #ef9b41;outline-offset:3px}
+h1,h2,h3,p{margin:0}
 small,.small{font-size:12px;color:var(--muted)}
-.pill{display:inline-flex;align-items:center;padding:8px 12px;border-radius:999px;border:1px solid #427b82;background:#1b383f;color:#b0f6e2;font-size:12px;white-space:nowrap}
-.hero{padding:21px 23px;border-radius:21px;border:1px solid #314965;background:linear-gradient(125deg,#1c3054,#14253d 70%);margin-bottom:18px}
-.hero p{line-height:1.6;margin-top:7px;color:#bbcee4;font-size:14px}
-.selectors{display:grid;grid-template-columns:1.1fr 1.4fr 1fr auto;gap:10px;margin-bottom:12px;align-items:end}
-label{display:block;color:#bbcee4;font-size:12px;font-weight:700;margin-bottom:7px}
-input,select{width:100%;border-radius:12px;background:#16233b;border:1px solid #425371;color:#fff;padding:13px 12px;min-height:48px;outline-offset:3px}
-button{border:0;border-radius:12px;cursor:pointer;min-height:48px}
-.refresh{padding:12px 22px;background:#81d7ef;color:#09243a;font-weight:900;white-space:nowrap}
-.status{min-height:27px;color:#a9bfd8;font-size:12px;margin-bottom:10px}
-.tabs{display:flex;gap:10px;margin:15px 0 18px}
-.tab{padding:12px 17px;background:#1b2a44;border:1px solid #334969;color:#adc0db;font-weight:800;flex:1}
-.tab[aria-selected="true"]{background:#2c5671;border-color:#77d3e9;color:white}
-.panel{background:#15233b;border:1px solid #2d405d;border-radius:17px;padding:18px;margin-bottom:13px}
-.panel h2{font-size:19px;margin-bottom:7px}
-.panel p{font-size:13px;color:#b1c1d8;line-height:1.6}
-.section-head{display:flex;justify-content:space-between;align-items:start;gap:10px;margin-bottom:13px}
-.notice{background:#222f42;border:1px solid #4b5971;border-radius:12px;padding:12px 14px;color:#cbd7e9;font-size:12px;line-height:1.6;margin-bottom:14px}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.card{background:#172740;border:1px solid #304463;border-radius:16px;padding:16px}
-.card h3{font-size:16px;margin-bottom:8px}
-.card .hint{color:#95b2cf;font-size:12px;margin-bottom:10px}
-.kv{display:flex;justify-content:space-between;gap:9px;margin-bottom:12px;font-size:12px;color:#c5d1e2}
-.picks{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}
-.pick{border:1px solid #425976;background:#203550;padding:7px 10px;border-radius:9px;font-size:13px;font-weight:750;font-variant-numeric:tabular-nums}
-.subhead{color:#86d9ea;font-weight:750;font-size:12px;margin-top:11px}
-.lanes{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:15px 0 5px}
-.lane{display:grid;gap:7px;justify-items:center;border:1px solid #3d4b65;border-radius:12px;padding:12px 3px;background:#1b2b45;font-size:12px}
-.lane b{font-size:18px}
-.lane strong{font-size:16px}
-.lane-1{color:#f5f7ff}.lane-2{color:#b4caff}.lane-3{color:#f58b9c}.lane-4{color:#8ec7ff}.lane-5{color:#f3d88d}.lane-6{color:#9be5b1}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:13px 8px;border-bottom:1px solid #30445e;text-align:left;vertical-align:middle}
-th{color:#93aecb;font-weight:700;font-size:11px;white-space:nowrap}
-td strong{font-size:14px}.table-wrap{overflow-x:auto}
-.num{white-space:nowrap;font-variant-numeric:tabular-nums}
-.boat{display:inline-flex;min-width:27px;height:27px;border-radius:7px;align-items:center;justify-content:center;font-weight:900;border:1px solid #536580;background:#263b55}
-.boat-1{background:#fff;color:#111}.boat-2{background:#1c2330;color:#fff}.boat-3{background:#ed444e;color:#fff}.boat-4{background:#3778c9;color:#fff}.boat-5{background:#e7d847;color:#1c1c1c}.boat-6{background:#3ba772;color:#fff}
-.error{color:#ffc0c1;background:#3b2733;border:1px solid #704451;border-radius:12px;padding:15px;line-height:1.6}
-.empty{text-align:center;padding:26px 12px;color:#9eb1ce}
-.ext{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:12px}
-.foot{padding-top:16px;border-top:1px solid #31445d;color:#91a4bd;font-size:11px;line-height:1.8;margin-top:28px}
 .hidden{display:none!important}
-footer a{margin-right:12px}
-@media(max-width:680px){main{padding:17px 11px 66px}header{align-items:start}.pill{padding:6px 8px;font-size:10px}.hero{padding:16px}.selectors{grid-template-columns:1fr 1fr}.selectors .date-group{grid-column:1/2}.selectors .venue-group{grid-column:2/3}.selectors .race-group{grid-column:1/2}.selectors .refresh{grid-column:2/3}.grid{grid-template-columns:1fr}.card{padding:14px}.lanes{gap:3px}.lane{padding:10px 2px}.lane strong{font-size:13px}.lane b{font-size:16px}th,td{padding:10px 6px}.panel{padding:13px}.hero p{font-size:12px}}
+.topline{height:37px;background:#132336;border-bottom:1px solid #32435b;color:#c3d0de}
+.topline-inner{max-width:1180px;margin:auto;padding:0 22px;height:100%;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.topline-label{font-size:11px;letter-spacing:.14em;font-weight:900;color:#fff}
+.topline-label em{font-style:normal;font-weight:600;color:#94a9c4}
+.topline-side{font-family:var(--mono);font-size:10px;letter-spacing:.05em;color:#a1b0c5}
+main{max-width:1180px;margin:0 auto;padding:0 22px 66px}
+.site-head{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:30px 0 26px}
+.smallcaps,.kicker{font-family:var(--mono);font-size:11px;color:#b8303a;letter-spacing:.15em;font-weight:900}
+.site-head h1{font-size:clamp(35px,5vw,57px);line-height:1.08;letter-spacing:-.065em;font-weight:950;margin-top:6px}
+.site-head h1 .emphasis{color:#db2f3a}
+.site-head h1 .jp{display:inline-block;font-family:inherit;margin-left:14px;font-size:clamp(15px,2.3vw,24px);font-weight:800;letter-spacing:-.045em;color:#677687;vertical-align:middle}
+.site-head p{margin-top:10px;color:#627285;font-size:13px;font-weight:600;letter-spacing:.02em}
+.header-mark{display:flex;align-items:center;gap:10px;border-left:2px solid #cbd4dc;padding-left:18px;min-width:125px}
+.header-mark b{font-family:var(--mono);font-size:42px;line-height:1;letter-spacing:-.08em;font-weight:900}
+.header-mark span{font-family:var(--mono);font-size:9px;line-height:1.55;color:#667788;letter-spacing:.07em;font-weight:900}
+.hero{overflow:hidden;position:relative;background:linear-gradient(110deg,#172c44 0%,#152a42 48%,#223c57 100%);border-top:5px solid var(--accent);margin-bottom:19px;min-height:155px}
+.hero:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(110deg,transparent 0,transparent 74px,rgba(255,255,255,.045) 75px,transparent 76px);pointer-events:none}
+.hero:after{content:"";position:absolute;right:18%;top:0;height:100%;width:1px;background:rgba(255,255,255,.15)}
+.hero-content{position:relative;z-index:1;max-width:780px;padding:24px 27px 25px}
+.eyebrow{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10px;font-weight:900;letter-spacing:.16em;color:#99bfd2}
+.eyebrow .signal{display:inline-block;width:7px;height:7px;background:#e34850;border-radius:100%;box-shadow:0 0 0 4px rgba(227,72,80,.18)}
+.hero h2{color:#fff;font-size:clamp(23px,3vw,36px);letter-spacing:-.06em;margin:12px 0 8px;font-weight:900;line-height:1.25}
+.hero p{line-height:1.7;font-size:13px;color:#bed0dc;max-width:660px}
+.hero-mark{position:absolute;right:31px;top:13px;font-family:var(--mono);font-style:italic;font-size:clamp(58px,10vw,129px);letter-spacing:-.09em;font-weight:950;color:rgba(255,255,255,.06);user-select:none}
+.racebar{background:#fff;border:1px solid var(--line);box-shadow:0 8px 20px rgba(34,47,64,.045);margin-bottom:0}
+.racebar-title{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:18px 21px 13px;border-bottom:1px solid #e4e8ed}
+.racebar-title h2{font-size:20px;font-weight:900;letter-spacing:-.04em;margin-top:4px}
+.racebar-meta{font-size:11px;color:#8390a0}
+.selectors{display:grid;grid-template-columns:1.05fr 1.55fr .85fr auto;gap:0;padding:16px 18px 18px;align-items:end}
+.selectors>div{padding:0 15px;border-right:1px solid #e3e8ee}
+.selectors>div:first-child{padding-left:0}
+.selectors>div:nth-child(3){border-right:0}
+label{display:block;margin:0 0 8px;font-size:11px;font-weight:800;color:#56667b}
+input,select{appearance:none;-webkit-appearance:none;min-height:49px;width:100%;border:1px solid #bfc9d4;border-radius:3px;color:#1d2b3b;background:#fff;box-shadow:0 2px 0 rgba(0,0,0,.02);padding:12px 12px;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums}
+select{padding-right:33px;background-image:url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="%234c6178" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpolyline points="6 9 12 15 18 9"/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 11px center}
+.refresh{background:#d8333d;color:#fff;border:1px solid #ce303b;border-radius:3px;min-height:49px;padding:0 20px;margin-left:15px;white-space:nowrap;font-weight:900;font-size:13px;letter-spacing:.03em;box-shadow:0 3px 0 #a92831;transition:background .15s}
+.refresh:hover{background:#b92732}
+.refresh:active{transform:translateY(2px);box-shadow:0 1px 0 #a92831}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:10px 1px 22px}
+.status{min-height:20px;color:#6b7989;font-size:12px;font-weight:600;line-height:1.55}
+.status:before{content:"";display:inline-block;width:7px;height:7px;vertical-align:1px;border-radius:100%;background:#7c8d9d;margin-right:8px}
+.toolbar-meta{font-size:10px;font-family:var(--mono);font-weight:800;letter-spacing:.09em;color:#8493a4;white-space:nowrap}
+.workspace-top{display:flex;justify-content:space-between;align-items:end;gap:14px;padding:0 2px 13px}
+.workspace-top h2{font-size:27px;line-height:1.2;font-weight:900;letter-spacing:-.05em;margin-top:6px}
+.update-note{font-size:11px;color:#7c8c9c;padding-bottom:3px}
+.tabs{display:flex;gap:0;margin:0 0 16px;border:1px solid var(--line);background:#fff}
+.tab{min-height:58px;flex:1;border:0;border-right:1px solid var(--line);border-bottom:4px solid transparent;border-radius:0;background:#fff;color:#65758a;font-weight:900;font-size:14px;letter-spacing:-.015em;padding:14px 15px 10px;transition:background .15s,color .15s}
+.tab:last-child{border-right:0}
+.tab:hover{background:#f7f9fa}
+.tab[aria-selected="true"]{background:#fff;border-bottom-color:#e03940;color:#16293d}
+.panel{background:#fff;border:1px solid var(--line);padding:22px 24px;margin-bottom:14px;box-shadow:0 4px 12px rgba(27,49,72,.025)}
+.panel h2{font-size:22px;line-height:1.3;font-weight:900;letter-spacing:-.045em;margin-bottom:7px}
+.panel p{font-size:13px;color:#526579;line-height:1.75}
+.panel .section-head{display:flex;justify-content:space-between;gap:15px;align-items:start;border-bottom:1px solid #e5e9ee;padding-bottom:15px;margin-bottom:15px}
+.panel .section-head h2{margin-bottom:5px}
+.pill{border:1px solid #d7e1e8;border-radius:0;display:inline-flex;align-items:center;gap:6px;padding:7px 10px;background:#f3f6f8;color:#375a6f;font-family:var(--mono);font-size:11px;letter-spacing:.04em;font-weight:900;white-space:nowrap}
+.notice{border-left:3px solid #e23b43;border-top:1px solid #e3e8ee;border-right:1px solid #e3e8ee;border-bottom:1px solid #e3e8ee;background:#f7f8fa;color:#536477;font-size:12px;line-height:1.75;padding:12px 15px;margin:13px 0 15px}
+.subhead{font-size:11px;font-family:var(--mono);letter-spacing:.05em;font-weight:900;color:#a2313b;margin:13px 0 7px}
+.lanes{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;margin:12px 0 0}
+.lane{position:relative;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;padding:17px 6px 15px;border:1px solid #d8dfe6;background:#fbfcfd;min-width:0}
+.lane:before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:#bdc7d0}
+.lane b{font-size:12px;color:#465466;font-weight:800;white-space:nowrap}
+.lane strong{font-family:var(--mono);font-size:clamp(16px,2.3vw,27px);color:#122a43;font-weight:900;letter-spacing:-.07em;white-space:nowrap}
+.lane-1:before{background:#d9dfe5}.lane-2:before{background:#1b2532}.lane-3:before{background:#d7333d}.lane-4:before{background:#3977c1}.lane-5:before{background:#dfc841}.lane-6:before{background:#298856}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin:15px 0}
+.card{background:#fff;border:1px solid #d9e0e7;border-top:4px solid #243c55;padding:19px 20px;position:relative;min-width:0}
+.card:nth-child(2){border-top-color:#317ea8}
+.card:nth-child(3){border-top-color:#db4048}
+.card:nth-child(4){border-top-color:#2e856b}
+.card:before{content:"PREDICTION / 01";font-family:var(--mono);letter-spacing:.11em;color:#8997a6;font-size:10px;font-weight:800;display:block;margin-bottom:6px}
+.card:nth-child(2):before{content:"PREDICTION / 02"}
+.card:nth-child(3):before{content:"PREDICTION / 03"}
+.card:nth-child(4):before{content:"PREDICTION / 04"}
+.card h3{font-size:21px;font-weight:950;letter-spacing:-.045em;margin:0 0 11px;color:#14283d}
+.card .hint{font-size:12px;color:#67788a}
+.kv{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed #d8e1e8;padding-bottom:11px;margin-bottom:14px;font-size:12px;color:#50667e;font-weight:700}
+.kv span:first-child{color:#162a41;font-family:var(--mono);font-size:13px;font-weight:900;white-space:nowrap}
+.kv span:last-child{overflow-wrap:anywhere;text-align:right;font-size:10px;color:#8d99a5}
+.picks{display:flex;flex-wrap:wrap;gap:6px;margin:7px 0 13px}
+.pick{background:#f0f4f7;color:#1a334a;border:1px solid #dae3eb;border-radius:2px;padding:9px 11px;font-family:var(--mono);font-size:13px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:710px}
+thead{background:#182c42;color:#f9fbff}
+th{text-align:left;padding:13px 10px;font-size:11px;font-weight:800;white-space:nowrap;letter-spacing:.015em}
+td{padding:15px 10px;text-align:left;vertical-align:middle;border-bottom:1px solid #e3e8ed;color:#30435a;font-weight:600}
+tbody tr:nth-child(even){background:#f7f9fa}
+tbody tr:hover{background:#eef5f9}
+td strong{font-size:14px;font-weight:900;color:#14273b}
+td .small{margin-top:3px}
+.num{white-space:nowrap;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.boat{display:inline-flex;width:34px;height:34px;align-items:center;justify-content:center;border-radius:2px;font-weight:950;border:1px solid #cbd1d8;background:#fff;font-family:var(--mono);font-size:15px}
+.boat-1{background:#fff;color:#161b22}.boat-2{background:#161c25;color:#fff;border-color:#161c25}.boat-3{background:#e23d46;color:#fff;border-color:#e23d46}.boat-4{background:#3974bf;color:#fff;border-color:#3974bf}.boat-5{background:#efd642;color:#222;border-color:#c3b23c}.boat-6{background:#269c5c;color:#fff;border-color:#269c5c}
+.error{color:#853036;background:#fff4f4;border:1px solid #efc4c5;border-left:3px solid #d63942;padding:15px;line-height:1.7;font-size:13px}
+.empty{text-align:center;padding:31px 15px;color:#7a8899;font-size:13px}
+.ext{display:flex;flex-wrap:wrap;gap:15px;margin-top:15px;font-size:13px;font-weight:800}
+.ext a{color:#bf303b}
+.foot{margin:29px 0 0;padding:20px 0 0;border-top:3px solid #1a2b42;color:#6e7d8e;font-size:11px;line-height:1.85}
+.foot a{display:inline-block;margin:11px 15px 0 0;font-size:12px;font-weight:800}
+.footer-label{font-family:var(--mono);color:#344b60;letter-spacing:.11em;font-size:10px;font-weight:900;display:block;margin-bottom:7px}
+@media(max-width:800px){
+ .selectors{grid-template-columns:1fr 1.2fr .8fr;row-gap:13px}
+ .selectors>div:nth-child(3){border-right:0}
+ .refresh{grid-column:1/-1;margin-left:0}
+ .hero-mark{right:10px}
+}
+@media(max-width:660px){
+ .topline{height:31px}.topline-inner{padding:0 14px}
+ .topline-label{font-size:9px}.topline-side{font-size:8px}
+ main{padding:0 12px 55px}
+ .site-head{padding:22px 0 18px}
+ .site-head h1{font-size:35px}
+ .site-head h1 .jp{display:block;margin:6px 0 0;font-size:14px;letter-spacing:.01em}
+ .site-head p{font-size:11px}
+ .header-mark{gap:7px;padding-left:9px;min-width:0}
+ .header-mark b{font-size:30px}.header-mark span{font-size:8px}
+ .hero{min-height:0;margin-bottom:13px}
+ .hero-content{padding:21px 18px}
+ .hero h2{font-size:25px;margin:10px 0 8px}
+ .hero p{font-size:12px;max-width:93%}
+ .hero-mark{right:2px;top:36px;font-size:74px}
+ .racebar-title{padding:14px 13px 12px}
+ .racebar-title h2{font-size:17px}
+ .racebar-meta{font-size:9px}
+ .selectors{grid-template-columns:1fr 1.3fr;padding:14px;gap:10px}
+ .selectors>div,.selectors>div:first-child{padding:0;border-right:0}
+ .selectors>div:nth-child(3){grid-column:1}
+ .selectors .refresh{grid-column:2;align-self:end}
+ .selectors label{font-size:10px;margin-bottom:6px}
+ input,select{font-size:13px;min-height:45px;padding:10px}
+ .refresh{margin:0;min-height:45px;font-size:12px;padding:0 8px}
+ .toolbar{margin:10px 0 20px}
+ .toolbar-meta{display:none}
+ .workspace-top h2{font-size:23px}
+ .update-note{font-size:10px}
+ .tabs{margin-bottom:11px}
+ .tab{font-size:13px;min-height:49px;padding:10px 5px 8px}
+ .panel{padding:16px 13px;margin-bottom:11px}
+ .panel h2{font-size:20px}
+ .panel .section-head{padding-bottom:12px}
+ .panel .section-head .pill{font-size:9px;padding:7px}
+ .grid{grid-template-columns:1fr;gap:10px;margin:10px 0}
+ .card{padding:16px 14px}
+ .card h3{font-size:20px}
+ .lanes{gap:4px}
+ .lane{padding:13px 2px 11px;gap:9px}
+ .lane b{font-size:9px}
+ .lane strong{font-size:13px;letter-spacing:-.05em}
+ .notice{padding:10px 12px}
+}
+@media(max-width:365px){
+ .site-head h1{font-size:30px}
+ .topline-label em{display:none}
+ .hero h2{font-size:22px}
+ .lane strong{font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 </style>
 </head>
 <body>
+<div class="topline"><div class="topline-inner">
+  <span class="topline-label">BOAT AI NAVI <em>/ RACE DATA JOURNAL</em></span>
+  <span class="topline-side">BOATRACE INFORMATION · JAPAN</span>
+</div></div>
 <main>
-<header>
-<div><div class="brand">BOAT AI NAVI / Read-only</div><h1>レース予想ビュー</h1></div>
-<span class="pill">🔒 データ書き込みなし</span>
+<header class="site-head">
+  <div>
+    <div class="smallcaps">RACING DATA / 競艇情報プラットフォーム</div>
+    <h1>RACE<span class="emphasis"> VIEW</span><span class="jp">レース情報</span></h1>
+    <p>出走情報と予想データを、ひとつの画面で。</p>
+  </div>
+  <div class="header-mark" aria-label="全国24場"><b>24</b><span>VENUES<br>IN JAPAN</span></div>
 </header>
 <section class="hero">
-<div class="brand">独立した閲覧専用ページ</div>
-<p>好きな競艇場とレースを選んで、PT2の予想と出走情報をチェック。選択はあなたの画面内だけで完結するため、他の閲覧者や元のスプレッドシートには影響しません。</p>
+  <div class="hero-content">
+    <div class="eyebrow"><span class="signal"></span> RACE DATA DESK / PT2 EDITION</div>
+    <h2>数字と展開から、レースを読む。</h2>
+    <p>競艇場・レースを選んで、PT2の予想と出走表をチェック。表示の切り替えは閲覧者ごとに独立。元のスプレッドシートや配信システムには影響しません。</p>
+  </div>
+  <div class="hero-mark" aria-hidden="true">RACE.</div>
 </section>
-<section class="selectors" aria-label="レースの選択">
-<div class="date-group"><label for="day">開催日（JST）</label><input id="day" type="date"></div>
-<div class="venue-group"><label for="venue">競艇場</label><select id="venue"></select></div>
-<div class="race-group"><label for="race">レース番号</label><select id="race"></select></div>
-<button class="refresh" id="refresh" type="button">↻ 更新する</button>
+<section class="racebar">
+  <div class="racebar-title">
+    <div><div class="kicker">SELECT YOUR RACE</div><h2>レースを選択</h2></div>
+    <span class="racebar-meta">日付 / 場 / レース番号</span>
+  </div>
+  <div class="selectors" aria-label="レースの選択">
+    <div class="date-group"><label for="day">開催日（JST）</label><input id="day" type="date"></div>
+    <div class="venue-group"><label for="venue">競艇場</label><select id="venue"></select></div>
+    <div class="race-group"><label for="race">レース番号</label><select id="race"></select></div>
+    <button class="refresh" id="refresh" type="button">↻ 情報を更新</button>
+  </div>
 </section>
-<div class="status" id="status" role="status" aria-live="polite">データソースを確認しています…</div>
-<nav class="tabs" aria-label="情報切り替え">
-<button class="tab" id="tab-pt2" type="button" aria-selected="true">🎯 PT2予想</button>
-<button class="tab" id="tab-race" type="button" aria-selected="false">🚤 出走表</button>
-</nav>
-<section id="view-pt2" aria-labelledby="tab-pt2"><div class="panel empty">予想を取得しています…</div></section>
-<section id="view-race" class="hidden" aria-labelledby="tab-race"><div class="panel empty">出走表を取得しています…</div></section>
-<footer class="foot">公開GitHubのPT2保存済み予想データと、既存の出走情報フィードを読み込む閲覧専用サービスです。Googleスプレッドシートへのログイン・編集権限は不要です。元シートのセルや配信ジョブを変更する機能はありません。更新は保存・取得元の反映状況に依存し、遅延する場合があります。<br><a href="https://docs.google.com/spreadsheets/d/1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo/edit" rel="noopener noreferrer" target="_blank">元のデータベース</a><a id="official" target="_blank" rel="noopener noreferrer">公式出走表</a></footer>
+<div class="toolbar">
+  <div class="status" id="status" role="status" aria-live="polite">データソースを確認しています…</div>
+  <span class="toolbar-meta">PERSONAL VIEW / READ ONLY</span>
+</div>
+<section class="workspace">
+  <div class="workspace-top">
+    <div><div class="kicker">RACE CENTER</div><h2>レースデータ</h2></div>
+    <span class="update-note">表示タブを切り替えて確認</span>
+  </div>
+  <nav class="tabs" aria-label="情報切り替え">
+    <button class="tab" id="tab-pt2" type="button" aria-selected="true">PT2 予想</button>
+    <button class="tab" id="tab-race" type="button" aria-selected="false">出走表・選手情報</button>
+  </nav>
+  <section id="view-pt2" aria-labelledby="tab-pt2"><div class="panel empty">予想を取得しています…</div></section>
+  <section id="view-race" class="hidden" aria-labelledby="tab-race"><div class="panel empty">出走表を取得しています…</div></section>
+</section>
+<footer class="foot">
+  <span class="footer-label">ABOUT THIS VIEWER</span>
+  公開GitHubのPT2保存済み予想データと、既存の出走情報フィードを読み込む閲覧専用サービスです。Googleスプレッドシートへのログイン・編集権限は不要です。元シートのセルや配信ジョブを変更する機能はありません。更新は保存・取得元の反映状況に依存し、遅延する場合があります。
+  <div><a href="https://docs.google.com/spreadsheets/d/1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo/edit" rel="noopener noreferrer" target="_blank">データベース ↗</a><a id="official" target="_blank" rel="noopener noreferrer">公式出走表 ↗</a></div>
+</footer>
 </main>
 <script>
 'use strict';
