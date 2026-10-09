@@ -1,0 +1,39 @@
+{
+  "alert_manshu_cases": [],
+  "alert_manshu_count": 0,
+  "day": "20261010",
+  "join_key_format": "YYYYMMDD_JCD_RR",
+  "live_sniper_integration": "not_enabled",
+  "missed_manshu_cases": [],
+  "missed_manshu_count": 0,
+  "missed_manshu_failure_gate_counts": {},
+  "missed_manshu_keys": [],
+  "missed_manshu_shape_counts": {},
+  "missed_manshu_winning_head_counts": {},
+  "negative_control_count": 0,
+  "non_manshu_control_cases": [],
+  "resolved_examples": 0,
+  "schema": "manshu-shadow-learning-v1",
+  "sniper_future_bridge": {
+    "combine_later_with": [
+      "opportunity_alerts.py sniper select yes/no",
+      "sniper score",
+      "best expected value",
+      "one_head_probability",
+      "non_one_head_probability",
+      "chosen ticket and official outcome"
+    ],
+    "do_not_autotune_on_same_evaluation_day": true,
+    "join_key": "sniper_join_key",
+    "leakage_guard": "only pre-race features for signal; outcomes as labels",
+    "status": "analysis_only"
+  },
+  "tag_comparisons": {},
+  "target_alert_manshu_rate_pct": 30.0,
+  "target_is_an_alert_condition_precision_not_ticket_hit_rate": true,
+  "total_unalerted_or_unobserved_manshu_cases": 0,
+  "training_status": "case_collection_only_not_model_retraining",
+  "unobserved_official_manshu_cases": [],
+  "unobserved_official_manshu_count": 0,
+  "unobserved_official_resolved_races": 0
+}
