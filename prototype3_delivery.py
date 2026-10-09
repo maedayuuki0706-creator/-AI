@@ -276,8 +276,29 @@ def message(record):
     return _prediction_message(record)
 
 
-def build_record(day, jcd, rno, deadline):
+def _official_with_late_exhibition_retry(day, jcd, rno, deadline):
+    """Retry one transient incomplete official preview near the race deadline.
+
+    Never promote incomplete exhibition data to a sendable prediction. This
+    only attempts a fresh read; the existing six-boat gate still applies.
+    """
     official = base.analyze_official(day, jcd, rno)
+    if not official or official.get("preview", {}).get("exhibition_count") == 6:
+        return official
+    close = datetime.strptime(day + " " + deadline, "%Y%m%d %H:%M").replace(tzinfo=base.JST)
+    seconds_left = (close - now_jst()).total_seconds()
+    if 0 < seconds_left <= 4 * 60:
+        # analyze_official tolerates beforeinfo fetch errors by returning 0/6;
+        # a fresh attempt can recover if this was a transient fetch failure.
+        base.fetch.cache_clear()
+        refreshed = base.analyze_official(day, jcd, rno)
+        if refreshed and refreshed.get("preview", {}).get("exhibition_count") == 6:
+            return refreshed
+    return official
+
+
+def build_record(day, jcd, rno, deadline):
+    official = _official_with_late_exhibition_retry(day, jcd, rno, deadline)
     if not official:
         return None, "official_unavailable"
     if official.get("preview", {}).get("exhibition_count") != 6:
