@@ -2,6 +2,14 @@ name: Manshu Shadow Watch - Internal Research Only
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'manshu_shadow_watch.py'
+      - 'manshu_venue_context.py'
+      - 'manshu_shadow_learning.py'
+      - 'tests/test_manshu_*.py'
+      - '.github/workflows/manshu-shadow-watch.yml'
   schedule:
     - cron: '4-59/10 * * * *'
 
@@ -26,7 +34,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Guard tests (no notifications)
-        run: python -m unittest discover -s tests -p 'test_manshu_shadow_watch.py' -v
+        run: python -m unittest discover -s tests -p 'test_manshu_*.py' -v
       - name: Open dedicated log branch, not main
         run: |
           git fetch origin research-manshu-watch-state
