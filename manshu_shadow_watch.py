@@ -7,9 +7,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from manshu_venue_context import gate_in_loss, POLICY_VERSION
+
 JST = ZoneInfo("Asia/Tokyo")
 START = "20261010"
-VERSION = "manshu-shadow-20261010-v1"
+VERSION = "manshu-shadow-20261010-v2-venue-aware"
 
 def num(v):
     if v is None or isinstance(v, bool) or v == "":
@@ -54,16 +56,23 @@ def classify(p, now):
     dip = round(st[1] - min(st[i] for i in (2, 3, 4)), 3)
     gap = round(tm[1] - min(tm[i] for i in (2, 3, 4, 5, 6)), 3)
     r5, r6 = num(b[5].get("exhibition_rank")), num(b[6].get("exhibition_rank"))
-    upset = (wind >= 3 or wave >= 3) and (
-        gap >= 0.13 or (dip >= 0.06 and (wave >= 3 or rank >= 4)) or
-        (rank >= 4 and wind >= 3)
-    )
-    followers = (wave >= 3 and (wind >= 3 or wave >= 4) and rank <= 3
-                 and dip < 0.12 and any(x is not None and x <= 3 for x in (r5, r6)))
-    flags = (["イン敗北警戒"] if upset else []) + (["ヒモ荒れ警戒"] if followers else [])
+    # First freeze the venue-specific baseline comparison: a normal 2/3-course
+    # head chance at Toda/Heiwajima/Edogawa is not by itself an upset alert.
     jcd, rno = str(p.get("jcd") or "").zfill(2), int(p.get("rno") or 0)
     if not jcd.isdigit() or not 1 <= rno <= 12:
         return None
+    generic_upset = (wind >= 3 or wave >= 3) and (
+        gap >= 0.13 or (dip >= 0.06 and (wave >= 3 or rank >= 4)) or
+        (rank >= 4 and wind >= 3)
+    )
+    upset, venue_context = gate_in_loss(
+        jcd, b, st, tm, rank, wind, wave, generic_upset
+    )
+    # An in-win follower alert is a distinct proposition; this venue gate
+    # modifies ONLY the "イン敗北警戒" alarm.
+    followers = (wave >= 3 and (wind >= 3 or wave >= 4) and rank <= 3
+                 and dip < 0.12 and any(x is not None and x <= 3 for x in (r5, r6)))
+    flags = (["イン敗北警戒"] if upset else []) + (["ヒモ荒れ警戒"] if followers else [])
     key = f"{day}_{jcd}_{rno:02d}"
     # Freeze all six pre-race observations for later missed-manshu analysis.
     # No actual position, finish, payout or future odds may enter this section.
@@ -94,6 +103,9 @@ def classify(p, now):
         "pre_lane5_rank": r5, "pre_lane6_rank": r6,
         "pre_inner_dip_s": dip, "pre_outer_fast_gap_s": gap,
         "pre_boats": pre_boats,
+        "venue_context": venue_context,
+        "baseline_in_loss_suppressed": venue_context["in_loss_suppressed_as_baseline"],
+        "venue_policy_version": POLICY_VERSION,
         "sniper_join_key": key,
         "sniper_integration_status": "research_only",
         "data_guard": "six_boats_before_deadline_unsettled"
