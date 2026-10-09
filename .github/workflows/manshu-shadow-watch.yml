@@ -1,0 +1,50 @@
+name: Manshu Shadow Watch - Internal Research Only
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '4-59/10 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: manshu-shadow-research-independent
+  cancel-in-progress: false
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Guard tests (no notifications)
+        run: python -m unittest discover -s tests -p 'test_manshu_shadow_watch.py' -v
+      - name: Open dedicated log branch, not main
+        run: |
+          git fetch origin research-manshu-watch-state
+          git worktree add -B research-manshu-watch-state "$RUNNER_TEMP/manshu-shadow-state" origin/research-manshu-watch-state
+      - name: Log only pre-deadline alerts and later official payout matches
+        run: |
+          python manshu_shadow_watch.py --source data/exhibition_log \
+            --payouts data/official_results \
+            --out "$RUNNER_TEMP/manshu-shadow-state/data/research_manshu_watch"
+      - name: Store results on research branch only
+        run: |
+          ROOT="$RUNNER_TEMP/manshu-shadow-state"
+          git -C "$ROOT" config user.name "github-actions[bot]"
+          git -C "$ROOT" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$ROOT" add data/research_manshu_watch/
+          if ! git -C "$ROOT" diff --cached --quiet; then
+            git -C "$ROOT" commit -m "research: record internal manshu shadow evaluation"
+            git -C "$ROOT" push origin HEAD:refs/heads/research-manshu-watch-state
+          else
+            echo "No shadow state changes"
+          fi
