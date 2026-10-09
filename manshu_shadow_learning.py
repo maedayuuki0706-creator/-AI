@@ -160,7 +160,53 @@ def _tag_comparison(cases):
     }
 
 
-def export_learning(day, entries):
+def _unobserved_official_manshu(day, entries, official_results):
+    """Separate official man-shu without any frozen pre-race snapshot.
+
+    They are missing observation opportunities, NOT rule-based no-alert examples.
+    Never reconstruct a signal using postrace/exhibition fields that may be overwritten.
+    """
+    seen = {f'{int(x["jcd"]):02d}:{int(x["rno"])}' for x in entries.values()}
+    cases = []
+    checked = 0
+    for official_key, record in sorted((official_results or {}).items()):
+        if not isinstance(record, dict) or record.get("status") != "settled":
+            continue
+        try:
+            jcd_raw, rno_raw = str(official_key).split(":", 1)
+            jcd, rno = f"{int(jcd_raw):02d}", int(rno_raw)
+        except (ValueError, TypeError):
+            continue
+        key = f"{jcd}:{rno}"
+        if key in seen:
+            continue
+        payouts = record.get("payouts") or {}
+        valid = [
+            (combo, _n(pay)) for combo, pay in payouts.items()
+            if isinstance(combo, str) and len(combo.split("-")) == 3
+            and len(set(combo.split("-"))) == 3
+            and all(x in "123456" for x in combo.split("-"))
+        ]
+        valid = [(combo, pay) for combo, pay in valid if pay is not None and pay > 0]
+        if len(valid) != 1:
+            continue
+        checked += 1
+        combo, amount = valid[0]
+        if amount >= 10000:
+            cases.append({
+                "key": f"{day}_{jcd}_{rno:02d}",
+                "day": day, "jcd": jcd, "rno": rno,
+                "classification": "no_prerace_observation_unknown_alert",
+                "reason": "締切前の凍結展示データ未取得。発報ルールの見逃しと混同しない",
+                "trifecta": combo, "payout_per_100": int(amount),
+                "source": record.get("source_url"),
+                "pre_race_features": None,
+                "eligible_for_signal_learning": False,
+            })
+    return checked, cases
+
+
+def export_learning(day, entries, official_results=None):
     """Return a learning dataset without silently rewriting production rules."""
     settled = [_case(row) for _, row in sorted(entries.items())]
     settled = [row for row in settled if row is not None]
@@ -173,6 +219,9 @@ def export_learning(day, entries):
     heads = Counter(x["observed_result"]["head"] for x in misses)
     reasons = Counter(reason for x in misses
                       for reason in x["pre_race_decision"]["not_triggered_reasons"])
+    unobserved_count, unobserved_manshu = _unobserved_official_manshu(
+        day, entries, official_results
+    )
     return {
         "day": day,
         "schema": SCHEMA_VERSION,
@@ -183,6 +232,10 @@ def export_learning(day, entries):
         "target_is_an_alert_condition_precision_not_ticket_hit_rate": True,
         "resolved_examples": len(settled),
         "missed_manshu_count": len(misses),
+        "unobserved_official_resolved_races": unobserved_count,
+        "unobserved_official_manshu_count": len(unobserved_manshu),
+        "total_unalerted_or_unobserved_manshu_cases": len(misses) + len(unobserved_manshu),
+        "unobserved_official_manshu_cases": unobserved_manshu,
         "alert_manshu_count": len(alert_manshu),
         "negative_control_count": len(ordinary),
         "missed_manshu_keys": [x["key"] for x in misses],
