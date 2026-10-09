@@ -41,6 +41,10 @@ class WatchTests(unittest.TestCase):
         self.assertEqual(report["alert_capture_rate_pct"], 100.0)
         self.assertEqual(report["alert_lift_vs_observed_baseline"], 1.0)
         self.assertEqual(report["alert_false_positive_races"], 0)
+        self.assertEqual(report["missed_manshu_races"], 0)
+        self.assertEqual(report["target_alert_manshu_rate_pct"], 30.0)
+        self.assertEqual(len(x["pre_boats"]), 6)
+        self.assertEqual(x["sniper_join_key"], "20261010_16_05")
     def test_idempotent_and_unmodified_history(self):
         with tempfile.TemporaryDirectory() as td:
             base=Path(td)
