@@ -84,3 +84,10 @@ https://www.boatrace.jp/owpc/pc/data/stadium?jcd=04
 ## 統計上の注意
 
 現時点の41Rは研究用の少数サンプル。日付／開催節／女子戦やグレード／向かい風・追い風／選手級別の偏りが強い可能性がある。個々の「5頭2件両方万舟」や「2/3A1で7R中1万舟」を普遍的な確率として用いない。正確な事前精度は10/10以降に凍結した展示情報を使った別日の評価で確認する。
+
+## 10/10以降の継続学習先
+
+- 毎日の研究状態：研究用GitHubブランチ `research-manshu-watch-state` の `data/research_manshu_watch/YYYYMMDD.json`。
+- 日次パターン分析：同ブランチ `data/research_manshu_watch/learning_YYYYMMDD.json` 内の `weak_in_venue_study`。
+- **累積分析**：同ブランチ `data/research_manshu_watch/weak_in_cumulative.json`。研究用ログから翌日以降も集計し直す。
+- 未観測レース・未確定は失敗と決めつけず分ける。既存穴くんの配信や学習パラメータを自動上書きしない。
