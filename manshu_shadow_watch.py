@@ -65,6 +65,25 @@ def classify(p, now):
     if not jcd.isdigit() or not 1 <= rno <= 12:
         return None
     key = f"{day}_{jcd}_{rno:02d}"
+    # Freeze all six pre-race observations for later missed-manshu analysis.
+    # No actual position, finish, payout or future odds may enter this section.
+    pre_boats = [
+        {
+            "lane": i,
+            "racer_id": str(b[i].get("racer_id") or ""),
+            "racer_name": str(b[i].get("name") or ""),
+            "class": str(b[i].get("current_class") or ""),
+            "motor_number": b[i].get("motor_number"),
+            "ex_st": st[i], "ex_time": tm[i],
+            "ex_rank": num(b[i].get("exhibition_rank")),
+            "ex_st_rank": num(b[i].get("exhibition_st_rank")),
+            "ex_course": num(b[i].get("exhibition_course")),
+            "tilt": num(b[i].get("tilt")),
+            "parts_exchange": b[i].get("parts_exchange"),
+            "propeller_exchange": b[i].get("propeller_exchange"),
+        }
+        for i in range(1, 7)
+    ]
     return {
         "key": key, "day": day, "jcd": jcd, "rno": rno,
         "venue": p.get("venue") or jcd, "alert": bool(flags), "types": flags,
@@ -74,6 +93,9 @@ def classify(p, now):
         "pre_wind_m": wind, "pre_wave_cm": wave, "pre_lane1_rank": rank,
         "pre_lane5_rank": r5, "pre_lane6_rank": r6,
         "pre_inner_dip_s": dip, "pre_outer_fast_gap_s": gap,
+        "pre_boats": pre_boats,
+        "sniper_join_key": key,
+        "sniper_integration_status": "research_only",
         "data_guard": "six_boats_before_deadline_unsettled"
     }
 
@@ -150,7 +172,12 @@ def summarize(day, entries):
             if precision is not None and baseline_rate else None
         ),
         "nonalert_resolved_races": len(no), "nonalert_manshu_races": len(mans(no)),
+        "missed_manshu_races": len(mans(no)),
+        "missed_manshu_keys": [e["key"] for e in mans(no)],
+        "missed_manshu_rate_of_all_observed_manshu_pct": rate(len(mans(no)), all_manshu),
         "nonalert_manshu_rate_pct": rate(len(mans(no)), len(no)),
+        "target_alert_manshu_rate_pct": 30.0,
+        "target_vs_actual_gap_points": round(30.0 - precision, 1) if precision is not None else None,
         "by_type": by_type,
         "note": "Shadow alert evaluates manshu occurrence only, NOT winning picks. Coverage is observed pre-race snapshots; unobserved races excluded. Overlapping types counted once."
     }
@@ -187,6 +214,15 @@ def run(source, payouts, out, now, lookback=3):
         txt = json.dumps(s, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
         if not summary_path.exists() or summary_path.read_text(encoding="utf-8") != txt:
             summary_path.write_text(txt, encoding="utf-8")
+        # Learning export keeps misses, alerted hits and ordinary negative controls.
+        # It is a dataset only; it never edits the sniper/prediction model.
+        from manshu_shadow_learning import export_learning
+        learning_path = out / f"learning_{day}.json"
+        learning_text = json.dumps(
+            export_learning(day, entries), ensure_ascii=False, indent=2, sort_keys=True
+        ) + "\n"
+        if not learning_path.exists() or learning_path.read_text(encoding="utf-8") != learning_text:
+            learning_path.write_text(learning_text, encoding="utf-8")
         summaries.append(s)
     return summaries
 
