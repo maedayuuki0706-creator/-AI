@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#132336">
+<link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
+<link rel="dns-prefetch" href="https://boat-sheet-feed.onrender.com">
 <title>RACE VIEW | BOAT AI NAVI - レース情報</title>
 <style>
 :root{
@@ -243,7 +245,29 @@ const VENUES=[['01','桐生'],['02','戸田'],['03','江戸川'],['04','平和�
 const API='https://boat-sheet-feed.onrender.com';
 const RAW='https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/main/data/prototype12_delivery/predictions/';
 const $=id=>document.getElementById(id);
-const state={day:'',venue:'20',race:8,tab:'pt2',token:0,prediction:null,raceRows:[],rosterRows:[],active:null};
+const state={day:'',venue:'20',race:8,tab:'pt2',token:0,prediction:null,raceRows:[],rosterRows:[],active:null,
+  pt2Status:'予想を読み込んでいます…',raceStatus:'出走情報はタブを開いたときに読み込みます。',
+  raceLoadingKey:'',raceLoadedKey:'',userSelectedVenue:false,venueToken:0};
+const CACHE_PREFIX='boat-race-view-v3:';
+function cacheRead(name,ttl) {
+  try{
+    const obj=JSON.parse(sessionStorage.getItem(CACHE_PREFIX+name)||'null');
+    if(obj&&Number.isFinite(obj.storedAt)&&Date.now()-obj.storedAt>=0&&Date.now()-obj.storedAt<ttl)return obj;
+  }catch(e){}
+  return null;
+}
+function cacheWrite(name,value) {
+  try{sessionStorage.setItem(CACHE_PREFIX+name,JSON.stringify({storedAt:Date.now(),value}));}catch(e){}
+}
+function lightPrediction(j) {
+  if(!j||!j.models||!j.models.prototype2)return null;
+  const p=j.models.prototype2;
+  return {day:j.day,jcd:j.jcd,rno:j.rno,venue:j.venue,deadline:j.deadline,created_at:j.created_at,
+    models:{prototype2:{grade:p.grade,heads:p.heads,strategy_cards:p.strategy_cards}}};
+}
+function currentKey(){return yyyymmdd()+'_'+state.venue+'_'+String(state.race).padStart(2,'0');}
+function refreshStatus(){$('status').textContent=state.tab==='pt2'?state.pt2Status:state.raceStatus;}
+function jstClock(){return new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'}).format(new Date());}
 const safe=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const jstToday=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const yyyymmdd=()=>state.day.replace(/-/g,'');
@@ -262,8 +286,8 @@ function csv(text) {
  if(row.length||part){row.push(part.replace(/\r$/,''));if(row.some(x=>x!==''))rows.push(row);}
  return rows;
 }
-async function getText(url) {
- const c=new AbortController();const timer=setTimeout(()=>c.abort(),18000);
+async function getText(url,timeout=18000) {
+ const c=new AbortController();const timer=setTimeout(()=>c.abort(),timeout);
  try{const r=await fetch(url,{signal:c.signal,cache:'no-store'});
  if(!r.ok){const e=new Error('HTTP '+r.status);e.status=r.status;throw e;}
  return await r.text();}finally{clearTimeout(timer);}
@@ -283,6 +307,8 @@ function raceOptions(){$('race').innerHTML=Array.from({length:12},(_,i)=>'<optio
 function setTab(tab){
  state.tab=tab;
  for(const name of ['pt2','race']){$('tab-'+name).setAttribute('aria-selected',String(tab===name));$('view-'+name).classList.toggle('hidden',tab!==name);}
+ if(tab==='race')loadRaceData();
+ refreshStatus();
 }
 function inside(section){return '<section class="panel">'+section+'</section>';}
 function predictionHtml(j){
@@ -332,41 +358,123 @@ function raceHtml(){
 function errorsInPart(name,e) {
  return e&&e.status===404 ? name+'がまだ公開されていません。':name+'の取得に失敗しました（'+safe(e.message||'通信エラー')+'）。';
 }
-async function loadRace(){
- const token=++state.token;
- updateAddress();
- setStatus('データを読み込んでいます…');
- $('view-pt2').innerHTML=inside('<div class="empty">PT2予想を取得しています…</div>');
- $('view-race').innerHTML=inside('<div class="empty">出走表を取得しています…</div>');
+
+function loadRaceData(force=false) {
+ const key=currentKey(),token=state.token;
+ if(!force&&(state.raceLoadingKey===key||state.raceLoadedKey===key))return;
+ state.raceLoadingKey=key;state.raceLoadedKey='';
+ const cachedRace=cacheRead('race:'+key,180000);
+ const cachedRoster=cacheRead('roster:'+key,180000);
+ state.raceRows=cachedRace?.value||[];
+ state.rosterRows=cachedRoster?.value||[];
+ $('view-race').innerHTML=(state.raceRows.length||state.rosterRows.length)?raceHtml():inside('<div class="empty">出走表を読み込んでいます…</div>');
+ state.raceStatus=(state.raceRows.length||state.rosterRows.length)?'保存済みの出走情報を表示中・最新データを確認しています…':'出走情報を取得しています…（初回は時間がかかる場合があります）';
+ refreshStatus();
  const args='date='+yyyymmdd()+'&jcd='+state.venue+'&rno='+state.race;
- const key=yyyymmdd()+'_'+state.venue+'_'+String(state.race).padStart(2,'0');
+ let completed=0,errors=[];
+ const onFinish=()=>{
+   if(token!==state.token)return;
+   completed++;
+   if(completed===2){
+     state.raceLoadingKey='';
+     state.raceLoadedKey=key;
+   }
+   if(state.raceRows.length||state.rosterRows.length){
+     $('view-race').innerHTML=raceHtml();
+     state.raceStatus=completed===2
+       ? ('出走情報を表示中（'+jstClock()+' JST確認）'+(errors.length?'・一部取得遅延':''))
+       : '出走情報を表示中・残りを取得しています…';
+   }else if(completed===2){
+     $('view-race').innerHTML=inside('<h2>出走表</h2><div class="empty">このレースの出走情報を取得できませんでした。開催状況と公式サイトをご確認ください。</div>');
+     state.raceStatus='出走情報を取得できませんでした。更新で再試行できます。';
+   }
+   refreshStatus();
+ };
+ // Renderの無料フィードが休止していても、表示全体を待たせず個別に反映する。
+ getText(API+'/race.csv?'+args,42000).then(text=>{
+   if(token!==state.token)return;
+   const rows=tableData(csv(text));
+   if(rows.length){state.raceRows=rows;cacheWrite('race:'+key,rows);}
+ }).catch(e=>{if(token===state.token)errors.push('出走情報');}).finally(onFinish);
+ getText(API+'/race_roster.csv?'+args,42000).then(text=>{
+   if(token!==state.token)return;
+   const rows=tableData(csv(text));
+   if(rows.length){state.rosterRows=rows;cacheWrite('roster:'+key,rows);}
+ }).catch(e=>{if(token===state.token)errors.push('選手名');}).finally(onFinish);
+}
+function loadRace(force=false){
+ const token=++state.token,key=currentKey();
+ updateAddress();
+ state.raceLoadingKey='';state.raceLoadedKey='';
+ state.raceRows=[];state.rosterRows=[];
+ $('view-race').innerHTML=inside('<div class="empty">出走表タブを開くと詳細を取得します。</div>');
+ state.raceStatus='出走情報はタブを開いたときに読み込みます。';
+ const cached=force?null:cacheRead('pt2:'+key,240000);
+ state.prediction=cached?.value||null;
+ if(state.prediction){
+   $('view-pt2').innerHTML=predictionHtml(state.prediction);
+   state.pt2Status='前回の予想データを先に表示中・最新情報を確認しています…';
+ }else{
+   $('view-pt2').innerHTML=inside('<div class="empty">PT2予想を読み込んでいます…</div>');
+   state.pt2Status='PT2予想を読み込んでいます…';
+ }
+ refreshStatus();
+ if(state.tab==='race')loadRaceData();
+ // PT2表示は出走表・開催場一覧の処理を待たない。
  const predictionUrl=RAW+key+'.json';
- const [pt2,race,roster]=await Promise.allSettled([getJson(predictionUrl),getText(API+'/race.csv?'+args),getText(API+'/race_roster.csv?'+args)]);
- if(token!==state.token)return;
- state.prediction=pt2.status==='fulfilled'?pt2.value:null;
- state.raceRows=race.status==='fulfilled'?tableData(csv(race.value)):[];
- state.rosterRows=roster.status==='fulfilled'?tableData(csv(roster.value)):[];
- $('view-pt2').innerHTML=state.prediction?predictionHtml(state.prediction):inside('<h2>PT2予想</h2><div class="error">'+errorsInPart('PT2保存済み予想',pt2.reason)+'</div><p>この日・場・Rに対応するJSONが公開GitHub上に保存されると閲覧できます。元シートや本番配信には影響しません。</p>');
- $('view-race').innerHTML=raceHtml();
- const messages=[];
- if(!state.prediction)messages.push('PT2未取得');
- if(!state.raceRows.length)messages.push('出走情報未取得');
- if(!state.rosterRows.length)messages.push('選手名未取得');
- setStatus(messages.length?'一部データ未取得：'+messages.join('・')+'。日時・開催状況をご確認ください。':'更新完了（'+new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'}).format(new Date())+' JST）');
+ getJson(predictionUrl).then(data=>{
+   if(token!==state.token)return;
+   const light=lightPrediction(data);
+   if(!light||light.day!==yyyymmdd()||String(light.jcd)!==state.venue||Number(light.rno)!==state.race){
+     throw new Error('予想データが選択レースと一致しません');
+   }
+   state.prediction=light;
+   cacheWrite('pt2:'+key,light);
+   $('view-pt2').innerHTML=predictionHtml(light);
+   state.pt2Status='PT2更新完了（'+jstClock()+' JST）';
+   refreshStatus();
+ }).catch(e=>{
+   if(token!==state.token)return;
+   if(state.prediction){
+     state.pt2Status='保存済みの予想を表示中・最新データは取得できませんでした。';
+   }else{
+     $('view-pt2').innerHTML=inside('<h2>PT2予想</h2><div class="error">'+errorsInPart('PT2保存済み予想',e)+'</div><p>予想が公開データに保存され次第、閲覧できます。既存の配信システムには影響しません。</p>');
+     state.pt2Status='PT2予想を取得できませんでした。日時・開催場を確認してください。';
+   }
+   refreshStatus();
+ });
 }
 async function loadVenues(keepSelection) {
- const requestDay=yyyymmdd();
+ const requestDay=yyyymmdd(), requestToken=++state.venueToken;
+ const cached=cacheRead('venues:'+requestDay,600000);
+ function applyVenues(venueCodes) {
+   if(requestToken!==state.venueToken||requestDay!==yyyymmdd())return;
+   state.active=venueCodes.length?venueCodes:null;
+   if(!keepSelection&&!state.userSelectedVenue&&state.active&&!state.active.includes(state.venue)){
+     // 手動で選択した競艇場は書き換えない。
+     state.venue=state.active[0];
+     venueOptions();
+     loadRace();
+   }else venueOptions();
+ }
+ if(cached)applyVenues(cached.value);
  try{
- const rows=csv(await getText(API+'/venues.csv?date='+requestDay)).slice(1);
- if(requestDay!==yyyymmdd())return;
- const active=rows.map(r=>String(r[0]).padStart(2,'0')).filter(code=>VENUES.some(v=>v[0]===code));
- state.active=active.length?active:null;
- if(!keepSelection&&state.active&&!state.active.includes(state.venue))state.venue=state.active[0];
- }catch(e){state.active=null;}
- venueOptions();await loadRace();
+   const rows=csv(await getText(API+'/venues.csv?date='+requestDay,42000)).slice(1);
+   if(requestDay!==yyyymmdd()||requestToken!==state.venueToken)return;
+   const active=rows.map(r=>String(r[0]).padStart(2,'0')).filter(code=>VENUES.some(v=>v[0]===code));
+   if(active.length)cacheWrite('venues:'+requestDay,active);
+   applyVenues(active);
+ }catch(e){
+   if(requestDay!==yyyymmdd()||requestToken!==state.venueToken)return;
+   if(!cached)state.active=null;
+   venueOptions();
+ }
 }
 function selectRace(){
- state.venue=$('venue').value;state.race=Number($('race').value);loadRace();
+ state.userSelectedVenue=true;
+ state.venue=$('venue').value;
+ state.race=Number($('race').value);
+ loadRace();
 }
 function boot(){
  const params=new URLSearchParams(location.search);
@@ -376,12 +484,15 @@ function boot(){
  $('day').value=state.day;venueOptions();raceOptions();
  $('tab-pt2').addEventListener('click',()=>setTab('pt2'));
  $('tab-race').addEventListener('click',()=>setTab('race'));
- $('day').addEventListener('change',()=>{if(!$('day').value)return;state.day=$('day').value;loadVenues(false);});
+ $('day').addEventListener('change',()=>{if(!$('day').value)return;state.day=$('day').value;state.active=null;loadRace();loadVenues(Boolean(venue));});
  $('venue').addEventListener('change',selectRace);
  $('race').addEventListener('change',selectRace);
- $('refresh').addEventListener('click',()=>loadRace());
+ $('refresh').addEventListener('click',()=>{loadRace(true);if(state.tab==='race')loadRaceData(true);});
+ // 予想は即時読み込み。休止中の出走情報フィードを待たない。
+ loadRace();
  loadVenues(Boolean(venue));
 }
+
 boot();
 </script>
 </body>
