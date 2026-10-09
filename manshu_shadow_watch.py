@@ -219,7 +219,7 @@ def run(source, payouts, out, now, lookback=3):
         from manshu_shadow_learning import export_learning
         learning_path = out / f"learning_{day}.json"
         learning_text = json.dumps(
-            export_learning(day, entries), ensure_ascii=False, indent=2, sort_keys=True
+            export_learning(day, entries, official_results=results), ensure_ascii=False, indent=2, sort_keys=True
         ) + "\n"
         if not learning_path.exists() or learning_path.read_text(encoding="utf-8") != learning_text:
             learning_path.write_text(learning_text, encoding="utf-8")
