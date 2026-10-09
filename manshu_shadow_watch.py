@@ -203,6 +203,44 @@ def summarize(day, entries):
         "note": "Shadow alert evaluates manshu occurrence only, NOT winning picks. Coverage is observed pre-race snapshots; unobserved races excluded. Overlapping types counted once."
     }
 
+def _write_weak_in_cumulative(out):
+    """Rebuild a cumulative weak-in venue study from frozen daily observations.
+
+    Never treats unobserved races as ordinary controls, and never backfills
+    post-race weather into a pre-race signal. Isolated research files only.
+    """
+    from manshu_shadow_learning import _case
+    from manshu_weak_in_study import analyze_weak_in
+
+    all_cases = []
+    files = []
+    for file in sorted(out.glob("20??????.json")):
+        if not (file.stem.isdigit() and len(file.stem) == 8):
+            continue
+        journal = load(file)
+        if not isinstance(journal.get("entries"), dict):
+            continue
+        files.append(file.name)
+        for entry in journal["entries"].values():
+            if not isinstance(entry, dict):
+                continue
+            settled_case = _case(entry)
+            if settled_case is not None:
+                all_cases.append(settled_case)
+    report = analyze_weak_in(all_cases)
+    report["analyzed_journal_files"] = files
+    report["resolved_observed_cases_all_venues"] = len(all_cases)
+    report["coverage_note"] = (
+        "Cumulative of ONLY pre-deadline observed-and-settled research logs. "
+        "Not every official race; not a live model."
+    )
+    path = out / "weak_in_cumulative.json"
+    data = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if not path.exists() or path.read_text(encoding="utf-8") != data:
+        path.write_text(data, encoding="utf-8")
+    return report
+
+
 def run(source, payouts, out, now, lookback=3):
     today = now.astimezone(JST).strftime("%Y%m%d")
     if today < START:
@@ -245,6 +283,7 @@ def run(source, payouts, out, now, lookback=3):
         if not learning_path.exists() or learning_path.read_text(encoding="utf-8") != learning_text:
             learning_path.write_text(learning_text, encoding="utf-8")
         summaries.append(s)
+    _write_weak_in_cumulative(out)
     return summaries
 
 def main():
