@@ -72,7 +72,7 @@ def _label(result):
         return None
     head, second, third = (int(s) for s in parts)
     if head == 1:
-        label = "イン艇頭_ヒモ荒れ" if any(x in (5, 6) for x in (second, third)) else "イン艇頭_内寄り"
+        label = "イン艇頭_5_6号艇がヒモ" if any(x in (5, 6) for x in (second, third)) else "イン艇頭_内寄り"
     elif head in (2, 3):
         label = "2_3号艇頭_外絡み" if any(x in (5, 6) for x in (second, third)) else "2_3号艇頭_内寄り"
     else:
