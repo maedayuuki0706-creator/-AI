@@ -45,9 +45,10 @@
   "x_result_attempts": {
     "20261010:06:3": {
       "at": "2026-10-10T11:59:28.350352+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "d1bce9f2d8ed463aa42cada6f0b6d5ca",
-      "status": "reserved"
+      "retry_at": "2026-10-10T12:00:00.791323+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {
@@ -550,6 +551,7 @@
       "attempt": 1,
       "claimed_at": "2026-10-10T11:59:28.350352+09:00",
       "content_sha256": "43104acbb453443265134745afc2fd9307837b9dbcca826169ffb74aab9765bc",
+      "error_type": "DefiniteRejection",
       "key": "result:20261010:06:3",
       "owner": "d1bce9f2d8ed463aa42cada6f0b6d5ca",
       "parent_post_id": "2108750297342632382",
@@ -596,7 +598,8 @@
         "source": "配当期待本線",
         "venue": "浜名湖"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "updated_at": "2026-10-10T11:59:30.791323+09:00"
     },
     "result:20261010:16:2": {
       "attempt": 1,
