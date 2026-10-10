@@ -45,6 +45,43 @@ class WatchTests(unittest.TestCase):
         self.assertEqual(report["target_alert_manshu_rate_pct"], 30.0)
         self.assertEqual(len(x["pre_boats"]), 6)
         self.assertEqual(x["sniper_join_key"], "20261010_16_05")
+    def test_daily_official_fallback_counts_unobserved_manshu_separately(self):
+        import tempfile
+        from pathlib import Path
+        from manshu_shadow_learning import export_learning
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            primary = base / "official_results"
+            primary.mkdir()
+            cache = base / "scoreboard" / "20261010" / "official"
+            cache.mkdir(parents=True)
+            two = {
+                "20261010_18_01.json": {
+                    "status": "settled", "payouts": {"3-1-4": 14060}},
+                "20261010_23_03.json": {
+                    "status": "settled", "payouts": {"4-5-2": 24700}},
+                "20261010_18_02.json": {
+                    "status": "settled", "payouts": {"4-3-1": 6690}},
+            }
+            for filename, record in two.items():
+                (cache / filename).write_text(json.dumps(record), encoding="utf-8")
+            merged = m.merge_official_results(
+                "20261010", primary, base / "scoreboard"
+            )
+            self.assertEqual(len(merged), 3)
+            self.assertEqual(merged["18:1"]["payouts"]["3-1-4"], 14060)
+            self.assertEqual(merged["23:3"]["payouts"]["4-5-2"], 24700)
+            entry = m.classify(self.sample, self.now)
+            self.assertFalse(m.adjudicate(entry, merged))
+            output = export_learning("20261010", {entry["key"]: entry}, merged)
+            self.assertEqual(output["unobserved_official_manshu_count"], 2)
+            self.assertEqual(output["missed_manshu_count"], 0)
+            self.assertEqual(output["alert_manshu_count"], 0)
+            self.assertEqual(
+                sorted(r["key"] for r in output["unobserved_official_manshu_cases"]),
+                ["20261010_18_01", "20261010_23_03"],
+            )
+
     def test_idempotent_and_unmodified_history(self):
         with tempfile.TemporaryDirectory() as td:
             base=Path(td)
