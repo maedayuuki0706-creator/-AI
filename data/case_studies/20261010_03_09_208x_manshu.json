@@ -1,0 +1,118 @@
+{
+  "case_id": "20261010_03_09",
+  "case_type": "verified_pre_race_picked_manshu_and_shadow_coverage_failure",
+  "recorded_from": "2026-10-10 official race result, exhibition and delivered prediction logs",
+  "outcome": {
+    "day": "20261010",
+    "venue": "江戸川",
+    "jcd": "03",
+    "rno": 9,
+    "trifecta": "4-1-6",
+    "payout_per_100_yen": 20860,
+    "odds_final": 208.6,
+    "official_source": "https://www.boatrace.jp/owpc/pc/race/raceresult?hd=20261010&jcd=03&rno=9"
+  },
+  "pre_race": {
+    "created_at": "2026-10-10T14:41:38.499492+09:00",
+    "deadline": "14:55",
+    "market_odds_when_predicted": 234,
+    "estimated_hit_probability": 0.019416117325299458,
+    "recorded_expected_value_multiplier": 4.543371454120073,
+    "model_fair_odds": 51.5,
+    "model_head_probabilities": {
+      "1": 0.3821,
+      "4": 0.2613
+    },
+    "market_head_probabilities": {
+      "1": 0.6463,
+      "4": 0.154
+    },
+    "inside_trust_score": 40.3,
+    "upset_risk_score": 57.2,
+    "best_attack_lane": 4,
+    "best_attack_method": "差し",
+    "attack_pressure_score": 54.1,
+    "exhibition": [
+      {
+        "lane": 1,
+        "st": 0.11,
+        "time": 6.84,
+        "rank": 2
+      },
+      {
+        "lane": 4,
+        "st": 0.11,
+        "time": 6.84,
+        "rank": 2
+      },
+      {
+        "lane": 6,
+        "st": 0.04,
+        "time": 7,
+        "rank": 6
+      }
+    ],
+    "warning": "Weather/wave fields in data/exhibition_log may have been overwritten on settlement; exclude from frozen pre-race feature claims."
+  },
+  "verified_winning_models": [
+    {
+      "name": "穴くん",
+      "classification": "actual delivery hit"
+    },
+    {
+      "name": "メインくん",
+      "classification": "actual delivery hit"
+    },
+    {
+      "name": "PT1",
+      "classification": "prototype delivery hit",
+      "main_hit": false,
+      "longshot_pick": true,
+      "stake_yen": 1100,
+      "return_yen": 20860
+    },
+    {
+      "name": "PT2",
+      "classification": "prototype delivery hit",
+      "main_hit": true,
+      "stake_yen": 1900,
+      "return_yen": 20860
+    },
+    {
+      "name": "PT2高配当型",
+      "classification": "offline strategy hit",
+      "stake_yen": 800,
+      "return_yen": 20860
+    },
+    {
+      "name": "PT2妙味型",
+      "classification": "offline strategy hit",
+      "stake_yen": 800,
+      "return_yen": 20860
+    }
+  ],
+  "not_hit": [
+    "PT3"
+  ],
+  "shadow_alert": {
+    "frozen_record_existed": false,
+    "classification": "not_observed_not_no_alert",
+    "belongs_to_official_unobserved_manshu": true,
+    "not_in_alert_precision_denominator": true
+  },
+  "research_hypotheses": [
+    "Venue with lower base 1-course win rate: 4-head market probability 15.4% vs model 26.1% at decision time, possibly overlooked 4-attack",
+    "4-boat A2 predicted strongest attacker by pressure 54.1 and '差し', with exhibition ST 0.11 tied boat1",
+    "Even though boat6 was exhibition time rank6, 4-1-6 was picked by multiple strategy variants; inspect rationale for retaining third-place outsider",
+    "Separate a good longshot ticket pick from a missing shadow-alert observation; do not retroactively classify this as alert or no-alert."
+  ],
+  "evidence_paths": [
+    "data/prototype_scoreboard/20261010/official/20261010_03_09.json",
+    "data/prototype_scoreboard/20261010/results/20261010_03_09.json",
+    "data/prototype12_delivery/predictions/20261010_03_09.json",
+    "data/exhibition_log/20261010/03_09.json",
+    "data/live_status/20261010.json"
+  ],
+  "research_only": true,
+  "live_prediction_logic_modified": false
+}
