@@ -29,9 +29,10 @@
   "x_result_attempts": {
     "20261010:02:2": {
       "at": "2026-10-10T11:19:27.616426+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "f0aba5b5024b45f093a5981625b7528f",
-      "status": "reserved"
+      "retry_at": "2026-10-10T11:20:01.181898+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {
@@ -230,6 +231,7 @@
       "attempt": 1,
       "claimed_at": "2026-10-10T11:19:27.616426+09:00",
       "content_sha256": "950a2eaf2d21b0ec35024b11944fdb2db3a3e6f43a02085e324177d49aab495b",
+      "error_type": "DefiniteRejection",
       "key": "result:20261010:02:2",
       "owner": "f0aba5b5024b45f093a5981625b7528f",
       "parent_post_id": "2108740238118146452",
@@ -283,7 +285,8 @@
         "source": "AI重なり本線",
         "venue": "戸田"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "updated_at": "2026-10-10T11:19:31.181898+09:00"
     },
     "result:20261010:23:6": {
       "attempt": 1,
