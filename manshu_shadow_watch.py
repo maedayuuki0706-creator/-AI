@@ -146,6 +146,32 @@ def load(path, default=None):
     except (OSError, ValueError):
         return {}
 
+def merge_official_results(day, payouts, scoreboard=None):
+    """Use original day ledger plus existing per-race official-result cache.
+
+    The prototype scoreboard official files are public result copies, not
+    predictions; they are read ONLY during retrospective outcome matching.
+    Missing pre-race observations must NEVER be rebuilt from these files.
+    """
+    records = load(payouts / f"{day}.json")
+    if scoreboard is None:
+        return records
+    official_dir = scoreboard / day / "official"
+    for path in sorted(official_dir.glob(f"{day}_??_??.json")):
+        parts = path.stem.split("_")
+        if len(parts) != 3:
+            continue
+        try:
+            jcd, rno = int(parts[1]), int(parts[2])
+        except (ValueError, TypeError):
+            continue
+        raw = load(path)
+        if raw.get("status") != "settled" or not raw.get("payouts"):
+            continue
+        key = f"{jcd:02d}:{rno}"
+        records.setdefault(key, raw)
+    return records
+
 def summarize(day, entries):
     a = list(entries.values())
     alert = [e for e in a if e["alert"]]
@@ -241,7 +267,7 @@ def _write_weak_in_cumulative(out):
     return report
 
 
-def run(source, payouts, out, now, lookback=3):
+def run(source, payouts, out, now, lookback=3, scoreboard=None):
     today = now.astimezone(JST).strftime("%Y%m%d")
     if today < START:
         return []
@@ -261,24 +287,33 @@ def run(source, payouts, out, now, lookback=3):
                 if e and e["key"] not in entries:
                     entries[e["key"]] = e
                     modified = True
-        results = load(payouts / f"{day}.json")
+        results = merge_official_results(day, payouts, scoreboard)
         for e in entries.values():
             if adjudicate(e, results):
                 modified = True
         if modified:
             path.write_text(json.dumps({"day": day, "entries": entries, "version": VERSION},
                                        ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        # This learning report also distinguishes no-observation cases.
+        from manshu_shadow_learning import export_learning
+        learning = export_learning(day, entries, official_results=results)
         s = summarize(day, entries)
+        s["unobserved_official_resolved_races"] = learning["unobserved_official_resolved_races"]
+        s["unobserved_official_manshu_count"] = learning["unobserved_official_manshu_count"]
+        s["unobserved_official_manshu_keys"] = [
+            row["key"] for row in learning["unobserved_official_manshu_cases"]
+        ]
+        s["coverage_warning"] = (
+            "Official-result-only races have no frozen pre-race decision. "
+            "They are NOT negative alerts and do NOT enter alert precision."
+        )
         summary_path = out / f"summary_{day}.json"
         txt = json.dumps(s, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
         if not summary_path.exists() or summary_path.read_text(encoding="utf-8") != txt:
             summary_path.write_text(txt, encoding="utf-8")
-        # Learning export keeps misses, alerted hits and ordinary negative controls.
-        # It is a dataset only; it never edits the sniper/prediction model.
-        from manshu_shadow_learning import export_learning
         learning_path = out / f"learning_{day}.json"
         learning_text = json.dumps(
-            export_learning(day, entries, official_results=results), ensure_ascii=False, indent=2, sort_keys=True
+            learning, ensure_ascii=False, indent=2, sort_keys=True
         ) + "\n"
         if not learning_path.exists() or learning_path.read_text(encoding="utf-8") != learning_text:
             learning_path.write_text(learning_text, encoding="utf-8")
@@ -290,9 +325,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, default=Path("data/exhibition_log"))
     parser.add_argument("--payouts", type=Path, default=Path("data/official_results"))
+    parser.add_argument("--scoreboard", type=Path, default=Path("data/prototype_scoreboard"))
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    for s in run(args.source, args.payouts, args.out, datetime.now(JST)):
+    for s in run(args.source, args.payouts, args.out, datetime.now(JST), scoreboard=args.scoreboard):
         print(json.dumps({k: s[k] for k in ("day", "observed_races", "alert_races",
             "resolved_alert_races", "pending_alert_races", "alert_manshu_races")}, ensure_ascii=False))
 
