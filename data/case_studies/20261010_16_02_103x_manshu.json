@@ -1,0 +1,82 @@
+{
+  "case_id": "20261010_16_02",
+  "purpose": "offline-language-explanation-verified-payout-vs-pre-race-exhibition",
+  "outcome": {
+    "date": "2026-10-10",
+    "venue": "児島",
+    "rno": 2,
+    "jcd": "16",
+    "winning_trifecta": "3-4-1",
+    "payout_per_100_yen": 10330,
+    "source": "https://www.boatrace.jp/owpc/pc/race/raceresult?hd=20261010&jcd=16&rno=2"
+  },
+  "before_deadline": {
+    "prediction_created_at": "2026-10-10T11:04:43.474160+09:00",
+    "deadline": "11:19",
+    "model_heads": {
+      "1": 0.1112494777001764,
+      "2": 0.2650805016163319,
+      "3": 0.24990776077280538,
+      "4": 0.19739041301608834
+    },
+    "race_shape": {
+      "inside_trust": 12.6,
+      "upset_risk": 71,
+      "attack_pressure": 51,
+      "best_attack_lane": 2,
+      "best_attack_method": null,
+      "warning": "model thought lane 2 the strongest attacker; do not claim lane 3 was explicitly its top attacking lane"
+    },
+    "exhibition": {
+      "1": {
+        "rank": 6,
+        "time_sec": 6.9,
+        "st_sec": 0.12,
+        "class": "B1"
+      },
+      "2": {
+        "rank": 1,
+        "time_sec": 6.69,
+        "st_sec": 0.11,
+        "class": "B1"
+      },
+      "3": {
+        "rank": 2,
+        "time_sec": 6.76,
+        "st_sec": 0.12,
+        "class": "A2"
+      },
+      "4": {
+        "rank": 5,
+        "time_sec": 6.86,
+        "st_sec": 0.03,
+        "class": "B1"
+      }
+    },
+    "ticket_3_4_1": {
+      "predicted_probability": 0.013237263316770049,
+      "odds_at_prediction": 116.8,
+      "estimated_ev": 1.5461123553987417,
+      "source": "PT1/PT2 common forecast of chance and odds; not direct Hole-kun score"
+    }
+  },
+  "actual_pick_verification": {
+    "hole_kun": "hit according to 20261010 live status",
+    "pt1": "not selected",
+    "pt2": "not selected in balanced strategy",
+    "pt2_longshot_offline": "hit",
+    "pt2_value_offline": "hit"
+  },
+  "interpretation": [
+    "Lane 1 had weakest exhibition time ranking, so a head defeat was plausible",
+    "Lane 3 (A2) showed 2nd quickest exhibition time, with model head chance about 25%",
+    "Lane 4 started fast in exhibition (0.03s), providing a plausible second-place attack scenario",
+    "Lane 1 is retained in third place rather than wholly erased",
+    "The exact first-party Hole-kun point-by-point decision record is not present in repo opportunity_alert_deliveries.jsonl; do not claim reconstructed shared PT1/PT2 forecast is a direct log of Hole-kun reasoning"
+  ],
+  "learning_separation": {
+    "pre_race_features_exclude_settlement_weather": true,
+    "case_class": "retrospective explanation not a calibrated predictive rule",
+    "no_live_strategy_changes": true
+  }
+}
