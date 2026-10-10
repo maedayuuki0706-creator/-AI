@@ -3,30 +3,120 @@
     "20261010.json"
   ],
   "base": {
-    "head_distribution_all": {},
+    "head_distribution_all": {
+      "1": 1,
+      "2": 1
+    },
     "head_distribution_manshu": {},
     "insufficient_for_stable_generalization": true,
     "manshu_1_head_with_5_or_6": 0,
     "manshu_2_3_head": 0,
     "manshu_4_5_6_head": 0,
     "manshu_races": 0,
-    "manshu_rate_pct": null,
+    "manshu_rate_pct": 0.0,
     "manshu_with_5_or_6_in_top3": 0,
-    "races": 0
+    "races": 2
   },
   "baseline_version": "course1-venue-baseline-20260701-20260930-v1",
   "cohorts": {
-    "all": {
-      "head_distribution_all": {},
+    "a1_in_2or3": {
+      "head_distribution_all": {
+        "2": 1
+      },
       "head_distribution_manshu": {},
       "insufficient_for_stable_generalization": true,
       "manshu_1_head_with_5_or_6": 0,
       "manshu_2_3_head": 0,
       "manshu_4_5_6_head": 0,
       "manshu_races": 0,
-      "manshu_rate_pct": null,
+      "manshu_rate_pct": 0.0,
       "manshu_with_5_or_6_in_top3": 0,
-      "races": 0
+      "races": 1
+    },
+    "all": {
+      "head_distribution_all": {
+        "1": 1,
+        "2": 1
+      },
+      "head_distribution_manshu": {},
+      "insufficient_for_stable_generalization": true,
+      "manshu_1_head_with_5_or_6": 0,
+      "manshu_2_3_head": 0,
+      "manshu_4_5_6_head": 0,
+      "manshu_races": 0,
+      "manshu_rate_pct": 0.0,
+      "manshu_with_5_or_6_in_top3": 0,
+      "races": 2
+    },
+    "lane1_exhibition_rank4_or_worse": {
+      "head_distribution_all": {
+        "2": 1
+      },
+      "head_distribution_manshu": {},
+      "insufficient_for_stable_generalization": true,
+      "manshu_1_head_with_5_or_6": 0,
+      "manshu_2_3_head": 0,
+      "manshu_4_5_6_head": 0,
+      "manshu_races": 0,
+      "manshu_rate_pct": 0.0,
+      "manshu_with_5_or_6_in_top3": 0,
+      "races": 1
+    },
+    "no_a1_in_2or3": {
+      "head_distribution_all": {
+        "1": 1
+      },
+      "head_distribution_manshu": {},
+      "insufficient_for_stable_generalization": true,
+      "manshu_1_head_with_5_or_6": 0,
+      "manshu_2_3_head": 0,
+      "manshu_4_5_6_head": 0,
+      "manshu_races": 0,
+      "manshu_rate_pct": 0.0,
+      "manshu_with_5_or_6_in_top3": 0,
+      "races": 1
+    },
+    "outer_exhibition_top3": {
+      "head_distribution_all": {
+        "1": 1
+      },
+      "head_distribution_manshu": {},
+      "insufficient_for_stable_generalization": true,
+      "manshu_1_head_with_5_or_6": 0,
+      "manshu_2_3_head": 0,
+      "manshu_4_5_6_head": 0,
+      "manshu_races": 0,
+      "manshu_rate_pct": 0.0,
+      "manshu_with_5_or_6_in_top3": 0,
+      "races": 1
+    },
+    "venue_02": {
+      "head_distribution_all": {
+        "2": 1
+      },
+      "head_distribution_manshu": {},
+      "insufficient_for_stable_generalization": true,
+      "manshu_1_head_with_5_or_6": 0,
+      "manshu_2_3_head": 0,
+      "manshu_4_5_6_head": 0,
+      "manshu_races": 0,
+      "manshu_rate_pct": 0.0,
+      "manshu_with_5_or_6_in_top3": 0,
+      "races": 1
+    },
+    "venue_03": {
+      "head_distribution_all": {
+        "1": 1
+      },
+      "head_distribution_manshu": {},
+      "insufficient_for_stable_generalization": true,
+      "manshu_1_head_with_5_or_6": 0,
+      "manshu_2_3_head": 0,
+      "manshu_4_5_6_head": 0,
+      "manshu_races": 0,
+      "manshu_rate_pct": 0.0,
+      "manshu_with_5_or_6_in_top3": 0,
+      "races": 1
     }
   },
   "coverage_note": "Cumulative of ONLY pre-deadline observed-and-settled research logs. Not every official race; not a live model.",
@@ -34,7 +124,85 @@
   "model_training_state": "offline_case_study_not_predictor_retraining",
   "no_future_values_in_features": true,
   "non1_head_manshu_count": 0,
-  "non_manshu_controls": [],
+  "non_manshu_controls": [
+    {
+      "alert": false,
+      "contains_outer": true,
+      "date": "20261010",
+      "head": 2,
+      "in_loss_suppressed_as_normal_venue": false,
+      "jcd": "02",
+      "key": "20261010_02_02",
+      "manshu": false,
+      "outcome_pattern": "2_3号艇頭_外絡み",
+      "payout_per_100": 1010,
+      "pre_features": {
+        "a1_boats_2or3": [
+          2,
+          3
+        ],
+        "a1_with_both_exhibition_edges": [],
+        "five_ex_top3": false,
+        "grade_status": "confirmed",
+        "lane1_class": "B1",
+        "lane1_ex_rank": 5.0,
+        "pre_ex_courses": {
+          "1": 1.0,
+          "2": 2.0,
+          "3": 3.0,
+          "4": 4.0,
+          "5": 5.0,
+          "6": 6.0
+        },
+        "pre_ex_inner_dip_s": 0.07,
+        "pre_ex_outer_gap_s": 0.16,
+        "pre_wave_cm": 1.0,
+        "pre_wind_m": 2.0,
+        "six_ex_top3": false
+      },
+      "result_source": "https://www.boatrace.jp/owpc/pc/race/raceresult?hd=20261010&jcd=02&rno=2",
+      "rno": 2,
+      "trifecta": "2-3-6",
+      "venue": "戸田"
+    },
+    {
+      "alert": true,
+      "contains_outer": false,
+      "date": "20261010",
+      "head": 1,
+      "in_loss_suppressed_as_normal_venue": true,
+      "jcd": "03",
+      "key": "20261010_03_01",
+      "manshu": false,
+      "outcome_pattern": "イン艇頭_内寄り",
+      "payout_per_100": 5260,
+      "pre_features": {
+        "a1_boats_2or3": [],
+        "a1_with_both_exhibition_edges": [],
+        "five_ex_top3": false,
+        "grade_status": "confirmed",
+        "lane1_class": "B2",
+        "lane1_ex_rank": 3.0,
+        "pre_ex_courses": {
+          "1": 1.0,
+          "2": 2.0,
+          "3": 3.0,
+          "4": 4.0,
+          "5": 5.0,
+          "6": 6.0
+        },
+        "pre_ex_inner_dip_s": 0.1,
+        "pre_ex_outer_gap_s": 0.04,
+        "pre_wave_cm": 5.0,
+        "pre_wind_m": 3.0,
+        "six_ex_top3": true
+      },
+      "result_source": "https://www.boatrace.jp/owpc/pc/race/raceresult?hd=20261010&jcd=03&rno=1",
+      "rno": 1,
+      "trifecta": "1-4-3",
+      "venue": "江戸川"
+    }
+  ],
   "notes": [
     "Course-1 historical rate does not equal boat-1 victory chance exactly; pre-ex-course stored.",
     "Non-1 head is common here. Only elevated payout is a manshu label.",
@@ -64,7 +232,7 @@
   },
   "one_head_manshu_count": 0,
   "ordinary_a1_2or3_head_manshu_candidates": [],
-  "resolved_observed_cases_all_venues": 1,
+  "resolved_observed_cases_all_venues": 5,
   "scope": "only settled races with frozen BEFORE-deadline six-boat data",
   "version": "weak-in-manshu-patterns-v1",
   "weak_in_head_does_not_imply_manshu": true
