@@ -15,9 +15,10 @@
   "x_result_attempts": {
     "20261010:23:6": {
       "at": "2026-10-10T10:52:12.135661+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "03d44d743a33428ebaca5b7fc4c9fbbe",
-      "status": "reserved"
+      "retry_at": "2026-10-10T10:52:55.150316+09:00",
+      "status": "retryable"
     }
   },
   "x_v2_receipts": {
@@ -89,6 +90,7 @@
       "attempt": 1,
       "claimed_at": "2026-10-10T10:52:12.135661+09:00",
       "content_sha256": "5568af8bcf6a08506e24358370c79b62eee886b7d590d8584c2124a14007a17c",
+      "error_type": "DefiniteRejection",
       "key": "result:20261010:23:6",
       "owner": "03d44d743a33428ebaca5b7fc4c9fbbe",
       "parent_post_id": "2108734180855267769",
@@ -142,7 +144,8 @@
         "source": "AI重なり本線",
         "venue": "唐津"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "updated_at": "2026-10-10T10:52:25.150316+09:00"
     }
   }
 }
