@@ -1,4 +1,4 @@
-"""Select up to ten curated races per day for X with protective alternate-head covers.
+"""Select up to 30 curated races per day for X with protective alternate-head covers.
 
 The selector uses only pre-race prototype predictions already committed to the
 repository. It never consults race results when deciding what to post.
@@ -13,11 +13,12 @@ from pathlib import Path
 from direct_discord_notify import JST
 import x_delivery_store as outbox
 import x_post_delivery as xpost
+from x_delivery_v2.limits import MAX_DAILY_X_PREDICTIONS
 
 PT12_DIR = Path("data/prototype12_delivery/predictions")
 PT3_DIR = Path("data/prototype3_delivery/predictions")
 FEATURE_SOURCES = {"AI重なり本線", "配当期待本線"}
-MAX_DAILY_POSTS = 10
+MAX_DAILY_POSTS = MAX_DAILY_X_PREDICTIONS
 MIN_LEAD_SECONDS = 11 * 60
 MAX_LEAD_SECONDS = 40 * 60
 MAIN_POINTS = 10
