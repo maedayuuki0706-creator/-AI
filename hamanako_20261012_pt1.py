@@ -141,7 +141,7 @@ def build_live(day, rno, deadline):
     for kind, label in (("mid", "中穴選別"), ("long", "穴選別")):
         candidates = opportunity_alerts._candidate_rows(official, kind)
         picked = opportunity_alerts._coherent_selection(candidates, kind, official)
-        selectors[label] = distinct([row.get("combination") for row in picked])[:6]
+        selectors[label] = distinct([row.get("combination") for row in picked])
     return {
         "official": official, "models": bundle["models"], "selectors": selectors,
         "db": db, "db_info": db_info, "db_picks": db_picks,
@@ -219,20 +219,20 @@ def format_message(day, rno, live):
     ordered = sorted(votes, key=lambda p: (
         -len(votes[p]), db_rank.get(p, 999), -float(odds.get(p, 0)), p
     ))
-    main = [p for p in ordered if len(votes[p]) >= 3][:6]
-    if len(main) < 4:
-        main = distinct(main + ordered)[:6]
-    cover = [p for p in ordered if p not in set(main)][:8]
+    main = [p for p in ordered if len(votes[p]) >= 3]
+    if not main:
+        main = [p for p in ordered if len(votes[p]) >= 2]
+    cover = [p for p in ordered if p not in set(main)]
     box = models.get("prototype1", {}).get("box_lanes") or []
     box_label = "".join(map(str, sorted(box))) if len(box) == 3 else "不明"
-    db_picks = live["db_picks"][:5]
+    db_picks = live["db_picks"]
     db_enabled = bool(live["db_info"].get("enabled"))
     if not db_enabled:
         db_picks = []
     def lines(picks, show_vote=False):
         return " / ".join(f"{p}({len(votes[p])}系統)" if show_vote else p for p in picks) or "該当なし"
     cover_long = [p for p in cover if odds.get(p, 0) >= 100]
-    near = f"\n💥 現時点100倍以上の抑え候補: {lines(cover_long[:3])}" if cover_long else ""
+    near = f"\n💥 現時点100倍以上の抑え候補: {lines(cover_long)}" if cover_long else ""
     snapshot = live["db_info"].get("snapshot_at") or "不明"
     preview = live["official"].get("preview") or {}
     model_names = "・".join(sources)
@@ -248,17 +248,40 @@ def format_message(day, rno, live):
         f"📡 **天候・潮の影響**\n{format_conditions(preview)}\n"
         f"※モデル予測であって的中保証ではありません。購入前に展示・最新オッズ確認。"
     )
-    if len(body) > 1950:
-        # Keep required sections, reduce verbose extras rather than truncating mid-ticket.
-        body = body.replace(f"｜集計: {model_names}", "｜既存/日和/PT1/PT2/PT3＋中穴/穴")
-    if len(body) > 1950:
-        body = body.replace(f"（DB照合 {'有効' if db_enabled else '一致データ不足'}／スナップショット {snapshot}）",
-                            f"（DB照合 {'有効' if db_enabled else '未成立'}）")
-    if len(body) > 1950:
-        raise ValueError("Discord payload too long")
     if len(set(main).intersection(cover)):
         raise AssertionError("Main and cover share picks")
     return body
+
+
+
+def split_messages(message, limit=1850):
+    """Split at line boundaries; never drop predicted combinations."""
+    if len(message) <= limit:
+        return [message]
+    parts = []
+    current = ""
+    for line in message.splitlines():
+        # Long ticket lines are separated at the existing slash boundary.
+        pieces = [line] if len(line) <= limit - 80 else (
+            [line[:line.find(" ")]] + line[line.find(" ") + 1:].split(" / ")
+            if " / " in line else [line[i:i + limit - 80] for i in range(0, len(line), limit - 80)]
+        )
+        if len(pieces) > 1 and " / " in line:
+            # Prefix the first fragment as its own line and preserve each ticket.
+            pieces = [pieces[0]] + [(" / " if i else "") + p for i, p in enumerate(pieces[1:])]
+        for piece in pieces:
+            if len(piece) > limit:
+                raise ValueError("Unsplit oversized Discord message")
+            candidate = (current + "\n" + piece).strip()
+            if len(candidate) > limit and current:
+                parts.append(current)
+                current = piece
+            else:
+                current = candidate
+    if current:
+        parts.append(current)
+    return [f"**浜名湖特別配信 {i + 1}/{len(parts)}**\n{p}" if len(parts) > 1 else p
+            for i, p in enumerate(parts)]
 
 
 def process_one(day, rno, deadline, *, dry_run=False):
@@ -270,8 +293,10 @@ def process_one(day, rno, deadline, *, dry_run=False):
     if base.minutes_until(now_jst(), deadline) < 0.5:
         print(f"{rno}R closing; skip stale prediction", flush=True)
         return False
+    chunks = split_messages(message)
     if dry_run:
-        print(message, flush=True)
+        for chunk in chunks:
+            print(chunk, flush=True)
         return True
     webhook = os.environ.get("PROTO1_DISCORD_WEBHOOK_URL", "").strip()
     if not webhook:
@@ -282,7 +307,10 @@ def process_one(day, rno, deadline, *, dry_run=False):
     if not path:
         return False
     try:
-        msg_id = discord_post(webhook, {"username": "浜名湖12日限定・AI総合ガイド", "content": message})
+        sent_ids = []
+        for chunk in chunks:
+            sent_ids.append(discord_post(webhook, {"username": "浜名湖12日限定・AI総合ガイド", "content": chunk}))
+        msg_id = ",".join(sent_ids)
     except Exception as exc:
         # A network failure may be an acknowledged post with a lost response.
         # Do not blindly retry: keep the reservation for manual reconciliation.
