@@ -1,6 +1,6 @@
 # 勝ちルール探索レポート
 
-対象 3034R / 28日 / 的中率 43.5% / 回収率 75.3% / 収支 -892,430円
+対象 3146R / 29日 / 的中率 43.1% / 回収率 74.4% / 収支 -957,360円
 
 ## 運用ルール
 
@@ -11,22 +11,27 @@
 
 ## 検証済みプラス候補
 
-- slit_shape=outer_attack_3: 検証 46R / 的中52.2% / ROI101.9%
+- slit_shape=outer_attack_3: 検証 45R / 的中48.9% / ROI101.3%
 
 ## 見送り候補
 
-- venue=桐生: 検証 35R / 的中37.1% / ROI44.5%
-- tide_phase=falling / wind=0-1m: 検証 38R / 的中44.7% / ROI50.7%
-- venue=戸田: 検証 29R / 的中31.0% / ROI51.2%
-- venue=尼崎 / wave=0-2cm: 検証 24R / 的中45.8% / ROI52.2%
-- head_gap=20pt+ / slit_shape=strong_outer_attack_4: 検証 45R / 的中40.0% / ROI53.3%
+- venue=浜名湖: 検証 25R / 的中32.0% / ROI37.0%
+- venue=戸田 / grade=C: 検証 24R / 的中20.8% / ROI40.5%
+- venue=桐生: 検証 42R / 的中38.1% / ROI42.7%
+- venue=戸田: 検証 39R / 的中28.2% / ROI47.2%
+- tide_range=medium / wind=0-1m: 検証 31R / 的中45.2% / ROI52.9%
 - venue=三国: 検証 34R / 的中32.4% / ROI53.8%
-- tide_range=medium / wind=0-1m: 検証 25R / 的中48.0% / ROI56.4%
-- points=11-12 / head_gap=10-19pt: 検証 134R / 的中33.6% / ROI60.9%
+- attack_gap=10-14pt / head_gap=20pt+: 検証 53R / 的中49.1% / ROI58.4%
+- venue=福岡: 検証 37R / 的中48.6% / ROI58.7%
+- head_gap=20pt+ / slit_shape=strong_outer_attack_4: 検証 44R / 的中45.5% / ROI59.6%
+- points=11-12 / head_gap=10-19pt: 検証 144R / 的中34.7% / ROI59.9%
+- tide_phase=falling / wind=0-1m: 検証 43R / 的中46.5% / ROI61.5%
 - venue=多摩川: 検証 48R / 的中45.8% / ROI62.1%
-- venue=福岡: 検証 34R / 的中55.9% / ROI65.6%
+- st_spread=10-14pt: 検証 148R / 的中45.3% / ROI62.8%
+- tide_applicable=no: 検証 411R / 的中42.1% / ROI63.9%
+- score=<60 / head_gap=10-19pt: 検証 27R / 的中33.3% / ROI66.2%
+- venue=常滑 / wind=2-3m: 検証 34R / 的中47.1% / ROI68.0%
 - venue=若松: 検証 44R / 的中43.2% / ROI68.7%
-- st_spread=10-14pt: 検証 134R / 的中50.0% / ROI69.9%
-- tide_applicable=no: 検証 385R / 的中43.9% / ROI70.5%
-- head_top=25-34%: 検証 215R / 的中33.0% / ROI71.3%
-- slit_shape=flat_or_inner: 検証 82R / 的中46.3% / ROI73.4%
+- venue=常滑 / wave=0-2cm: 検証 43R / 的中48.8% / ROI69.3%
+- tide_level=mid: 検証 117R / 的中39.3% / ROI73.2%
+- head_top=25-34%: 検証 223R / 的中32.7% / ROI73.9%
