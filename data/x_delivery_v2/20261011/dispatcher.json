@@ -1,24 +1,36 @@
 {
   "audit": {
     "already_selected": 10,
-    "eligible": 0,
-    "inside_cutoff": 32,
-    "prediction_files": 45,
-    "selection_gate": 3
+    "eligible": 1,
+    "inside_cutoff": 33,
+    "prediction_files": 46,
+    "selection_gate": 2
   },
-  "checked_at": "2026-10-11T12:14:07.030743+09:00",
+  "checked_at": "2026-10-11T12:18:28.077532+09:00",
   "counts": {
-    "waiting_result": 2
+    "quota_or_guard": 1,
+    "sent": 2,
+    "waiting_result": 1
   },
   "day": "20261011",
   "errors": [],
   "events": [
     {
+      "key": "prediction:20261011:22:4",
+      "status": "quota_or_guard"
+    },
+    {
       "key": "result:20261011:06:3",
-      "status": "waiting_result"
+      "post_id": "2109121331078046059",
+      "status": "sent"
     },
     {
       "key": "result:20261011:22:3",
+      "post_id": "2109121354905915558",
+      "status": "sent"
+    },
+    {
+      "key": "result:20261011:02:4",
       "status": "waiting_result"
     }
   ],
@@ -146,11 +158,27 @@
       "verified": true
     },
     {
+      "content_sha256": "6066da29e432e616c12ec6cd506a9983d1f9282593a30298a954ac3bb52781a9",
+      "key": "result:20261011:06:3",
+      "post_id": "2109121331078046059",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-11T12:18:05.862515+09:00",
+      "verified": true
+    },
+    {
       "content_sha256": "e8280955d658d8668cf82309214d534761ea8100171c555347d791bc2b98ce20",
       "key": "result:20261011:16:3",
       "post_id": "2109119334815785210",
       "restart_duplicate_guard_verified": true,
       "sent_at": "2026-10-11T12:10:09.926716+09:00",
+      "verified": true
+    },
+    {
+      "content_sha256": "2d1d67a399d45294f5e07d0c3443c03630ff1e10948395d36db06b12d6793856",
+      "key": "result:20261011:22:3",
+      "post_id": "2109121354905915558",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-11T12:18:11.529345+09:00",
       "verified": true
     },
     {
@@ -324,5 +352,5 @@
   ],
   "status": "checked",
   "trigger_event": "workflow_dispatch",
-  "workflow_run_id": "38107691962"
+  "workflow_run_id": "38107910354"
 }
