@@ -18,6 +18,7 @@ import x_featured_selector as selector
 import x_post_delivery as formatter
 from x_delivery_policy import JST, validate_live_row
 from x_delivery_v2.store import FIELDS, Store, key, receipt_key
+from x_delivery_v2.usage import daily_usage
 
 RECOVERY = Path("data/x_delivery_v2_recovery")
 
@@ -161,6 +162,31 @@ def verify(state, archive):
     return verified
 
 
+def _write_actions_monitor_summary(report: dict) -> None:
+    """Visible per-run X cost/duplicate summary, without additional X API calls."""
+    path = os.getenv("GITHUB_STEP_SUMMARY", "").strip()
+    if not path:
+        return
+    current = report["x_monitor"]["today"]
+    previous = report["x_monitor"]["previous_day"]
+    lines = [
+        "### X 投稿数・API料金（推定）・重複防止",
+        f"- 当日予想: **{current['confirmed_predictions']}/{current['prediction_limit']}**、結果: **{current['confirmed_results']}**",
+        f"- 当日確認済み投稿: **{current['confirmed_post_total']}**、通常投稿料金概算: **${current['estimated_confirmed_posts_cost_usd']:.3f}**",
+        f"- 30本予想+30本結果を毎日投稿した場合: **${current['full_day_cost_estimate_usd']:.2f}/日**、**${current['full_30_days_cost_estimate_usd']:.2f}/30日**",
+        f"- 前日確認済み投稿: **{previous['confirmed_post_total']}**、料金概算: **${previous['estimated_confirmed_posts_cost_usd']:.3f}**",
+        f"- ID検証と再送ブロック確認: **{report['x_monitor']['duplicate_guard_verified']}件**、未解決送信: **{report['x_monitor']['held_transmissions']}件**",
+        f"- 監視アラート: **{', '.join(current['alerts'] + previous['alerts']) or 'なし'}**",
+        "",
+        "※ 成功IDを基にした概算です。失敗/不明の請求、残高、他アプリの利用は含みません。実請求はX Developer Consoleで確認してください。",
+    ]
+    try:
+        with Path(path).open("a", encoding="utf-8") as summary_file:
+            summary_file.write("\n".join(lines) + "\n")
+    except OSError:
+        print("::warning::X Actions cost summary unavailable", flush=True)
+
+
 def run_once(*, store=None, clock=None, transport=render_send, mode="all", budget_seconds=90,
              monotonic=time.monotonic, ready=formatter.check_render_ready, candidates=None):
     clock = clock or (lambda:datetime.now(JST))
@@ -209,8 +235,10 @@ def run_once(*, store=None, clock=None, transport=render_send, mode="all", budge
                     errors.append({"stage":"result", "key":race, "error_type":type(exc).__name__})
     native = []
     held = []
+    states_by_day = {}
     for check_day in days:
         current = store.state(check_day)
+        states_by_day[check_day] = current
         archive = store.archive(check_day)
         try:
             native += verify(current, archive)
@@ -228,13 +256,24 @@ def run_once(*, store=None, clock=None, transport=render_send, mode="all", budge
             if replay["status"] != "already_sent" or replay["post_id"] != proof["post_id"]:
                 raise ValueError("X restart duplicate guard did not hold")
             proof["restart_duplicate_guard_verified"] = True
+    usage_today = daily_usage(states_by_day.get(day, {}))
+    usage_previous = daily_usage(states_by_day.get(days[1], {}))
+    monitor = {
+        "today": usage_today,
+        "previous_day": usage_previous,
+        "duplicate_guard_verified": sum(bool(row.get("restart_duplicate_guard_verified")) for row in native),
+        "held_transmissions": len(held),
+    }
+    integrity_alerts = {"prediction_cap_exceeded", "result_cap_exceeded", "result_missing_prediction"}
+    unexpected = integrity_alerts.intersection(usage_today["alerts"] + usage_previous["alerts"])
     report = {"day":day, "checked_at":clock().isoformat(), "workflow_run_id":os.getenv("GITHUB_RUN_ID", "local"),
               "trigger_event":os.getenv("GITHUB_EVENT_NAME", ""), "mode":mode,
-              "status":"degraded" if errors or held else "checked", "audit":audit,
+              "status":"degraded" if errors or held or unexpected else "checked", "audit":audit,
               "counts":dict(Counter(row["status"] for row in events)), "events":[{k:row[k] for k in ("key","status","post_id") if k in row} for row in events],
-              "errors":errors, "held":held, "production_verification":native}
+              "errors":errors, "held":held, "production_verification":native, "x_monitor":monitor}
     store.report(day, report)
-    print("X dispatcher "+json.dumps({k:report[k] for k in ("day", "status", "audit", "counts", "errors", "held")}, ensure_ascii=False), flush=True)
+    _write_actions_monitor_summary(report)
+    print("X dispatcher "+json.dumps({k:report[k] for k in ("day", "status", "audit", "counts", "errors", "held", "x_monitor")}, ensure_ascii=False), flush=True)
     return report
 
 
