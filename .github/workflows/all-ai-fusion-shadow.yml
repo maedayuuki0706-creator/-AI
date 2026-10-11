@@ -1,0 +1,84 @@
+name: All AI Fusion - Log Only Shadow Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'fusion_shadow.py'
+      - 'fusion_shadow_runner.py'
+      - 'tests/test_fusion_shadow.py'
+      - '.github/workflows/all-ai-fusion-shadow.yml'
+  schedule:
+    # UTC 23:03-14:58 = JST 08:03-23:58. GitHub schedules can be delayed.
+    - cron: '3-58/5 23,0-14 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: all-ai-fusion-shadow-independent
+  cancel-in-progress: false
+
+jobs:
+  check_and_log:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*.py
+            /notification_policy.json
+            /tests/test_fusion_shadow.py
+            /x_delivery_v2/
+            /data/sheet_db/
+            /data/racer_profiles.json
+            /data/learning_state.json
+            /data/venue_tactical_priors.json
+            /data/venue_tide_profiles.json
+            /data/race_context/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate timing, scoring, storage and no-delivery integration
+        run: python -m unittest discover -s tests -p 'test_fusion_shadow.py' -v
+      - name: Open separate log state
+        run: |
+          git fetch --depth=1 origin research-fusion-shadow-state:refs/remotes/origin/research-fusion-shadow-state
+          git -c core.sparseCheckout=false worktree add --detach "$RUNNER_TEMP/fusion-shadow-state" refs/remotes/origin/research-fusion-shadow-state
+          git -C "$RUNNER_TEMP/fusion-shadow-state" config user.name 'github-actions[bot]'
+          git -C "$RUNNER_TEMP/fusion-shadow-state" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Collect live predictions and later official results; log only
+        run: python fusion_shadow_runner.py --out "$RUNNER_TEMP/fusion-shadow-state/data/fusion_shadow" --budget-seconds 85
+      - name: Persist log state only, including failed collector coverage
+        id: persist
+        if: always()
+        run: |
+          ROOT="$RUNNER_TEMP/fusion-shadow-state"
+          if [ ! -d "$ROOT/data/fusion_shadow" ]; then
+            exit 0
+          fi
+          git -C "$ROOT" add data/fusion_shadow/
+          if ! git -C "$ROOT" diff --cached --quiet; then
+            git -C "$ROOT" commit -m 'research: record all-AI fusion shadow logs'
+            git -C "$ROOT" push origin HEAD:refs/heads/research-fusion-shadow-state
+            echo "commit_sha=$(git -C "$ROOT" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Confirm remote prediction save before deadline in a second receipt commit
+        if: always() && steps.persist.outputs.commit_sha != ''
+        env:
+          FUSION_STATE_COMMIT: ${{ steps.persist.outputs.commit_sha }}
+        run: |
+          ROOT="$RUNNER_TEMP/fusion-shadow-state"
+          python fusion_shadow_runner.py --out "$ROOT/data/fusion_shadow" --checkpoint-commit "$FUSION_STATE_COMMIT"
+          if [ -d "$ROOT/data/fusion_shadow/checkpoints" ]; then
+            git -C "$ROOT" add data/fusion_shadow/checkpoints/
+          fi
+          if ! git -C "$ROOT" diff --cached --quiet; then
+            git -C "$ROOT" commit -m 'research: confirm durable pre-deadline fusion snapshots'
+            git -C "$ROOT" push origin HEAD:refs/heads/research-fusion-shadow-state
+          fi
