@@ -295,7 +295,7 @@ def format_message(day, rno, live):
         f"🧠 **根拠・展開予想**\n{explain(live['official'])}\n"
         f"🎯 **本線（重複なし・{len(main)}点）**\n{lines(main)}\n一致状況：{agreement_note or '該当なし'}\n"
         f"🛟 **抑え（{len(cover)}点）** {near}\n{lines(cover)}\n"
-        f"📦 **根拠重視の3艇BOX：{box_label} BOX（6点・本線との重複OK）**\n{box_reason(models.get('prototype1') or {}, box)}\n"
+        f"📦 **PT1 BOX｜根拠重視の3艇：{box_label} BOX（6点・本線との重複OK）**\n{box_reason(models.get('prototype1') or {}, box)}\n"
         f"🗃️ **DB総合予想｜未掲載分 {len(db_unique)}点**\n{lines(db_unique)}\n"
         f"（DB照合 {'有効' if db_enabled else '一致データ不足'}／スナップショット {snapshot}）\n"
         f"📡 **天候・潮の影響**\n{format_conditions(preview)}\n"
