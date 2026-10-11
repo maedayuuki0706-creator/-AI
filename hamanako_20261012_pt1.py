@@ -202,6 +202,36 @@ def explain(official):
     return f"1号艇 {b1.get('name', '')}（{b1.get('current_class', '級別不明')}）{motor_text}。\n{wall}\n{outside}"
 
 
+def compress_exact(picks):
+    """Compress only complete combinations; never add unintended tickets."""
+    remaining = set(distinct(picks))
+    out = []
+    while remaining:
+        head, second, third = min(remaining).split("-")
+        seconds, thirds = {second}, {third}
+        changed = True
+        while changed:
+            changed = False
+            for b in "123456":
+                if b != head and b not in seconds and b not in thirds and all(
+                    f"{head}-{b}-{c}" in remaining for c in thirds
+                ):
+                    seconds.add(b)
+                    changed = True
+            for c in "123456":
+                if c != head and c not in thirds and c not in seconds and all(
+                    f"{head}-{b}-{c}" in remaining for b in seconds
+                ):
+                    thirds.add(c)
+                    changed = True
+        chosen = {f"{head}-{b}-{c}" for b in seconds for c in thirds}
+        if not chosen <= remaining:
+            raise AssertionError("formation changed the original picks")
+        remaining -= chosen
+        out.append(f"{head}-{''.join(sorted(seconds))}-{''.join(sorted(thirds))}")
+    return out
+
+
 def format_message(day, rno, live):
     models = live["models"]
     sources = {}
@@ -229,10 +259,23 @@ def format_message(day, rno, live):
     db_enabled = bool(live["db_info"].get("enabled"))
     if not db_enabled:
         db_picks = []
-    def lines(picks, show_vote=False):
-        return " / ".join(f"{p}({len(votes[p])}系統)" if show_vote else p for p in picks) or "該当なし"
+    # Show any exact ticket only once across main, cover, BOX and DB.
+    from itertools import permutations
+    main_set = set(main)
+    cover_set = set(cover) - main_set
+    box_set = {"-".join(map(str, p)) for p in permutations(box, 3)} if len(box) == 3 else set()
+    box_unique = box_set - main_set - cover_set
+    db_unique = set(db_picks) - main_set - cover_set - box_unique
+    if len(main_set | cover_set | box_unique | db_unique) != sum(
+        map(len, (main_set, cover_set, box_unique, db_unique))
+    ):
+        raise AssertionError("duplicate ticket across sections")
+    def lines(picks):
+        return " / ".join(compress_exact(picks)) or "該当なし"
+    agreement = Counter(len(votes[p]) for p in main)
+    agreement_note = "・".join(f"{n}AI一致 {count}点" for n, count in sorted(agreement.items(), reverse=True))
     cover_long = [p for p in cover if odds.get(p, 0) >= 100]
-    near = f"\n💥 現時点100倍以上の抑え候補: {lines(cover_long)}" if cover_long else ""
+    near = f"（現在100倍以上 {len(cover_long)}点含む）" if cover_long else ""
     snapshot = live["db_info"].get("snapshot_at") or "不明"
     preview = live["official"].get("preview") or {}
     model_names = "・".join(sources)
@@ -240,10 +283,10 @@ def format_message(day, rno, live):
         f"🚤 **10/12 浜名湖{rno}R｜PT1特別・全AI横断**\n"
         f"⏰ 締切 {live['deadline']}｜集計: {model_names}\n"
         f"🧠 **根拠・展開予想**\n{explain(live['official'])}\n"
-        f"🎯 **本線（重複削除・一致数を表示）**\n{lines(main, True)}\n"
-        f"🛟 **抑え**\n{lines(cover)}{near}\n"
-        f"📦 **PT1の3艇BOX**  {box_label}（全6通り。上記と重複する買い目あり）\n"
-        f"🗃️ **DB総合予想** {lines(db_picks)}\n"
+        f"🎯 **本線（重複なし・{len(main)}点）**\n{lines(main)}\n一致状況：{agreement_note or '該当なし'}\n"
+        f"🛟 **抑え（{len(cover)}点）** {near}\n{lines(cover)}\n"
+        f"📦 **PT1 BOX {box_label}｜未掲載分 {len(box_unique)}点**\n{lines(box_unique)}\n"
+        f"🗃️ **DB総合予想｜未掲載分 {len(db_unique)}点**\n{lines(db_unique)}\n"
         f"（DB照合 {'有効' if db_enabled else '一致データ不足'}／スナップショット {snapshot}）\n"
         f"📡 **天候・潮の影響**\n{format_conditions(preview)}\n"
         f"※モデル予測であって的中保証ではありません。購入前に展示・最新オッズ確認。"
