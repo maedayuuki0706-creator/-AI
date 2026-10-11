@@ -69,9 +69,10 @@
   "x_result_attempts": {
     "20261011:12:8": {
       "at": "2026-10-11T18:29:44.469163+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "5552b658af9148f5aa172da326869414",
-      "status": "reserved"
+      "retry_at": "2026-10-11T18:30:17.774610+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {
@@ -1415,6 +1416,7 @@
       "attempt": 1,
       "claimed_at": "2026-10-11T18:29:44.469163+09:00",
       "content_sha256": "e1da08572b42094cbb749a32f918035d035c4c7ef879b6e960f4faf3462bef13",
+      "error_type": "DefiniteRejection",
       "key": "result:20261011:12:8",
       "owner": "5552b658af9148f5aa172da326869414",
       "parent_post_id": "2109210855544176739",
@@ -1468,7 +1470,8 @@
         "source": "AI重なり本線",
         "venue": "住之江"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "updated_at": "2026-10-11T18:29:47.774610+09:00"
     },
     "result:20261011:15:4": {
       "attempt": 1,
