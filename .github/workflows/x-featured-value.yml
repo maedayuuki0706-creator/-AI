@@ -41,7 +41,7 @@ jobs:
       - name: Validate featured selector
         run: python -m unittest discover -s tests -p 'test_x_delivery_v2*.py' -v
 
-      - name: Dispatch up to ten featured value races with durable receipts
+      - name: Dispatch up to thirty featured value races with durable receipts
         env:
           TZ: Asia/Tokyo
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
