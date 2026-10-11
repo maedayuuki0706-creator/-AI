@@ -1,0 +1,49 @@
+name: Hamanako Oct 12 PT1 One-Day All AI Special
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        type: boolean
+        required: false
+        default: true
+        description: 'Print only, do not post Discord'
+  push:
+    branches: [main]
+    paths:
+      - 'hamanako_20261012_pt1.py'
+      - 'tests/test_hamanako_20261012_pt1.py'
+      - '.github/workflows/hamanako-20261012-pt1.yml'
+  # UTC 01:00-08:59 is 10:00-17:59 JST. Script has a hard 2026-10-12 JST kill switch.
+  schedule:
+    - cron: '*/5 1-8 12 10 *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hamanako-20261012-pt1-special
+  cancel-in-progress: false
+
+jobs:
+  test-and-special:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate isolated special safely offline
+        run: |
+          python -m py_compile hamanako_20261012_pt1.py
+          python -m unittest discover -s tests -p 'test_hamanako_20261012_pt1.py' -v
+      - name: One-day race-specific PT1 Discord bulletin
+        env:
+          TZ: Asia/Tokyo
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
+          HAMANAKO_SPECIAL_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+        run: python -u hamanako_20261012_pt1.py
