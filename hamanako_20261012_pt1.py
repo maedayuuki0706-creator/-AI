@@ -232,6 +232,17 @@ def compress_exact(picks):
     return out
 
 
+def box_reason(pt1, box):
+    """Display provenance and the live model's evidence for each BOX lane."""
+    if len(box) != 3 or len(set(box)) != 3:
+        return "対象3艇を確定できず（BOX提示なし）"
+    notes = pt1.get("boat_reasons") or {}
+    return "\n".join(
+        f"{lane}号艇：{notes.get(str(lane)) or 'PT1の3着内確率・AI支持で選定'}"
+        for lane in sorted(box)
+    )
+
+
 def format_message(day, rno, live):
     models = live["models"]
     sources = {}
@@ -264,12 +275,11 @@ def format_message(day, rno, live):
     main_set = set(main)
     cover_set = set(cover) - main_set
     box_set = {"-".join(map(str, p)) for p in permutations(box, 3)} if len(box) == 3 else set()
-    box_unique = box_set - main_set - cover_set
-    db_unique = set(db_picks) - main_set - cover_set - box_unique
-    if len(main_set | cover_set | box_unique | db_unique) != sum(
-        map(len, (main_set, cover_set, box_unique, db_unique))
-    ):
-        raise AssertionError("duplicate ticket across sections")
+    # BOX is a standalone three-boat recommendation, intentionally independent.
+    # Overlap with main/cover is permitted only in this separate BOX display.
+    db_unique = set(db_picks) - main_set - cover_set - box_set
+    if main_set & cover_set or db_unique & (main_set | cover_set | box_set):
+        raise AssertionError("duplicate ticket across non-BOX sections")
     def lines(picks):
         return " / ".join(compress_exact(picks)) or "該当なし"
     agreement = Counter(len(votes[p]) for p in main)
@@ -285,7 +295,7 @@ def format_message(day, rno, live):
         f"🧠 **根拠・展開予想**\n{explain(live['official'])}\n"
         f"🎯 **本線（重複なし・{len(main)}点）**\n{lines(main)}\n一致状況：{agreement_note or '該当なし'}\n"
         f"🛟 **抑え（{len(cover)}点）** {near}\n{lines(cover)}\n"
-        f"📦 **PT1 BOX {box_label}｜未掲載分 {len(box_unique)}点**\n{lines(box_unique)}\n"
+        f"📦 **根拠重視の3艇BOX：{box_label} BOX（6点・本線との重複OK）**\n{box_reason(models.get('prototype1') or {}, box)}\n"
         f"🗃️ **DB総合予想｜未掲載分 {len(db_unique)}点**\n{lines(db_unique)}\n"
         f"（DB照合 {'有効' if db_enabled else '一致データ不足'}／スナップショット {snapshot}）\n"
         f"📡 **天候・潮の影響**\n{format_conditions(preview)}\n"
