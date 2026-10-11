@@ -53,13 +53,14 @@ def github_request(method, path, payload):
     token = os.environ["GITHUB_TOKEN"]
     repo = os.environ["GITHUB_REPOSITORY"]
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    blob_sha = payload.pop("_blob_sha", None)
     body = {
         "message": f"Record Oct 12 Hamanako PT1 special {path.rsplit('/', 1)[-1]}",
         "content": base64.b64encode(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).decode(),
         "branch": "main",
     }
-    if payload.get("_blob_sha"):
-        body["sha"] = payload.pop("_blob_sha")
+    if blob_sha:
+        body["sha"] = blob_sha
     request = urllib.request.Request(
         url, data=json.dumps(body).encode("utf-8"), method=method,
         headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
@@ -168,7 +169,7 @@ def format_conditions(preview):
         phase = {"rising": "上げ潮", "falling": "下げ潮"}.get(tide.get("phase"), "潮位変動")
         station = tide.get("station") or "舞阪"
         nearm = tide.get("nearest_turn_minutes")
-        minutes = f"／潮止まりまで約{nearm}分" if isinstance(nearm, int) else ""
+        minutes = f"／満干の転換点から前後約{nearm}分" if isinstance(nearm, int) else ""
         result += f"\n🌊 {phase}{minutes}（{station}の参照潮汐。水面への影響は展示と照合）"
     else:
         result += "\n🌊 浜名湖は汽水で干満差あり。今回の潮位推定は未取得（補正なし）"
@@ -266,6 +267,9 @@ def process_one(day, rno, deadline, *, dry_run=False):
         print(f"{rno}R {status}", flush=True)
         return False
     message = format_message(day, rno, live)
+    if base.minutes_until(now_jst(), deadline) < 0.5:
+        print(f"{rno}R closing; skip stale prediction", flush=True)
+        return False
     if dry_run:
         print(message, flush=True)
         return True
