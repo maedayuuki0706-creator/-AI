@@ -437,6 +437,18 @@ def collect_candidates(now: datetime, state: dict, *, audit: dict | None = None)
         audit[reason] = audit.get(reason, 0) + 1
     featured = list(map(str, state.get("x_featured_races") or []))
     posted = set(map(str, state.get("x_posted_races") or []))
+    in_flight = {
+        key.removeprefix("prediction:")
+        for key, receipt in (state.get("x_v2_receipts") or {}).items()
+        if key.startswith("prediction:")
+        and receipt.get("status") in {"sending", "sent", "uncertain"}
+    }
+    reserved = set(featured) | posted | in_flight
+    remaining = max(0, MAX_DAILY_POSTS - len(reserved))
+    if not remaining:
+        audit["daily_quota_full"] = len(reserved)
+        audit["eligible"] = 0
+        return []
     used_modes = set((state.get("x_featured_modes") or {}).values())
     candidates = []
     for stem in sorted(_stems(day)):
@@ -480,7 +492,8 @@ def collect_candidates(now: datetime, state: dict, *, audit: dict | None = None)
 
     candidates.sort(key=lambda item: (item["rank"], -int(item["race"]["rno"])), reverse=True)
     audit["eligible"] = len(candidates)
-    return candidates
+    audit["remaining_daily_slots"] = remaining
+    return candidates[:remaining]
 
 
 def run(now: datetime | None = None) -> int:
