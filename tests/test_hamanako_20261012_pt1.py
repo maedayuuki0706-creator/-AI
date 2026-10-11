@@ -46,7 +46,18 @@ class HamanakoOneDayTests(unittest.TestCase):
             self.assertIn(section, content)
         self.assertLessEqual(len(content), 1950)
         self.assertIn("123", content)
-        self.assertIn("1-2-3(5系統)", content)
+        self.assertIn("5AI一致", content)
+
+    def test_compression_is_exact_and_duplicate_free(self):
+        picks = ["1-2-4", "1-2-5", "1-3-4", "1-3-5", "1-2-4"]
+        compressed = m.compress_exact(picks)
+        expanded = []
+        for line in compressed:
+            first, seconds, thirds = line.split("-")
+            expanded += [f"{first}-{b}-{c}" for b in seconds for c in thirds]
+        self.assertEqual(set(expanded), set(picks))
+        self.assertEqual(len(expanded), len(set(expanded)))
+        self.assertIn("1-23-45", compressed)
 
     def test_no_false_tide_assertion(self):
         s = m.format_conditions({"wind_speed": None, "wave_cm": None,
