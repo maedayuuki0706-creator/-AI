@@ -1,0 +1,326 @@
+"""One-day, isolated Hamamatsu/Hamanako PT1 field guide.
+Does not touch existing Discord channel feeds or modify prediction journals.
+The only valid live day is 2026-10-12 JST, venue 06.
+"""
+from __future__ import annotations
+
+import base64
+from collections import Counter, defaultdict
+from datetime import datetime
+from hashlib import sha256
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.request
+
+import direct_discord_notify as base
+import detailed_discord_notify as cards
+import four_way_prototype as trial
+import hiyori_model
+import hiyori_source
+import opportunity_alerts
+import mid_value_selection
+import pt2_sheet_db
+from discord_ack import post as discord_post
+
+DAY = "20261012"
+JCD = "06"
+RECEIPT_ROOT = "data/hamanako_pt1_20261012/receipts"
+COMBO = re.compile(r"^[1-6]-[1-6]-[1-6]$")
+MODEL_LABELS = {
+    "existing": "既存", "hiyori": "日和",
+    "prototype1": "PT1", "prototype2": "PT2", "prototype3": "PT3",
+}
+
+
+def now_jst():
+    return datetime.now(base.JST)
+
+
+def valid_combo(item):
+    if not isinstance(item, str) or not COMBO.fullmatch(item):
+        return False
+    return len(set(item.split("-"))) == 3
+
+
+def distinct(values):
+    return list(dict.fromkeys(value for value in values if valid_combo(value)))
+
+
+def github_request(method, path, payload):
+    token = os.environ["GITHUB_TOKEN"]
+    repo = os.environ["GITHUB_REPOSITORY"]
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    blob_sha = payload.pop("_blob_sha", None)
+    body = {
+        "message": f"Record Oct 12 Hamanako PT1 special {path.rsplit('/', 1)[-1]}",
+        "content": base64.b64encode(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).decode(),
+        "branch": "main",
+    }
+    if blob_sha:
+        body["sha"] = blob_sha
+    request = urllib.request.Request(
+        url, data=json.dumps(body).encode("utf-8"), method=method,
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+                 "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28"},
+    )
+    with urllib.request.urlopen(request, timeout=15) as response:
+        return json.load(response)
+
+
+def reserve(rno, content):
+    """Atomic create: if receipt already exists, never post a second message."""
+    path = f"{RECEIPT_ROOT}/{DAY}_{JCD}_{rno:02}.json"
+    payload = {
+        "day": DAY, "venue": JCD, "race": rno,
+        "state": "reserved", "reserved_at": now_jst().isoformat(),
+        "digest": sha256(content.encode()).hexdigest(),
+    }
+    try:
+        answer = github_request("PUT", path, dict(payload))
+    except urllib.error.HTTPError as exc:
+        if exc.code in (409, 422):
+            print(f"receipt exists/conflict for {rno}R; do not repost", flush=True)
+            return None, None
+        raise
+    return path, answer["content"]["sha"]
+
+
+def mark_delivered(path, sha, rno, message_id):
+    receipt = {
+        "day": DAY, "venue": JCD, "race": rno,
+        "state": "delivered", "delivered_at": now_jst().isoformat(),
+        "message_id": str(message_id), "_blob_sha": sha,
+    }
+    return github_request("PUT", path, receipt)
+
+
+def build_live(day, rno, deadline):
+    captured = now_jst()
+    official = base.analyze_official(day, JCD, rno)
+    if not official or len(official.get("inputs") or []) != 6:
+        return None, "公式出走情報不足"
+    if (official.get("preview") or {}).get("exhibition_count") != 6:
+        return None, "展示情報待機"
+    odds = {
+        row["combination"]: float(row["odds"])
+        for row in official.get("trifecta") or []
+        if valid_combo(row.get("combination")) and isinstance(row.get("odds"), (int, float))
+        and float(row["odds"]) > 0
+    }
+    if len(odds) < 60:
+        return None, "当日オッズ取得待機"
+
+    # Use the same live official snapshot for every available model.
+    request = {"day": day, "jcd": JCD, "rno": rno,
+               "deadline": deadline, "captured_at": captured.isoformat(),
+               "official": official}
+    try:
+        source = hiyori_source.fetch_race(day, JCD, rno)
+        source["fetched_at"] = now_jst().isoformat()
+        hiyori = hiyori_model.analyze(official, source, day, JCD, rno)
+        if not any(f.get("used") for f in hiyori.get("features") or []):
+            return None, "日和実測データ待機"
+        bundle = trial.build_bundle(request, hiyori, source, now=now_jst())
+    except Exception as exc:
+        # Never invent an absent model's picks.
+        print(f"model input waiting {rno}R: {type(exc).__name__}: {exc}", flush=True)
+        return None, "日和・比較モデル待機"
+
+    db = pt2_sheet_db.enhance_analysis(official, JCD)
+    db_info = db.get("sheet_database") or {}
+    db_picks = distinct([
+        row["combination"]
+        for row in cards.displayed_picks_variable(db, True)
+    ])
+    # The 中穴/穴 policies are selection layers, not additional independent engines.
+    mid_value_selection.install(opportunity_alerts)
+    selectors = {}
+    for kind, label in (("mid", "中穴選別"), ("long", "穴選別")):
+        candidates = opportunity_alerts._candidate_rows(official, kind)
+        picked = opportunity_alerts._coherent_selection(candidates, kind, official)
+        selectors[label] = distinct([row.get("combination") for row in picked])[:6]
+    return {
+        "official": official, "models": bundle["models"], "selectors": selectors,
+        "db": db, "db_info": db_info, "db_picks": db_picks,
+        "odds": odds, "deadline": deadline,
+    }, "ready"
+
+
+def format_conditions(preview):
+    wind = preview.get("wind_speed")
+    wave = preview.get("wave_cm")
+    wind_label = f"{wind:g}m" if isinstance(wind, (int, float)) else "不明"
+    wave_label = f"{wave:g}cm" if isinstance(wave, (int, float)) else "不明"
+    if wind is None:
+        wind_effect = "風速未取得。直前のスリット・旋回を優先"
+    elif wind >= 5:
+        wind_effect = "風が強い。起こし・旋回の乱れを警戒"
+    elif wind >= 3:
+        wind_effect = "風の影響に注意。2・3の壁と4の行き足を比較"
+    else:
+        wind_effect = "比較的弱風。風だけで穴扱いしない"
+    # Official beforeinfo parser measures wind speed, not the exact wind direction.
+    result = f"🌬️ 風{wind_label}・波{wave_label}｜{wind_effect}（風向は未判定）"
+    tide = preview.get("tide") or {}
+    if tide.get("available"):
+        phase = {"rising": "上げ潮", "falling": "下げ潮"}.get(tide.get("phase"), "潮位変動")
+        station = tide.get("station") or "舞阪"
+        nearm = tide.get("nearest_turn_minutes")
+        minutes = f"／満干の転換点から前後約{nearm}分" if isinstance(nearm, int) else ""
+        result += f"\n🌊 {phase}{minutes}（{station}の参照潮汐。水面への影響は展示と照合）"
+    else:
+        result += "\n🌊 浜名湖は汽水で干満差あり。今回の潮位推定は未取得（補正なし）"
+    return result
+
+
+def explain(official):
+    boats = {int(b["lane"]): b for b in official.get("inputs") or []}
+    preview = official.get("preview") or {}
+    b1 = boats[1]
+    motor = b1.get("motor_top2_rate")
+    motor_text = f"／1号艇のモーター2連率{motor:g}%" if isinstance(motor, (int, float)) else ""
+    candidates = [
+        (b.get("exhibition_st"), i) for i, b in boats.items()
+        if i in (3, 4, 5) and isinstance(b.get("exhibition_st"), (int, float))
+    ]
+    attack = min(candidates)[1] if candidates else None
+    st_2 = boats[2].get("exhibition_st")
+    st_3 = boats[3].get("exhibition_st")
+    st_4 = boats[4].get("exhibition_st")
+    if all(isinstance(s, (int, float)) for s in (st_3, st_4)):
+        wall = f"3号艇の展示ST {st_3:.2f}、4号艇 {st_4:.2f}。"
+        wall += "4攻めの可能性あり。" if st_4 + .07 < st_3 else "壁が崩れるかは伸びも確認。"
+    else:
+        wall = "2・3号艇が壁になるか直前の展示で判断。"
+    if attack:
+        outside = f"{attack}号艇の展示STが3〜5号艇で先行。攻めた艇の外側にも展開余地。"
+    else:
+        outside = "外から仕掛ける艇は確定できず。"
+    return f"1号艇 {b1.get('name', '')}（{b1.get('current_class', '級別不明')}）{motor_text}。\n{wall}\n{outside}"
+
+
+def format_message(day, rno, live):
+    models = live["models"]
+    sources = {}
+    for key in MODEL_LABELS:
+        model = models.get(key) or {}
+        sources[MODEL_LABELS[key]] = distinct(model.get("picks") or [])
+    sources.update(live["selectors"])
+    votes = defaultdict(set)
+    for source, picks in sources.items():
+        for combo in picks:
+            votes[combo].add(source)
+    db_rank = {p: i for i, p in enumerate(live["db_picks"])}
+    odds = live["odds"]
+    # Agreement first, then DB ranking as a tie-breaker. Avoid duplicate tickets.
+    ordered = sorted(votes, key=lambda p: (
+        -len(votes[p]), db_rank.get(p, 999), -float(odds.get(p, 0)), p
+    ))
+    main = [p for p in ordered if len(votes[p]) >= 3][:6]
+    if len(main) < 4:
+        main = distinct(main + ordered)[:6]
+    cover = [p for p in ordered if p not in set(main)][:8]
+    box = models.get("prototype1", {}).get("box_lanes") or []
+    box_label = "".join(map(str, sorted(box))) if len(box) == 3 else "不明"
+    db_picks = live["db_picks"][:5]
+    db_enabled = bool(live["db_info"].get("enabled"))
+    if not db_enabled:
+        db_picks = []
+    def lines(picks, show_vote=False):
+        return " / ".join(f"{p}({len(votes[p])}系統)" if show_vote else p for p in picks) or "該当なし"
+    cover_long = [p for p in cover if odds.get(p, 0) >= 100]
+    near = f"\n💥 現時点100倍以上の抑え候補: {lines(cover_long[:3])}" if cover_long else ""
+    snapshot = live["db_info"].get("snapshot_at") or "不明"
+    preview = live["official"].get("preview") or {}
+    model_names = "・".join(sources)
+    body = (
+        f"🚤 **10/12 浜名湖{rno}R｜PT1特別・全AI横断**\n"
+        f"⏰ 締切 {live['deadline']}｜集計: {model_names}\n"
+        f"🧠 **根拠・展開予想**\n{explain(live['official'])}\n"
+        f"🎯 **本線（重複削除・一致数を表示）**\n{lines(main, True)}\n"
+        f"🛟 **抑え**\n{lines(cover)}{near}\n"
+        f"📦 **PT1の3艇BOX**  {box_label}（全6通り。上記と重複する買い目あり）\n"
+        f"🗃️ **DB総合予想** {lines(db_picks)}\n"
+        f"（DB照合 {'有効' if db_enabled else '一致データ不足'}／スナップショット {snapshot}）\n"
+        f"📡 **天候・潮の影響**\n{format_conditions(preview)}\n"
+        f"※モデル予測であって的中保証ではありません。購入前に展示・最新オッズ確認。"
+    )
+    if len(body) > 1950:
+        # Keep required sections, reduce verbose extras rather than truncating mid-ticket.
+        body = body.replace(f"｜集計: {model_names}", "｜既存/日和/PT1/PT2/PT3＋中穴/穴")
+    if len(body) > 1950:
+        body = body.replace(f"（DB照合 {'有効' if db_enabled else '一致データ不足'}／スナップショット {snapshot}）",
+                            f"（DB照合 {'有効' if db_enabled else '未成立'}）")
+    if len(body) > 1950:
+        raise ValueError("Discord payload too long")
+    if len(set(main).intersection(cover)):
+        raise AssertionError("Main and cover share picks")
+    return body
+
+
+def process_one(day, rno, deadline, *, dry_run=False):
+    live, status = build_live(day, rno, deadline)
+    if not live:
+        print(f"{rno}R {status}", flush=True)
+        return False
+    message = format_message(day, rno, live)
+    if base.minutes_until(now_jst(), deadline) < 0.5:
+        print(f"{rno}R closing; skip stale prediction", flush=True)
+        return False
+    if dry_run:
+        print(message, flush=True)
+        return True
+    webhook = os.environ.get("PROTO1_DISCORD_WEBHOOK_URL", "").strip()
+    if not webhook:
+        raise RuntimeError("PT1 webhook is missing; fail closed")
+    if not os.getenv("GITHUB_TOKEN") or not os.getenv("GITHUB_REPOSITORY"):
+        raise RuntimeError("durable receipt repository unavailable; fail closed")
+    path, sha = reserve(rno, message)
+    if not path:
+        return False
+    try:
+        msg_id = discord_post(webhook, {"username": "浜名湖12日限定・AI総合ガイド", "content": message})
+    except Exception as exc:
+        # A network failure may be an acknowledged post with a lost response.
+        # Do not blindly retry: keep the reservation for manual reconciliation.
+        print(f"::error::Discord ack unknown {rno}R: {type(exc).__name__}: {exc}", flush=True)
+        raise
+    mark_delivered(path, sha, rno, msg_id)
+    print(f"{rno}R posted PT1 message_id={msg_id}", flush=True)
+    return True
+
+
+def main():
+    now = now_jst()
+    if now.strftime("%Y%m%d") != DAY:
+        print("One-day special inactive outside 2026-10-12 JST", flush=True)
+        return 0
+    # Do not disturb other channels or their delivery/scoreboard state.
+    if not 10 <= now.hour <= 17:
+        print("Outside Hamanako race window", flush=True)
+        return 0
+    if os.getenv("GITHUB_REPOSITORY") != "maedayuuki0706-creator/-AI":
+        raise RuntimeError("unexpected repository")
+    base.fetch.cache_clear()
+    schedule = base.deadlines(DAY, JCD)
+    if len(schedule) != 12:
+        print("Official deadline data incomplete; no messages", flush=True)
+        return 0
+    due = [
+        (rno, deadline)
+        for rno, deadline in enumerate(schedule, 1)
+        if .5 <= base.minutes_until(now, deadline) <= 17
+    ]
+    for rno, deadline in due:
+        try:
+            process_one(DAY, rno, deadline, dry_run=os.getenv("HAMANAKO_SPECIAL_DRY_RUN") == "1")
+        except Exception as exc:
+            print(f"::warning::{rno}R failed: {type(exc).__name__}: {exc}", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
