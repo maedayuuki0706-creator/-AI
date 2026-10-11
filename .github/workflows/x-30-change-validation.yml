@@ -1,0 +1,29 @@
+name: X 30 Posts No-Send Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "x_featured_selector.py"
+      - "x_delivery_v2/**"
+      - "tests/test_x_delivery_v2.py"
+      - "tests/test_x_featured_selector.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate 30-post cap, exact receipts, cutoff and zero duplicate sends
+        run: |
+          python -m unittest discover -s tests -p 'test_x_delivery_v2.py' -v
+          python -m unittest discover -s tests -p 'test_x_featured_selector.py' -v
+          python -m unittest discover -s tests -p 'test_x_delivery.py' -v
