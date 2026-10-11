@@ -18,6 +18,8 @@ import x_post_delivery as formatter
 from x_delivery_policy import JST, weighted_length
 from x_delivery_v2 import dispatcher
 from x_delivery_v2.store import Store, key, receipt_key
+from x_delivery_v2.limits import MAX_DAILY_X_PREDICTIONS
+from x_delivery_v2.usage import daily_usage
 
 
 class MemoryStore(Store):
@@ -164,12 +166,48 @@ class XProductionTests(unittest.TestCase):
         self.sender.assert_not_called()
 
     def test_daily_quota_includes_inflight_and_confirmed_claims(self):
-        rows=[{**self.row,"rno":r} for r in range(1,12)]
+        self.assertEqual(selector.MAX_DAILY_POSTS, MAX_DAILY_X_PREDICTIONS)
+        rows = [
+            {**self.row, "jcd": f"{venue:02d}", "rno": rno}
+            for venue in (2, 3, 5)
+            for rno in range(1, 13)
+        ][:MAX_DAILY_X_PREDICTIONS + 1]
         for row in rows:
             self.store.publish(row)
             self.send(row)
-        self.assertEqual(self.sender.call_count,10)
-        self.assertEqual(len(self.store.state("20261006")["x_featured_races"]),10)
+        self.assertEqual(self.sender.call_count, MAX_DAILY_X_PREDICTIONS)
+        state = self.store.state("20261006")
+        self.assertEqual(len(state["x_featured_races"]), MAX_DAILY_X_PREDICTIONS)
+        self.assertEqual(len(state["x_post_ids"]), MAX_DAILY_X_PREDICTIONS)
+        self.assertEqual(len(state["x_attempts"]), 0)
+
+    def test_x_monitor_reports_30_cap_costs_and_result_pairing(self):
+        self.assertEqual(self.send()["status"], "sent")
+        self.now += timedelta(minutes=31)
+        self.assertEqual(self.send(phase="result")["status"], "sent")
+        report = dispatcher.run_once(store=self.store, clock=lambda:self.now,
+                                      transport=self.sender, candidates=[], ready=Mock())
+        current = report["x_monitor"]["today"]
+        self.assertEqual(current["prediction_limit"], 30)
+        self.assertEqual(current["confirmed_predictions"], 1)
+        self.assertEqual(current["confirmed_results"], 1)
+        self.assertEqual(current["confirmed_post_total"], 2)
+        self.assertEqual(current["estimated_confirmed_posts_cost_usd"], 0.03)
+        self.assertEqual(current["full_day_cost_estimate_usd"], 0.9)
+        self.assertEqual(current["full_30_days_cost_estimate_usd"], 27.0)
+        self.assertEqual(report["x_monitor"]["duplicate_guard_verified"], 2)
+        self.assertTrue(current["cost_estimate_only_not_x_invoice"])
+        self.assertEqual(self.sender.call_count, 2)
+
+    def test_x_monitor_warns_about_orphan_results_and_uncertain_posts(self):
+        race = key(self.row)
+        status = daily_usage({
+            "x_result_post_ids": {race: "123456789"},
+            "x_v2_receipts": {"prediction:" + race: {"status": "uncertain"}},
+        })
+        self.assertIn("result_missing_prediction", status["alerts"])
+        self.assertIn("unresolved_api_attempts", status["alerts"])
+        self.assertEqual(status["result_without_prediction_count"], 1)
 
     def test_result_requires_confirmed_prediction_id_and_does_not_repost_prediction(self):
         self.now += timedelta(minutes=31)
