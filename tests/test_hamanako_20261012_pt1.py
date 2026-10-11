@@ -41,7 +41,7 @@ class HamanakoOneDayTests(unittest.TestCase):
 
     def test_message_has_requested_sections(self):
         content = m.format_message(m.DAY, 1, sample_live())
-        for section in ("浜名湖1R", "根拠・展開予想", "本線", "抑え", "3艇BOX",
+        for section in ("浜名湖1R", "根拠・展開予想", "本線", "抑え", "PT1 BOX",
                         "DB総合予想", "天候・潮の影響", "上げ潮"):
             self.assertIn(section, content)
         self.assertLessEqual(len(content), 1950)
