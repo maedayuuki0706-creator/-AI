@@ -1,4 +1,8 @@
 import unittest
+from datetime import datetime
+from unittest.mock import patch
+
+from x_delivery_policy import JST
 
 import x_featured_selector as featured
 
@@ -43,6 +47,38 @@ class FeaturedXSelectorTests(unittest.TestCase):
         self.assertIsNotNone(pick)
         self.assertEqual(pick["source"], "AI重なり本線")
         self.assertIn("5-2-4", pick["picks"])
+
+    def test_full_daily_quota_skips_selection_but_keeps_results_free_to_run(self):
+        day = "20261011"
+        state = {
+            "x_featured_races": [f"{day}:02:{r}" for r in range(1, 13)]
+            + [f"{day}:03:{r}" for r in range(1, 13)]
+            + [f"{day}:05:{r}" for r in range(1, 7)],
+        }
+        audit = {}
+        now = datetime(2026, 10, 11, 13, 0, tzinfo=JST)
+        with patch.object(featured, "_stems", side_effect=AssertionError("must not scan prediction files")):
+            self.assertEqual(featured.collect_candidates(now, state, audit=audit), [])
+        self.assertEqual(audit["daily_quota_full"], 30)
+        self.assertEqual(audit["eligible"], 0)
+
+    def test_inflight_claims_also_count_toward_quota(self):
+        day = "20261011"
+        state = {
+            "x_featured_races": [f"{day}:02:{r}" for r in range(1, 12)],
+            "x_v2_receipts": {
+                f"prediction:{day}:03:{r}": {"status": "sending"}
+                for r in range(1, 13)
+            } | {
+                f"prediction:{day}:05:{r}": {"status": "uncertain"}
+                for r in range(1, 8)
+            },
+        }
+        audit = {}
+        now = datetime(2026, 10, 11, 13, 0, tzinfo=JST)
+        with patch.object(featured, "_stems", side_effect=AssertionError("must not scan prediction files")):
+            self.assertEqual(featured.collect_candidates(now, state, audit=audit), [])
+        self.assertEqual(audit["daily_quota_full"], 30)
 
     def test_dominant_one_head_is_not_featured(self):
         m = self.model(

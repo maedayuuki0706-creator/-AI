@@ -7,6 +7,7 @@ import json
 import re
 
 import x_delivery_store as outbox
+from .limits import MAX_DAILY_X_PREDICTIONS
 
 MAX_ATTEMPTS = 3
 FIELDS = {"prediction": ("x_attempts", "x_posted_races", "x_post_ids"),
@@ -54,7 +55,7 @@ class Store:
                                     lambda old: encode(change(json.loads(old) if old else {})))
         return json.loads(raw), commit
 
-    def claim(self, row, phase, owner, now, *, quota=10):
+    def claim(self, row, phase, owner, now, *, quota=MAX_DAILY_X_PREDICTIONS):
         attempts, sent, ids = FIELDS[phase]
         race = key(row)
         rkey = receipt_key(row, phase)
