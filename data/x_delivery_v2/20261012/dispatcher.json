@@ -1,23 +1,22 @@
 {
   "audit": {
-    "already_selected": 26,
+    "already_selected": 27,
     "eligible": 1,
     "inside_cutoff": 72,
-    "prediction_files": 99,
-    "remaining_daily_slots": 4
+    "prediction_files": 100,
+    "remaining_daily_slots": 3
   },
-  "checked_at": "2026-10-12T15:02:18.552299+09:00",
+  "checked_at": "2026-10-12T15:06:35.111382+09:00",
   "counts": {
-    "sent": 1,
-    "uncertain": 1,
-    "waiting_result": 2
+    "sent": 3,
+    "uncertain": 1
   },
   "day": "20261012",
   "errors": [],
   "events": [
     {
-      "key": "prediction:20261012:02:10",
-      "post_id": "2109524884787429466",
+      "key": "prediction:20261012:03:10",
+      "post_id": "2109525902254354815",
       "status": "sent"
     },
     {
@@ -26,11 +25,13 @@
     },
     {
       "key": "result:20261012:06:9",
-      "status": "waiting_result"
+      "post_id": "2109525934441398293",
+      "status": "sent"
     },
     {
       "key": "result:20261012:03:9",
-      "status": "waiting_result"
+      "post_id": "2109525958239932643",
+      "status": "sent"
     }
   ],
   "held": [
@@ -95,6 +96,14 @@
       "post_id": "2109509468325302694",
       "restart_duplicate_guard_verified": true,
       "sent_at": "2026-10-12T14:00:25.070380+09:00",
+      "verified": true
+    },
+    {
+      "content_sha256": "4dc2de5021982fb6ef9b66d54c07bcb5a6bf0ded113917e1d8a7575ff6703f1c",
+      "key": "prediction:20261012:03:10",
+      "post_id": "2109525902254354815",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-12T15:05:43.152435+09:00",
       "verified": true
     },
     {
@@ -306,6 +315,14 @@
       "verified": true
     },
     {
+      "content_sha256": "fcdf5ae6a9ebf9a59bbfcae2081319ead3d248fee3785562473bdd85fb26e624",
+      "key": "result:20261012:03:9",
+      "post_id": "2109525958239932643",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-12T15:05:56.513162+09:00",
+      "verified": true
+    },
+    {
       "content_sha256": "209ecdbb9e00bf3d1acbd6bb0ba7c93db5e4510c4115d87e4a08758691f1ce98",
       "key": "result:20261012:06:4",
       "post_id": "2109486585406423159",
@@ -327,6 +344,14 @@
       "post_id": "2109510460513148994",
       "restart_duplicate_guard_verified": true,
       "sent_at": "2026-10-12T14:04:21.585344+09:00",
+      "verified": true
+    },
+    {
+      "content_sha256": "c7bab069f982e5a0f4601cda24d0718c594209dcc57c140bf93ddf942a90fbb1",
+      "key": "result:20261012:06:9",
+      "post_id": "2109525934441398293",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-12T15:05:50.806136+09:00",
       "verified": true
     },
     {
@@ -636,9 +661,9 @@
   ],
   "status": "degraded",
   "trigger_event": "workflow_dispatch",
-  "workflow_run_id": "38210534284",
+  "workflow_run_id": "38210847210",
   "x_monitor": {
-    "duplicate_guard_verified": 74,
+    "duplicate_guard_verified": 77,
     "held_transmissions": 1,
     "previous_day": {
       "alerts": [],
@@ -658,19 +683,20 @@
     },
     "today": {
       "alerts": [
-        "unresolved_api_attempts"
+        "unresolved_api_attempts",
+        "near_full_daily_post_cost"
       ],
-      "confirmed_post_total": 48,
-      "confirmed_predictions": 27,
-      "confirmed_results": 21,
+      "confirmed_post_total": 51,
+      "confirmed_predictions": 28,
+      "confirmed_results": 23,
       "cost_estimate_only_not_x_invoice": true,
-      "estimated_confirmed_posts_cost_usd": 0.72,
+      "estimated_confirmed_posts_cost_usd": 0.765,
       "full_30_days_cost_estimate_usd": 27.0,
       "full_day_cost_estimate_usd": 0.9,
       "prediction_limit": 30,
-      "remaining_prediction_slots": 3,
+      "remaining_prediction_slots": 2,
       "result_without_prediction_count": 0,
-      "results_pending_or_unconfirmed": 6,
+      "results_pending_or_unconfirmed": 5,
       "standard_post_create_unit_usd": 0.015,
       "unresolved_api_attempt_count": 1
     }
