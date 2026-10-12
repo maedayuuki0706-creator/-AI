@@ -388,16 +388,24 @@ def main():
     base.fetch.cache_clear()
     schedule = base.deadlines(DAY, JCD)
     if len(schedule) != 12:
-        print("Official deadline data incomplete; no messages", flush=True)
+        print(f"Official deadline data incomplete ({len(schedule)}/12); no messages", flush=True)
         return 0
+    print(f"Hamanako PT1 check at {now.isoformat()} - next races: " +
+          ", ".join(f"{rno}R={deadline}({base.minutes_until(now, deadline):.1f}m)"
+                    for rno, deadline in enumerate(schedule, 1)
+                    if base.minutes_until(now, deadline) > 0)[:240], flush=True)
     due = [
         (rno, deadline)
         for rno, deadline in enumerate(schedule, 1)
         if .5 <= base.minutes_until(now, deadline) <= 17
     ]
+    if not due:
+        print("No race in the 0.5–17 minute delivery window; no post attempted", flush=True)
     for rno, deadline in due:
         try:
-            process_one(DAY, rno, deadline, dry_run=os.getenv("HAMANAKO_SPECIAL_DRY_RUN") == "1")
+            posted = process_one(DAY, rno, deadline, dry_run=os.getenv("HAMANAKO_SPECIAL_DRY_RUN") == "1")
+            if not posted:
+                print(f"::warning::{rno}R not delivered (check waiting reason above)", flush=True)
         except Exception as exc:
             print(f"::warning::{rno}R failed: {type(exc).__name__}: {exc}", flush=True)
     return 0
