@@ -47,4 +47,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
           HAMANAKO_SPECIAL_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+          HAMANAKO_SPECIAL_WATCH_SECONDS: '240'
         run: python -u hamanako_20261012_pt1.py
