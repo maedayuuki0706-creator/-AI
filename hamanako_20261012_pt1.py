@@ -397,10 +397,10 @@ def main():
     due = [
         (rno, deadline)
         for rno, deadline in enumerate(schedule, 1)
-        if .5 <= base.minutes_until(now, deadline) <= 17
+        if .5 <= base.minutes_until(now, deadline) <= 28
     ]
     if not due:
-        print("No race in the 0.5–17 minute delivery window; no post attempted", flush=True)
+        print("No race in the 0.5–28 minute delivery window; no post attempted", flush=True)
     for rno, deadline in due:
         try:
             posted = process_one(DAY, rno, deadline, dry_run=os.getenv("HAMANAKO_SPECIAL_DRY_RUN") == "1")
