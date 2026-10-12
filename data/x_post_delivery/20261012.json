@@ -89,9 +89,10 @@
   "x_result_attempts": {
     "20261012:02:6": {
       "at": "2026-10-12T13:23:14.376150+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "b13c4f5458a24b01a65e5ccba44563d5",
-      "status": "reserved"
+      "retry_at": "2026-10-12T13:23:47.218575+09:00",
+      "status": "retryable"
     },
     "20261012:06:6": {
       "at": "2026-10-12T13:22:56.376115+09:00",
@@ -1528,6 +1529,7 @@
       "attempt": 1,
       "claimed_at": "2026-10-12T13:23:14.376150+09:00",
       "content_sha256": "eff3151008a62c911c39b698775b4ad5c2793b4a910c99e2d1e616eaa4e1515a",
+      "error_type": "DefiniteRejection",
       "key": "result:20261012:02:6",
       "owner": "b13c4f5458a24b01a65e5ccba44563d5",
       "parent_post_id": "2109493746161332618",
@@ -1574,7 +1576,8 @@
         "source": "配当期待本線",
         "venue": "戸田"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "updated_at": "2026-10-12T13:23:17.218575+09:00"
     },
     "result:20261012:06:4": {
       "attempt": 1,
