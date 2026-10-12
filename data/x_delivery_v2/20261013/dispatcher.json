@@ -1,12 +1,23 @@
 {
-  "audit": {},
-  "checked_at": "2026-10-13T08:49:15.915943+09:00",
+  "audit": {
+    "eligible": 1,
+    "inside_cutoff": 2,
+    "prediction_files": 3,
+    "remaining_daily_slots": 30
+  },
+  "checked_at": "2026-10-13T08:50:22.351324+09:00",
   "counts": {
+    "sent": 1,
     "uncertain": 1
   },
   "day": "20261013",
   "errors": [],
   "events": [
+    {
+      "key": "prediction:20261013:14:2",
+      "post_id": "2109793682916540735",
+      "status": "sent"
+    },
     {
       "key": "result:20261012:23:9",
       "status": "uncertain"
@@ -18,8 +29,16 @@
       "status": "uncertain"
     }
   ],
-  "mode": "results",
+  "mode": "all",
   "production_verification": [
+    {
+      "content_sha256": "8ecbd3969d42be624dfb33ed94b77aa05f7873a849e02735dd310bcc5470f63f",
+      "key": "prediction:20261013:14:2",
+      "post_id": "2109793682916540735",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-13T08:49:47.036390+09:00",
+      "verified": true
+    },
     {
       "content_sha256": "8e77709865661969c89359f27fd731fd03b8fecf6915f050c9704725833b3936",
       "key": "prediction:20261012:02:1",
@@ -494,10 +513,10 @@
     }
   ],
   "status": "degraded",
-  "trigger_event": "schedule",
-  "workflow_run_id": "38324059596",
+  "trigger_event": "workflow_dispatch",
+  "workflow_run_id": "38324104472",
   "x_monitor": {
-    "duplicate_guard_verified": 59,
+    "duplicate_guard_verified": 60,
     "held_transmissions": 1,
     "previous_day": {
       "alerts": [
@@ -520,17 +539,17 @@
     },
     "today": {
       "alerts": [],
-      "confirmed_post_total": 0,
-      "confirmed_predictions": 0,
+      "confirmed_post_total": 1,
+      "confirmed_predictions": 1,
       "confirmed_results": 0,
       "cost_estimate_only_not_x_invoice": true,
-      "estimated_confirmed_posts_cost_usd": 0.0,
+      "estimated_confirmed_posts_cost_usd": 0.015,
       "full_30_days_cost_estimate_usd": 27.0,
       "full_day_cost_estimate_usd": 0.9,
       "prediction_limit": 30,
-      "remaining_prediction_slots": 30,
+      "remaining_prediction_slots": 29,
       "result_without_prediction_count": 0,
-      "results_pending_or_unconfirmed": 0,
+      "results_pending_or_unconfirmed": 1,
       "standard_post_create_unit_usd": 0.015,
       "unresolved_api_attempt_count": 0
     }
