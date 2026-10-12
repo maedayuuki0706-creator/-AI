@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - 'prototype12_delivery.py'
+      - 'hamanako_20261012_pt1.py'
       - 'prototype_runner.py'
       - 'four_way_prototype.py'
       - 'scent_box.py'
@@ -78,6 +79,30 @@ jobs:
             git pull --rebase origin main && git push origin HEAD:main && exit 0
           done
           exit 1
+
+
+  # Independent emergency tick: keep PT1 Hamanako-only messages alive on
+  # the already-active Prototype 1-2 schedule. This never affects PT2.
+  hamanako-pt1-special:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    concurrency:
+      group: hamanako-20261012-pt1-special
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publish Hamanako-only Oct 12 PT1 if race is due
+        env:
+          TZ: Asia/Tokyo
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROTO1_DISCORD_WEBHOOK_URL: ${{ secrets.PROTO1_DISCORD_WEBHOOK_URL }}
+          HAMANAKO_SPECIAL_DRY_RUN: '0'
+        run: python -u hamanako_20261012_pt1.py
 
   sync-pt2-sheet:
     needs: deliver
