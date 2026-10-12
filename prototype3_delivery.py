@@ -20,6 +20,7 @@ import detailed_discord_notify as cards
 import four_way_prototype as trial
 import hiyori_model
 import hiyori_source
+import yuuki_scenario_reasoning
 from discord_formation import compress_picks
 
 ROOT = Path("data/prototype3_delivery")
@@ -259,6 +260,8 @@ def _prediction_message(record, *, selected=False):
         "",
         "📝 **ゆうきの予想根拠（モデル内評価）**",
         *_reason_lines(model),
+        "",
+        *yuuki_scenario_reasoning.message_lines(record.get("scenario_reasoning") or {}),
     ]
     if selected:
         selection = record.get("selection") or {}
@@ -318,6 +321,7 @@ def build_record(day, jcd, rno, deadline):
         "created_at": now_jst().isoformat(),
         "model": model,
         "selection": selection,
+        "scenario_reasoning": yuuki_scenario_reasoning.analyze(official),
     }
     record["digest"] = sha256(
         json.dumps(record, ensure_ascii=False, sort_keys=True).encode("utf-8")
