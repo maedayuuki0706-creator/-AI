@@ -74,6 +74,7 @@ class HamanakoOneDayTests(unittest.TestCase):
 
     def test_no_real_post_on_dry_run(self):
         with patch.object(m, "build_live", return_value=(sample_live(), "ready")), \
+             patch.object(m.base, "minutes_until", return_value=10.0), \
              patch.object(m, "reserve") as reserve, \
              patch.object(m, "discord_post") as send:
             self.assertTrue(m.process_one(m.DAY, 1, "10:58", dry_run=True))
@@ -85,6 +86,7 @@ class HamanakoOneDayTests(unittest.TestCase):
                                         "GITHUB_TOKEN": "dummy",
                                         "GITHUB_REPOSITORY": "maedayuuki0706-creator/-AI"}), \
              patch.object(m, "build_live", return_value=(sample_live(), "ready")), \
+             patch.object(m.base, "minutes_until", return_value=10.0), \
              patch.object(m, "reserve", return_value=("path", "sha")) as reserve, \
              patch.object(m, "discord_post", return_value="123456789") as send, \
              patch.object(m, "mark_delivered") as mark:
