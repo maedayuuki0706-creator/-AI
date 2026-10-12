@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -412,4 +413,16 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    watch_seconds = max(0, min(300, int(os.getenv("HAMANAKO_SPECIAL_WATCH_SECONDS", "0"))))
+    if watch_seconds:
+        stop_at = time.monotonic() + watch_seconds
+        while True:
+            exit_code = main()
+            if exit_code:
+                sys.exit(exit_code)
+            remaining = stop_at - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(35, remaining))
+    else:
+        sys.exit(main())
