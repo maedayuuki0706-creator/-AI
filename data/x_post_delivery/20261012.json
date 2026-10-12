@@ -69,9 +69,10 @@
   "x_result_attempts": {
     "20261012:06:4": {
       "at": "2026-10-12T12:21:36.098021+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "ee29bbe495fe469196e82f188e8f9b30",
-      "status": "reserved"
+      "retry_at": "2026-10-12T12:22:09.024729+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {
@@ -1201,6 +1202,7 @@
       "attempt": 1,
       "claimed_at": "2026-10-12T12:21:36.098021+09:00",
       "content_sha256": "209ecdbb9e00bf3d1acbd6bb0ba7c93db5e4510c4115d87e4a08758691f1ce98",
+      "error_type": "DefiniteRejection",
       "key": "result:20261012:06:4",
       "owner": "ee29bbe495fe469196e82f188e8f9b30",
       "parent_post_id": "2109480546988667327",
@@ -1254,7 +1256,8 @@
         "source": "AI重なり本線",
         "venue": "浜名湖"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "updated_at": "2026-10-12T12:21:39.024729+09:00"
     },
     "result:20261012:16:1": {
       "attempt": 1,
