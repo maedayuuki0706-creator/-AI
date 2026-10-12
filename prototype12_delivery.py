@@ -297,8 +297,19 @@ def build_record(day, jcd, rno, deadline):
     return record, "ready"
 
 
+def pt1_normal_paused(day):
+    # 2026-10-12: PT1 is reserved exclusively for the independent
+    # Hamanako all-AI special bulletin. Keep PT2 and research running.
+    return str(day) == "20261012"
+
+
 def delivery_complete(key):
-    return all(path_for("deliveries", stream, key).exists() for stream in STREAMS)
+    day = str(key).split("_", 1)[0]
+    return all(
+        path_for("deliveries", stream, key).exists()
+        for stream in STREAMS
+        if not (stream == "prototype1" and pt1_normal_paused(day))
+    )
 
 
 def deliver(record):
@@ -306,6 +317,9 @@ def deliver(record):
     if not trial.before_deadline(record["day"], record["deadline"], now_jst()):
         return
     for stream in STREAMS:
+        if stream == "prototype1" and pt1_normal_paused(record["day"]):
+            # The separate hamanako_20261012_pt1.py job owns PT1 posts today.
+            continue
         receipt = path_for("deliveries", stream, key)
         if receipt.exists():
             continue
