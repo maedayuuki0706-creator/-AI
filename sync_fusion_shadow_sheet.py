@@ -217,7 +217,14 @@ def frozen_records(root):
         if not core.aware(record["created_at"]) <= core.aware(checkpoint["prediction_committed_at"]) < core.aware(record["deadline_at"]):
             raise ValueError("Research projection has no valid pre-deadline save time")
         outcome_path = root/"evaluations"/path.parent.name/path.name
-        records.append((record, _read(outcome_path) if outcome_path.exists() else None))
+        outcome = _read(outcome_path) if outcome_path.exists() else None
+        supplement_path = root/"official_verifications"/path.parent.name/path.name
+        if supplement_path.exists():
+            supplement = _read(supplement_path)
+            if supplement["prediction_digest"] != record["digest"] or not outcome or supplement["original_evaluation_digest"] != core.digest(outcome):
+                raise ValueError("Later official verification does not match the frozen forecast and first result")
+            outcome = supplement["evaluation"]
+        records.append((record, outcome))
     return records
 
 

@@ -313,10 +313,13 @@ def evaluate(record, result, now):
 
 def summarize(root):
     root = Path(root)
-    totals, per_day, pending, late = {}, {}, 0, 0
+    totals, per_day, pending, late, other_engines = {}, {}, 0, 0, 0
     for path in sorted((root / "predictions").glob("*/*.json")):
         record = json.loads(path.read_text())
         if record.get("mode") != "prospective_shadow":
+            continue
+        if record.get("version") != VERSION:
+            other_engines += 1
             continue
         result_path = root / "evaluations" / record["day"] / path.name
         if not result_path.exists():
@@ -345,5 +348,6 @@ def summarize(root):
             item["roi_pct"] = 100 * item["return_yen"] / item["stake_yen"] if item["stake_yen"] else None
     return {"version": VERSION, "mode": "prospective_shadow", "research_only": True,
             "pending_races": pending, "excluded_late_checkpoint_races": late,
+            "excluded_other_engine_races": other_engines,
             "models": totals, "by_day": per_day,
             "note": "Native policy cards have different budgets. Compare equal-budget controls separately."}

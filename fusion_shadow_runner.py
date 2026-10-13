@@ -151,7 +151,9 @@ def capture_one(out, day, jcd, rno, deadline):
     key = core.identity(day, jcd, rno)
     prediction_path = root / "predictions" / day / f"{key}.json"
     if prediction_path.exists():
-        return {"key": key, "status": "already_frozen"}
+        existing_version = load(prediction_path).get("version")
+        return {"key":key, "status":"already_frozen" if existing_version == core.VERSION else "already_frozen_other_engine",
+                "existing_engine_version":existing_version}
     record, snapshot = build_live(day, jcd, rno, deadline)
     if now_jst() > core.cutoff(day, deadline) - timedelta(seconds=core.MIN_LEAD_SECONDS):
         raise ValueError("Capture finished too late; nothing is frozen")
@@ -209,9 +211,20 @@ def collect_results(root, end):
     root = Path(root)
     pending = []
     for path in sorted((root / "predictions").glob("*/*.json")):
-        if (root / "evaluations" / path.parent.name / path.name).exists():
-            continue
         record = load(path)
+        if record.get("version") != core.VERSION:
+            continue
+        evaluation_path = root / "evaluations" / path.parent.name / path.name
+        existing = load(evaluation_path) if evaluation_path.exists() else None
+        # Preserve the original observation. Later-published ST/finish/method
+        # details are a separate append-only verification, never a new forecast.
+        if existing and (existing.get("excluded_reason") or
+                         (existing.get("official_result") or {}).get("race_details") or
+                         (root / "official_verifications" / path.parent.name / path.name).exists()):
+            continue
+        retry_path = root / "details_retry" / path.parent.name / path.name
+        if existing and retry_path.exists() and now_jst() < core.aware(load(retry_path)["next_attempt_at"]):
+            continue
         deadline = core.aware(record["deadline_at"])
         checkpoint_path = root / "checkpoints" / record["day"] / path.name
         if now_jst() < deadline + timedelta(minutes=3) or not checkpoint_path.exists():
@@ -223,9 +236,11 @@ def collect_results(root, end):
             core.write_once(root / "evaluations" / record["day"] / path.name,
                             {"key": record["key"], "excluded_reason": "late_remote_checkpoint"})
             continue
-        pending.append((record, checkpoint))
+        pending.append((record, checkpoint, path.name, existing))
+    # New settlement has priority over optional late ST/method enrichment.
+    pending.sort(key=lambda pair: (pair[3] is not None, pair[0]["deadline_at"]))
 
-    def fetch_result(record, checkpoint):
+    def fetch_result(record, checkpoint, filename, existing):
         url = base.official_url("raceresult", record["day"], record["jcd"], record["rno"])
         raw = base.fetch(url)
         result = parse_payout(raw)
@@ -236,12 +251,32 @@ def collect_results(root, end):
             result["race_details"] = None
             result["race_details_missing_reason"] = str(exc)
         result.update(key=record["key"], source_url=url, observed_at=now_jst().isoformat(),
+                      response_sha256=core.sha256(raw.encode()).hexdigest(),
                       prediction_committed_at=checkpoint["prediction_committed_at"],
                       prediction_commit_sha=checkpoint["commit_sha"])
+        if existing:
+            prior = existing["official_result"]
+            if (prior.get("status"), prior.get("payouts"), prior.get("refund_lanes")) != (
+                    result.get("status"), result.get("payouts"), result.get("refund_lanes")):
+                raise ValueError("Later official details do not match the original settled payout; held for review")
+            if not result.get("race_details"):
+                observed = now_jst()
+                core.write_report(root / "details_retry" / record["day"] / filename,
+                    {"key":record["key"], "last_attempt_at":observed.isoformat(),
+                     "next_attempt_at":(observed+timedelta(minutes=20)).isoformat(),
+                     "status":"official_finish_st_method_not_available",
+                     "source_url":url, "missing_reason":result.get("race_details_missing_reason")})
+                return record["key"], False
         outcome = core.evaluate(record, result, now_jst())
         if outcome:
-            core.write_once(root / "results" / record["day"] / f"{record['key']}.json", result)
-            core.write_once(root / "evaluations" / record["day"] / f"{record['key']}.json", outcome)
+            if existing:
+                core.write_once(root / "official_verifications" / record["day"] / filename,
+                    {"key":record["key"], "prediction_digest":record["digest"],
+                     "original_evaluation_digest":core.digest(existing), "evaluation":outcome,
+                     "note":"Append-only later official details; frozen forecast and first result observation retained"})
+            else:
+                core.write_once(root / "results" / record["day"] / filename, result)
+                core.write_once(root / "evaluations" / record["day"] / filename, outcome)
         return record["key"], bool(outcome)
 
     settled, errors = 0, []
@@ -325,7 +360,12 @@ def run(root, budget_seconds=125):
             for jcd, deadlines in schedule["venues"].items():
                 for rno, deadline in enumerate(deadlines, 1):
                     key = core.identity(day, jcd, rno)
-                    if (root / "predictions" / day / f"{key}.json").exists():
+                    previous_path = root / "predictions" / day / f"{key}.json"
+                    if previous_path.exists():
+                        previous_version = load(previous_path).get("version")
+                        if previous_version != core.VERSION:
+                            status.setdefault("other_engine_frozen_races", []).append(
+                                {"key":key,"engine":previous_version,"status":"reference_only_preserved"})
                         continue
                     lead = (core.cutoff(day, deadline) - now_jst()).total_seconds()
                     race = {"key": key, "day": day, "jcd": jcd, "rno": rno, "deadline": deadline}
