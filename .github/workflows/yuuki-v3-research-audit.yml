@@ -1,0 +1,64 @@
+name: Yuuki V3 research-only verified scenario audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      audit_day:
+        description: 'Archive date YYYYMMDD'
+        required: false
+        default: '20261013'
+        type: string
+  push:
+    branches:
+      - research/yuuki-v3-safe-audit-20261013
+    paths:
+      - 'research/yuuki_v3_shadow_audit.py'
+      - 'research/test_yuuki_v3_shadow_audit.py'
+      - '.github/workflows/yuuki-v3-research-audit.yml'
+
+# No cron, webhook, secrets, production dispatcher, or persistent data writes.
+permissions:
+  contents: read
+
+concurrency:
+  group: yuuki-v3-readonly-research-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify_only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            research
+            .github/workflows/yuuki-v3-research-audit.yml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify independent audit logic
+        run: python -m unittest discover -s research -p 'test_yuuki_v3_shadow_audit.py' -v
+      - name: Checkout log-only frozen records (read-only)
+        uses: actions/checkout@v4
+        with:
+          ref: research-fusion-shadow-state
+          path: audit_state
+          persist-credentials: false
+          sparse-checkout: |
+            data/fusion_shadow/predictions
+            data/fusion_shadow/official_verifications
+      - name: Audit frozen forecasts against later official verification
+        env:
+          AUDIT_DAY: ${{ inputs.audit_day || '20261013' }}
+        run: |
+          python research/yuuki_v3_shadow_audit.py \
+            --state-root audit_state/data/fusion_shadow \
+            --days "$AUDIT_DAY" \
+            --output "$RUNNER_TEMP/yuuki-v3-audit.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yuuki-v3-research-audit
+          path: ${{ runner.temp }}/yuuki-v3-audit.json
+          retention-days: 14
