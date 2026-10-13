@@ -33,6 +33,10 @@ def _value(value):
     return "未取得" if value is None else str(value)
 
 
+def _check(value):
+    return "未確認" if value is None else "一致" if value else "不一致"
+
+
 def weather_text(record):
     p = record.get("pre_race_weather") or {}
     tide = p.get("tide") or {}
@@ -52,8 +56,10 @@ def review_text(record, outcome):
     verdict = "○ 的中" if score["hit"] else "× 不的中" if score["eligible_race"] else "判定対象外"
     review = outcome.get("scenario_review") or {}
     misses = _join(x["combination"]+":"+x["reason"] for x in review.get("miss_reasons", []))
-    checks = _join(f"{x['lane']}号艇:決まり手整合={_value(x['method_matches_win_hypothesis'])},事前負け条件={_value(x['pre_loss_condition_observed'])}"
+    checks = _join(f"{x['lane']}号艇:決まり手整合={_check(x['method_matches_win_hypothesis'])},事前負け条件={_check(x['pre_loss_condition_observed'])}"
                    for x in review.get("boats", []))
+    if review.get("abnormal_race_detected"):
+        checks += "\n事故・失格等を含むため通常の展開学習から除外"
     return (f"{verdict}／仮想投資{score['stake_yen']}円／払戻{score['return_yen']}円／"
             f"回収率{100*score['return_yen']/score['stake_yen']:.1f}%\n"
             f"見落とし区分={misses}\n{checks}\n次回:{_join(review.get('next_hypotheses', []))}\n"
@@ -105,7 +111,7 @@ def rows_for(record, outcome=None):
         review = reviews.get(s["lane"])
         conclusion = "新ロジック・事前仮説／"+record["version"]
         if review:
-            conclusion += f"\n結果:頭={review['won']}／本番ST={_value(review['actual_st'])}／決まり手整合={_value(review['method_matches_win_hypothesis'])}／事前負け条件={_value(review['pre_loss_condition_observed'])}"
+            conclusion += f"\n結果:頭={'1着' if review['won'] else '1着以外'}／本番ST={_value(review['actual_st'])}／決まり手整合={_check(review['method_matches_win_hypothesis'])}／事前負け条件={_check(review['pre_loss_condition_observed'])}"
         boat_rows.append([date, record["venue"], f"{record['rno']}R", log_id,
             str(s["lane"])+"号艇", f"{s['head_probability']:.2%}",
             _join(s["win_paths"])+"\n成立条件:"+_join(s["win_conditions"]), _join(s["loss_paths"]),

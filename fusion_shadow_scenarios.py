@@ -224,6 +224,8 @@ def evaluate_hypotheses(record, result):
     details = result.get("race_details") or {}
     actual = {int(b["lane"]): b for b in details.get("finish", []) if b.get("lane")}
     winners = sorted({int(c[0]) for c in result.get("payouts", {})})
+    abnormal = any(b.get("status") not in (None, "finished") for b in actual.values()) or details.get("method") == "恵まれ"
+    expected_courses = {s["lane"]: s["predicted_course"] for s in record.get("boat_scenarios", [])}
     rows = []
     for s in record.get("boat_scenarios", []):
         lane = s["lane"]
@@ -231,20 +233,25 @@ def evaluate_hypotheses(record, result):
         st = number(b.get("st"), 0, 1)
         checked = []
         for condition in s["condition_tests"]:
-            other = number(actual.get(condition["other_lane"], {}).get("st"), 0, 1)
+            other_boat = actual.get(condition["other_lane"], {})
+            other = number(other_boat.get("st"), 0, 1)
             met = None
-            if st is not None and other is not None:
+            entry_matches = (b.get("course") == s["predicted_course"] and
+                             other_boat.get("course") == expected_courses.get(condition["other_lane"]))
+            if not abnormal and entry_matches and st is not None and other is not None:
                 gap = other-st if condition["kind"] == "st_advantage" else st-other
                 met = gap >= condition["threshold"]
             checked.append({**condition, "observed": met})
         method = details.get("method")
         won = lane in winners
-        expected_method = method in s["anticipated_methods"] if won and method else None
-        anticipated_loss = any(t["observed"] is True for t in checked if t["kind"] == "outside_attack") if not won and actual else None
+        expected_method = method in s["anticipated_methods"] if won and method and not abnormal else None
+        loss_checks = [t for t in checked if t["kind"] == "outside_attack" and t["observed"] is not None]
+        anticipated_loss = any(t["observed"] for t in loss_checks) if not won and loss_checks and not abnormal else None
         rows.append({"lane": lane, "won": won, "actual_st": st, "actual_course": b.get("course"),
                      "method_matches_win_hypothesis": expected_method,
                      "pre_loss_condition_observed": anticipated_loss, "condition_checks": checked,
-                     "causal_attribution": "unverified_without_race_video",
+                     "entry_matches_hypothesis": b.get("course") == s["predicted_course"] if b.get("course") is not None else None,
+                     "causal_attribution": "abnormal_race_excluded" if abnormal else "unverified_without_race_video",
                      "missing_post_race_fields": [k for k,v in (("actual_st",st),("actual_course",b.get("course")),("winning_method",method)) if v is None]})
     chosen = set(record["models"]["fusion"]["picks"])
     hit = bool(chosen.intersection(result.get("payouts", {})))
@@ -258,6 +265,7 @@ def evaluate_hypotheses(record, result):
                            "pre_race_missing_fields": s.get("missing_fields", []),
                            "reason": "頭不採用" if not s.get("head_tickets") else "頭採用済み・2/3着の選択外"})
     return {"boats": rows, "hit": hit, "miss_reasons": misses,
+            "abnormal_race_detected": abnormal, "ordinary_scenario_learning_eligible": not abnormal,
             "next_hypotheses": ["平均ST差と展示ST差の本番再現性を、同じ進入・場条件で比較する",
                                 "頭を採用した外れと、頭を採用しなかった外れを分けて検証する"],
             "note": "公式着順・ST・決まり手との整合確認。映像なしで勝敗の原因を断定しない"}
