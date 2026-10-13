@@ -42,23 +42,24 @@ def _single_outcome(result):
 
 
 def analyze_race(prediction, verification):
-    outcome = _single_outcome(verification)
+    evaluation = verification.get("evaluation") or verification
+    outcome = _single_outcome(evaluation)
     if outcome is None:
         return None, "unsettled_abnormal_refund"
     actual, payout, official = outcome
     deadline = _time(prediction.get("deadline_at"))
     created = _time(prediction.get("created_at"))
-    committed = _time(verification.get("prediction_committed_at")
+    committed = _time(evaluation.get("prediction_committed_at")
                       or official.get("prediction_committed_at"))
     if not (deadline and created and committed and created < deadline and committed < deadline):
         return None, "unproven_predeadline"
-    if verification.get("prediction_digest") != prediction.get("digest"):
+    if (verification.get("prediction_digest") or evaluation.get("prediction_digest")) != prediction.get("digest"):
         return None, "digest_mismatch"
-    if verification.get("key") != prediction.get("key"):
+    if (verification.get("key") or evaluation.get("key")) != prediction.get("key"):
         return None, "key_mismatch"
     if prediction.get("mode") != "prospective_shadow" or not prediction.get("research_only"):
         return None, "not_prospective_research"
-    if not all(isinstance(x, dict) for x in prediction.get("boat_scenarios", [])):
+    if len(prediction.get("boat_scenarios") or []) != 6 or not all(isinstance(x, dict) for x in prediction["boat_scenarios"]):
         return None, "invalid_scenarios"
 
     model = prediction.get("models") or {}
@@ -92,8 +93,7 @@ def analyze_race(prediction, verification):
     method_match = (method in predicted_methods) if method and predicted_methods else None
     verified_condition_count = 0
     condition_supported = 0
-    checks = ((verification.get("evaluation") or {}).get("scenario_review") or
-              verification.get("scenario_review") or {}).get("boats") or []
+    checks = (evaluation.get("scenario_review") or {}).get("boats") or []
     for lane in checks:
         if str(lane.get("lane")) != winner:
             continue
