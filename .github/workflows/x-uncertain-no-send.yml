@@ -1,0 +1,37 @@
+name: X Uncertain Quarantine No-Send Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'x_delivery_v2/**'
+      - 'tests/test_x_delivery_v2*.py'
+      - '.github/workflows/x-uncertain-no-send.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  no-send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate uncertain guards with external network forbidden
+        run: |
+          python - <<'PY'
+          import contextlib, io, socket, unittest, urllib.request
+          from unittest.mock import patch
+          def blocked(*args, **kwargs):
+              raise AssertionError('External network forbidden in no-send validation')
+          suite = unittest.TestSuite(unittest.defaultTestLoader.loadTestsFromName(name) for name in (
+              'tests.test_x_delivery_v2', 'tests.test_x_delivery_v2_quarantine',
+              'tests.test_x_featured_selector', 'tests.test_x_delivery'))
+          with patch.object(socket.socket, 'connect', blocked), patch.object(socket.socket, 'connect_ex', blocked), patch.object(urllib.request, 'urlopen', blocked):
+              with contextlib.redirect_stdout(io.StringIO()):
+                  result = unittest.TextTestRunner(verbosity=2).run(suite)
+          raise SystemExit(not result.wasSuccessful())
+          PY
