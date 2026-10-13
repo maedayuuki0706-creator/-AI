@@ -60,6 +60,8 @@ def review_text(record, outcome):
                    for x in review.get("boats", []))
     if review.get("abnormal_race_detected"):
         checks += "\n事故・失格等を含むため通常の展開学習から除外"
+    elif review.get("abnormal_race_detected") is None:
+        checks += "\n事故・失格の情報未取得。通常の展開学習にはまだ採用しない"
     return (f"{verdict}／仮想投資{score['stake_yen']}円／払戻{score['return_yen']}円／"
             f"回収率{100*score['return_yen']/score['stake_yen']:.1f}%\n"
             f"見落とし区分={misses}\n{checks}\n次回:{_join(review.get('next_hypotheses', []))}\n"

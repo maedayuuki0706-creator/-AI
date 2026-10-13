@@ -224,7 +224,9 @@ def evaluate_hypotheses(record, result):
     details = result.get("race_details") or {}
     actual = {int(b["lane"]): b for b in details.get("finish", []) if b.get("lane")}
     winners = sorted({int(c[0]) for c in result.get("payouts", {})})
-    abnormal = any(b.get("status") not in (None, "finished") for b in actual.values()) or details.get("method") == "恵まれ"
+    known_abnormal = any(b.get("status") not in (None, "finished") for b in actual.values()) or details.get("method") == "恵まれ"
+    complete_status = len(actual) == 6 and all(b.get("status") is not None for b in actual.values())
+    abnormal = True if known_abnormal else False if complete_status else None
     expected_courses = {s["lane"]: s["predicted_course"] for s in record.get("boat_scenarios", [])}
     rows = []
     for s in record.get("boat_scenarios", []):
@@ -265,7 +267,8 @@ def evaluate_hypotheses(record, result):
                            "pre_race_missing_fields": s.get("missing_fields", []),
                            "reason": "頭不採用" if not s.get("head_tickets") else "頭採用済み・2/3着の選択外"})
     return {"boats": rows, "hit": hit, "miss_reasons": misses,
-            "abnormal_race_detected": abnormal, "ordinary_scenario_learning_eligible": not abnormal,
+            "abnormal_race_detected": abnormal,
+            "ordinary_scenario_learning_eligible": abnormal is False and details.get("method") is not None,
             "next_hypotheses": ["平均ST差と展示ST差の本番再現性を、同じ進入・場条件で比較する",
                                 "頭を採用した外れと、頭を採用しなかった外れを分けて検証する"],
             "note": "公式着順・ST・決まり手との整合確認。映像なしで勝敗の原因を断定しない"}

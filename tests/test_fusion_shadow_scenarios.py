@@ -63,6 +63,8 @@ class ProspectiveScenarioTests(unittest.TestCase):
         self.assertTrue(all(x['actual_st'] is None for x in o['scenario_review']['boats']))
         self.assertTrue(all(x['method_matches_win_hypothesis'] is None for x in o['scenario_review']['boats']))
         self.assertTrue(all(x['causal_attribution']=='unverified_without_race_video' for x in o['scenario_review']['boats']))
+        self.assertIsNone(o['scenario_review']['abnormal_race_detected'])
+        self.assertFalse(o['scenario_review']['ordinary_scenario_learning_eligible'])
 
     def test_accidents_are_not_learned_as_ordinary_scenario_losses(self):
         p=record();r=result(p)
