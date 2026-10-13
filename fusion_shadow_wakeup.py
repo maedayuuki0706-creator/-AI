@@ -29,8 +29,7 @@ def wake(*, api=request, now=None, current_run_id="", branch=CODE_BRANCH):
     if branch != CODE_BRANCH:
         raise ValueError("Only the dedicated research code branch may be continued")
     now = now or datetime.now(ZoneInfo("Asia/Tokyo"))
-    if not 8 <= now.astimezone(ZoneInfo("Asia/Tokyo")).hour <= 23:
-        return {"status": "outside_research_hours", "workflow": WORKFLOW}
+    race_hours = 8 <= now.astimezone(ZoneInfo("Asia/Tokyo")).hour <= 23
     workflow = api("/actions/workflows/"+WORKFLOW)
     if workflow.get("state") != "active":
         return {"status": "disabled_by_owner", "workflow": WORKFLOW}
@@ -39,7 +38,10 @@ def wake(*, api=request, now=None, current_run_id="", branch=CODE_BRANCH):
         return {"status": "already_active", "workflow": WORKFLOW}
     # One attempt only: an ambiguous dispatch response is never retried.
     api(f"/actions/workflows/{workflow['id']}/dispatches", {"ref": branch})
-    return {"status": "requested", "workflow": WORKFLOW, "branch": branch}
+    # Keep the relay alive overnight because cron only runs the default main
+    # workflow. The collector itself still forbids out-of-hours forecasts.
+    return {"status":"requested", "workflow":WORKFLOW, "branch":branch,
+            "phase":"race_hours" if race_hours else "overnight_relay_no_forecast"}
 
 
 def main():

@@ -31,6 +31,12 @@ class IndependentWakeTests(unittest.TestCase):
         with self.assertRaises(TimeoutError):wake.wake(api=api,now=NOW)
         self.assertEqual(api.call_count,3)
 
+    def test_overnight_relay_preserves_next_morning_bootstrap_without_forecast_calls(self):
+        api=Mock(side_effect=[{'id':123,'state':'active'},{'workflow_runs':[]},{}])
+        report=wake.wake(api=api,now=NOW.replace(hour=2))
+        self.assertEqual(report['phase'],'overnight_relay_no_forecast')
+        self.assertEqual(api.call_args.args[1],{'ref':wake.CODE_BRANCH})
+
 
 if __name__ == '__main__':
     unittest.main()
