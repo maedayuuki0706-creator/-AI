@@ -29,7 +29,7 @@ def _strategy(model, families, **extra):
                      selection_policy=model.get("selection_policy"), **extra)
 
 
-def build_live(day, jcd, rno, deadline):
+def build_live(day, jcd, rno, deadline, *, prefetch=True):
     # Import prediction helpers only inside an isolated capture subprocess.
     import direct_discord_notify as official_source
     import detailed_discord_notify as cards
@@ -48,11 +48,27 @@ def build_live(day, jcd, rno, deadline):
     from ticket_compression import compression_snapshot
 
     captured = now_jst()
+    # Fast exhibition gate: do not spend the capture budget on a race whose
+    # official preview is still empty. All prefetches are GETs in this child;
+    # the production modules/files and their delivery behavior are unchanged.
+    if prefetch:
+        preview_raw = official_source.fetch(official_source.official_url('beforeinfo', day, jcd, rno))
+        if official_source.parse_beforeinfo(preview_raw).get('exhibition_count') != 6:
+            raise ValueError("Six official exhibition records are not yet available")
+        urls = [official_source.official_url(kind, day, jcd, n) for kind, n in
+                (('racelist', rno), ('odds3t', rno), ('racelist', 1))]
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            prefetched = [pool.submit(official_source.fetch, url) for url in dict.fromkeys(urls)]
+            biyori_fetch = pool.submit(hiyori_source.fetch_race, day, jcd, rno)
+            for future in prefetched:
+                future.result()
+            source = biyori_fetch.result()
+    else:
+        source = hiyori_source.fetch_race(day, jcd, rno)
+    source["fetched_at"] = now_jst().isoformat()
     official = official_source.analyze_official(day, jcd, rno)
     if not official or official.get("preview", {}).get("exhibition_count") != 6:
         raise ValueError("Live official/exhibition data are not ready")
-    source = hiyori_source.fetch_race(day, jcd, rno)
-    source["fetched_at"] = now_jst().isoformat()
     hiyori = hiyori_model.analyze(official, source, day, jcd, rno)
     database = pt2_sheet_db.enhance_analysis(official, jcd)
     odds = {r["combination"]: r.get("odds") for r in official["trifecta"]}
@@ -118,6 +134,8 @@ def build_live(day, jcd, rno, deadline):
                      "exhibition_course": b.get("predicted_course")} for b in official["inputs"]]
     context = classify({**request, "venue": official["venue"], "rows": context_rows, "settled": False}, now_jst())
     provenance = {"source_url": source.get("source_url"), "hiyori_input_hash": core.digest(source),
+                  "official_urls": {kind: official_source.official_url(kind, day, jcd, rno)
+                                    for kind in ("racelist", "beforeinfo", "odds3t")},
                   "legacy_fusion_available": False,
                   "legacy_fusion_reason": "Original kyoteibiyori_adapter.race_model is explicitly not ready; real Hiyori model used instead.",
                   "learning": "Existing bridge policy retained; all_ai_learning is a report, not an independent engine.",
@@ -209,7 +227,14 @@ def collect_results(root, end):
 
     def fetch_result(record, checkpoint):
         url = base.official_url("raceresult", record["day"], record["jcd"], record["rno"])
-        result = parse_payout(base.fetch(url))
+        raw = base.fetch(url)
+        result = parse_payout(raw)
+        try:
+            from race_context import parse_result
+            result["race_details"] = parse_result(raw, record["day"], record["jcd"], record["rno"])
+        except ValueError as exc:
+            result["race_details"] = None
+            result["race_details_missing_reason"] = str(exc)
         result.update(key=record["key"], source_url=url, observed_at=now_jst().isoformat(),
                       prediction_committed_at=checkpoint["prediction_committed_at"],
                       prediction_commit_sha=checkpoint["commit_sha"])
@@ -283,7 +308,7 @@ def write_summary(root):
     return summary
 
 
-def run(root, budget_seconds=85):
+def run(root, budget_seconds=125):
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     start, now = time.monotonic(), now_jst()
@@ -315,7 +340,7 @@ def run(root, budget_seconds=85):
                 if time.monotonic() >= end - 25:
                     status["captures"] += [{"key": r["key"], "status": "deferred_by_budget"} for r in due[offset:]]
                     break
-                timeout = min(55, end - time.monotonic() - 15)
+                timeout = min(90, end - time.monotonic() - 20)
                 with ThreadPoolExecutor(max_workers=3) as pool:
                     futures = [pool.submit(_capture_child, root, r, timeout) for r in due[offset:offset + 3]]
                     for future in as_completed(futures):
@@ -340,7 +365,7 @@ def run(root, budget_seconds=85):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", required=True)
-    parser.add_argument("--budget-seconds", type=int, default=85)
+    parser.add_argument("--budget-seconds", type=int, default=125)
     parser.add_argument("--capture-one", nargs=4, metavar=("DAY", "JCD", "RNO", "DEADLINE"))
     parser.add_argument("--checkpoint-commit")
     args = parser.parse_args()

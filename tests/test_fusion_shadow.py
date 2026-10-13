@@ -245,7 +245,7 @@ class RunnerIsolationTests(unittest.TestCase):
                 patch.object(opportunity_alerts, "_send", side_effect=forbidden), \
                 patch.object(opportunity_alerts, "_append_log", side_effect=forbidden), \
                 patch.object(x_post_delivery, "post_to_x", side_effect=forbidden):
-            prediction, snapshot = runner.build_live("20261012", "06", 1, "10:15")
+            prediction, snapshot = runner.build_live("20261012", "06", 1, "10:15", prefetch=False)
         self.assertEqual(len(prediction["models"]["fusion"]["picks"]), 10)
         for key in ("native_pt2_balanced", "native_pt2_probability", "native_pt2_value", "native_pt2_longshot",
                     "native_comparison_prototype1", "native_comparison_prototype3", "native_featured_plan", "native_long_selected"):

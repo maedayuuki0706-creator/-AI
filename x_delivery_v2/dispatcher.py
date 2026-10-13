@@ -19,6 +19,7 @@ import x_post_delivery as formatter
 from x_delivery_policy import JST, validate_live_row
 from x_delivery_v2.store import FIELDS, Store, key, receipt_key
 from x_delivery_v2.usage import daily_usage
+from x_delivery_v2.quarantine import classify as classify_quarantine
 
 RECOVERY = Path("data/x_delivery_v2_recovery")
 
@@ -71,9 +72,13 @@ def render_send(phase, body):
             return json.load(response)
     except urllib.error.HTTPError as exc:
         try:
-            return json.loads(exc.read())
+            value = json.loads(exc.read())
+            if isinstance(value, dict):
+                value["transport_http_status"] = exc.code
+                return value
+            return {"ok": False, "transport_http_status": exc.code}
         except (ValueError, TypeError):
-            return {"ok": False}
+            return {"ok": False, "transport_http_status": exc.code}
 
 
 def deliver(row, phase, *, store, clock, transport=render_send):
@@ -83,6 +88,9 @@ def deliver(row, phase, *, store, clock, transport=render_send):
     post_id = str((before.get(ids) or {}).get(race) or "")
     if post_id.isdigit():
         return {"key": receipt_key(row, phase), "status": "already_sent", "post_id": post_id}
+    quarantined = classify_quarantine(before, receipt_key(row, phase))
+    if quarantined:
+        return quarantined
     if phase == "prediction":
         try:
             validate_live_row(row, clock(), min_lead_seconds=selector.MIN_LEAD_SECONDS)
@@ -112,6 +120,7 @@ def deliver(row, phase, *, store, clock, transport=render_send):
     except Exception as exc:
         response = {"ok":False, "error_type":type(exc).__name__}
     response = response if isinstance(response, dict) else {"ok": False}
+    evidence = {k: response[k] for k in ("error", "error_type", "transport_http_status", "definitely_not_posted", "retryable") if k in response}
     if response.get("ok") and str(response.get("post_id") or "").isdigit():
         result = {"status": "sent", "post_id": str(response["post_id"]),
                   "sent_at":clock().isoformat(), "request_started_at":started.isoformat(),
@@ -129,6 +138,8 @@ def deliver(row, phase, *, store, clock, transport=render_send):
                   "error_type":response.get("error_type") or "DefiniteRejection"}
     else:
         result = {"status":"uncertain", "error_type":response.get("error_type") or "MissingAcknowledgement"}
+    result["transport_evidence"] = evidence
+    result.setdefault("request_started_at", started.isoformat())
     saved = store.finish(row, phase, owner, result, clock())
     persisted = saved["x_v2_receipts"][receipt_key(row, phase)]
     print("X V2 "+json.dumps({"key":persisted["key"], "status":persisted["status"],
@@ -176,6 +187,7 @@ def _write_actions_monitor_summary(report: dict) -> None:
         f"- 30本予想+30本結果を毎日投稿した場合: **${current['full_day_cost_estimate_usd']:.2f}/日**、**${current['full_30_days_cost_estimate_usd']:.2f}/30日**",
         f"- 前日確認済み投稿: **{previous['confirmed_post_total']}**、料金概算: **${previous['estimated_confirmed_posts_cost_usd']:.3f}**",
         f"- ID検証と再送ブロック確認: **{report['x_monitor']['duplicate_guard_verified']}件**、未解決送信: **{report['x_monitor']['held_transmissions']}件**",
+        f"- 確認済みの保留隔離: **{report['x_monitor'].get('quarantined_transmissions', 0)}件**。投稿状態は未確定、無条件再送は禁止",
         f"- 監視アラート: **{', '.join(current['alerts'] + previous['alerts']) or 'なし'}**",
         "",
         "※ 成功IDを基にした概算です。失敗/不明の請求、残高、他アプリの利用は含みません。実請求はX Developer Consoleで確認してください。",
@@ -234,7 +246,7 @@ def run_once(*, store=None, clock=None, transport=render_send, mode="all", budge
                 except Exception as exc:
                     errors.append({"stage":"result", "key":race, "error_type":type(exc).__name__})
     native = []
-    held = []
+    held, quarantined = [], []
     states_by_day = {}
     for check_day in days:
         current = store.state(check_day)
@@ -247,7 +259,16 @@ def run_once(*, store=None, clock=None, transport=render_send, mode="all", budge
         for phase, (attempts, _, _) in FIELDS.items():
             for race, attempt in (current.get(attempts) or {}).items():
                 if attempt.get("status") in {"reserved", "uncertain", "blocked"}:
-                    held.append({"key":phase+":"+race, "status":attempt["status"]})
+                    rkey = phase+":"+race
+                    try:
+                        isolated = classify_quarantine(current, rkey)
+                    except ValueError as exc:
+                        errors.append({"stage":"quarantine_integrity", "key":rkey, "error_type":type(exc).__name__})
+                        isolated = None
+                    if isolated:
+                        quarantined.append(isolated)
+                    else:
+                        held.append({"key":rkey, "status":attempt["status"]})
         for proof in [x for x in native if x["key"].split(":")[1] == check_day]:
             saved = current["x_v2_receipts"][proof["key"]]
             def forbidden(*args):
@@ -262,17 +283,21 @@ def run_once(*, store=None, clock=None, transport=render_send, mode="all", budge
         "today": usage_today,
         "previous_day": usage_previous,
         "duplicate_guard_verified": sum(bool(row.get("restart_duplicate_guard_verified")) for row in native),
-        "held_transmissions": len(held),
+        "held_transmissions": len(held)+len(quarantined),
+        "quarantined_transmissions": len(quarantined),
     }
     integrity_alerts = {"prediction_cap_exceeded", "result_cap_exceeded", "result_missing_prediction"}
     unexpected = integrity_alerts.intersection(usage_today["alerts"] + usage_previous["alerts"])
     report = {"day":day, "checked_at":clock().isoformat(), "workflow_run_id":os.getenv("GITHUB_RUN_ID", "local"),
               "trigger_event":os.getenv("GITHUB_EVENT_NAME", ""), "mode":mode,
-              "status":"degraded" if errors or held or unexpected else "checked", "audit":audit,
+              "status":"degraded" if errors or held or unexpected else "checked_with_quarantine" if quarantined else "checked", "audit":audit,
               "counts":dict(Counter(row["status"] for row in events)), "events":[{k:row[k] for k in ("key","status","post_id") if k in row} for row in events],
-              "errors":errors, "held":held, "production_verification":native, "x_monitor":monitor}
+              "errors":errors, "held":held, "quarantined":quarantined, "production_verification":native, "x_monitor":monitor}
     store.report(day, report)
     _write_actions_monitor_summary(report)
+    if quarantined:
+        print("::warning::Reviewed uncertain X transmissions remain quarantined; no resend: "+
+              ", ".join(row["key"] for row in quarantined), flush=True)
     print("X dispatcher "+json.dumps({k:report[k] for k in ("day", "status", "audit", "counts", "errors", "held", "x_monitor")}, ensure_ascii=False), flush=True)
     return report
 
@@ -284,7 +309,7 @@ def main():
     args = parser.parse_args()
     try:
         report = run_once(mode=args.mode, budget_seconds=args.budget_seconds)
-        return 0 if report["status"] == "checked" else 1
+        return 0 if report["status"] in {"checked", "checked_with_quarantine"} else 1
     except Exception as exc:
         print(f"::error::X production dispatcher failed ({type(exc).__name__})", flush=True)
         return 1

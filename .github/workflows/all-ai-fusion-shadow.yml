@@ -3,11 +3,15 @@ name: All AI Fusion - Log Only Shadow Test
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    # Isolated code branch: a main commit would auto-deploy existing Render bots.
+    branches: [work/x-fusion-recovery-20261013]
     paths:
       - 'fusion_shadow.py'
       - 'fusion_shadow_runner.py'
-      - 'tests/test_fusion_shadow.py'
+      - 'fusion_shadow_scenarios.py'
+      - 'fusion_shadow_wakeup.py'
+      - 'sync_fusion_shadow_sheet.py'
+      - 'tests/test_fusion_shadow*.py'
       - '.github/workflows/all-ai-fusion-shadow.yml'
   schedule:
     # UTC 23:03-14:58 = JST 08:03-23:58. GitHub schedules can be delayed.
@@ -15,6 +19,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: all-ai-fusion-shadow-independent
@@ -23,8 +28,10 @@ concurrency:
 jobs:
   check_and_log:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
+      - name: Mark research run time
+        run: echo "FUSION_RUN_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
@@ -33,7 +40,8 @@ jobs:
           sparse-checkout: |
             /*.py
             /notification_policy.json
-            /tests/test_fusion_shadow.py
+            /tests/__init__.py
+            /tests/test_fusion_shadow*.py
             /x_delivery_v2/
             /data/sheet_db/
             /data/racer_profiles.json
@@ -45,7 +53,16 @@ jobs:
         with:
           python-version: '3.12'
       - name: Validate timing, scoring, storage and no-delivery integration
-        run: python -m unittest discover -s tests -p 'test_fusion_shadow.py' -v
+        id: guards
+        run: python -m unittest discover -s tests -p 'test_fusion_shadow*.py' -v
+      - name: Read latest database snapshots from main without changing main
+        run: |
+          git fetch --depth=1 origin main
+          for path in data/sheet_db data/racer_profiles.json data/learning_state.json data/venue_tactical_priors.json data/venue_tide_profiles.json data/race_context; do
+            if git cat-file -e "FETCH_HEAD:$path" 2>/dev/null; then
+              git checkout --ignore-skip-worktree-bits FETCH_HEAD -- "$path"
+            fi
+          done
       - name: Open separate log state
         run: |
           git fetch --depth=1 origin research-fusion-shadow-state:refs/remotes/origin/research-fusion-shadow-state
@@ -53,7 +70,7 @@ jobs:
           git -C "$RUNNER_TEMP/fusion-shadow-state" config user.name 'github-actions[bot]'
           git -C "$RUNNER_TEMP/fusion-shadow-state" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
       - name: Collect live predictions and later official results; log only
-        run: python fusion_shadow_runner.py --out "$RUNNER_TEMP/fusion-shadow-state/data/fusion_shadow" --budget-seconds 85
+        run: python fusion_shadow_runner.py --out "$RUNNER_TEMP/fusion-shadow-state/data/fusion_shadow" --budget-seconds 125
       - name: Persist log state only, including failed collector coverage
         id: persist
         if: always()
@@ -82,3 +99,26 @@ jobs:
             git -C "$ROOT" commit -m 'research: confirm durable pre-deadline fusion snapshots'
             git -C "$ROOT" push origin HEAD:refs/heads/research-fusion-shadow-state
           fi
+      - name: Install independent research sheet client
+        run: pip install 'gspread>=6,<7' 'google-auth>=2,<3'
+      - name: Project frozen new-Yuuki logs and official verification into existing tabs
+        continue-on-error: true
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: python sync_fusion_shadow_sheet.py --root "$RUNNER_TEMP/fusion-shadow-state/data/fusion_shadow"
+      - name: Save sheet projection status only on research state
+        if: always()
+        run: |
+          ROOT="$RUNNER_TEMP/fusion-shadow-state"
+          if [ -f "$ROOT/data/fusion_shadow/sheet_sync.json" ]; then
+            git -C "$ROOT" add data/fusion_shadow/sheet_sync.json
+            if ! git -C "$ROOT" diff --cached --quiet; then
+              git -C "$ROOT" commit -m 'research: checkpoint independent sheet projection'
+              git -C "$ROOT" push origin HEAD:refs/heads/research-fusion-shadow-state
+            fi
+          fi
+      - name: Continue only this research workflow on its isolated code branch
+        if: always() && !cancelled() && steps.guards.conclusion == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python -u fusion_shadow_wakeup.py
