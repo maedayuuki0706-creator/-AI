@@ -1,0 +1,30 @@
+{
+  "reviewed_at": "2026-10-13T02:36:28.627Z",
+  "key": "result:20261012:23:9",
+  "claim": {
+    "owner": "8051b3dd36204b90931313b99f519fcf",
+    "claimed_at": "2026-10-12T12:45:22.410696+09:00",
+    "content_sha256": "44ea47c25a121faa64c601e4113170950b120e821d668926d07f674007acc8b6",
+    "parent_post_id": "2109484570999763085"
+  },
+  "github_status": "uncertain",
+  "result_post_id": null,
+  "automatic_resend_prohibited": true,
+  "not_definitively_unposted": true,
+  "source_logs": [
+    {
+      "id": "142a5c46-b78b-4afa-954f-af4c1c57e4c8",
+      "time": "2026-10-12T03:45:25.388817254Z",
+      "message": "X sync rejected: HTTP 503"
+    },
+    {
+      "id": "572774d1-422c-4b4f-990a-b1a47a5fc450",
+      "time": "2026-10-12T03:45:25.388850825Z",
+      "message": "web 127.0.0.1 \"POST /api/x-result HTTP/1.1\" 502 -"
+    }
+  ],
+  "cause_inference": "The uncertain receipt's request window aligns with Render's X HTTP503 / HTTP502 response. A 503 is ambiguous; do not clear the original guard.",
+  "production_change_status": "Prepared fix tested on isolated branch. Main untouched because it auto-deploys an existing Discord question bot and X server.",
+  "review_state": "held_with_original_uncertain_guard",
+  "original_receipt_not_changed": true
+}
