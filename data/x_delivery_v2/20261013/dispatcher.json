@@ -1,14 +1,15 @@
 {
   "audit": {
     "already_selected": 10,
-    "eligible": 0,
-    "inside_cutoff": 40,
-    "prediction_files": 53,
+    "eligible": 1,
+    "inside_cutoff": 42,
+    "prediction_files": 54,
     "remaining_daily_slots": 20,
-    "selection_gate": 3
+    "selection_gate": 1
   },
-  "checked_at": "2026-10-13T13:21:33.193775+09:00",
+  "checked_at": "2026-10-13T13:25:32.907041+09:00",
   "counts": {
+    "sent": 2,
     "uncertain": 1,
     "waiting_result": 1
   },
@@ -16,7 +17,17 @@
   "errors": [],
   "events": [
     {
+      "key": "prediction:20261013:22:6",
+      "post_id": "2109862895802896604",
+      "status": "sent"
+    },
+    {
       "key": "result:20261013:22:5",
+      "post_id": "2109862920121471305",
+      "status": "sent"
+    },
+    {
+      "key": "result:20261013:04:7",
       "status": "waiting_result"
     },
     {
@@ -113,6 +124,14 @@
       "verified": true
     },
     {
+      "content_sha256": "b7ddcd0887321059a3a38e08375e0b46cacb004d0ff55d0b400912ae303a1a37",
+      "key": "prediction:20261013:22:6",
+      "post_id": "2109862895802896604",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-13T13:24:48.662757+09:00",
+      "verified": true
+    },
+    {
       "content_sha256": "abf8ffad61699f06c17998607c6b7aba6c9f283ab7a91f0b06695535acf9b357",
       "key": "result:20261013:06:3",
       "post_id": "2109841192854945884",
@@ -174,6 +193,14 @@
       "post_id": "2109841171547848820",
       "restart_duplicate_guard_verified": true,
       "sent_at": "2026-10-13T11:58:29.196886+09:00",
+      "verified": true
+    },
+    {
+      "content_sha256": "714bbe8bfc5a4bd72a723392e23b72e9a541b61210a42fe274af0f193bee5d01",
+      "key": "result:20261013:22:5",
+      "post_id": "2109862920121471305",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-10-13T13:24:54.461964+09:00",
       "verified": true
     },
     {
@@ -651,9 +678,9 @@
   ],
   "status": "degraded",
   "trigger_event": "workflow_dispatch",
-  "workflow_run_id": "38345966384",
+  "workflow_run_id": "38346273321",
   "x_monitor": {
-    "duplicate_guard_verified": 77,
+    "duplicate_guard_verified": 79,
     "held_transmissions": 1,
     "previous_day": {
       "alerts": [
@@ -676,15 +703,15 @@
     },
     "today": {
       "alerts": [],
-      "confirmed_post_total": 18,
-      "confirmed_predictions": 10,
-      "confirmed_results": 8,
+      "confirmed_post_total": 20,
+      "confirmed_predictions": 11,
+      "confirmed_results": 9,
       "cost_estimate_only_not_x_invoice": true,
-      "estimated_confirmed_posts_cost_usd": 0.27,
+      "estimated_confirmed_posts_cost_usd": 0.3,
       "full_30_days_cost_estimate_usd": 27.0,
       "full_day_cost_estimate_usd": 0.9,
       "prediction_limit": 30,
-      "remaining_prediction_slots": 20,
+      "remaining_prediction_slots": 19,
       "result_without_prediction_count": 0,
       "results_pending_or_unconfirmed": 2,
       "standard_post_create_unit_usd": 0.015,
