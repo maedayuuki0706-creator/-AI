@@ -1,0 +1,5876 @@
+{
+  "boat_scenarios": [
+    {
+      "anticipated_methods": [
+        "逃げ"
+      ],
+      "axis_decision": "頭採用",
+      "axis_reason": "補正後の頭確率54.0%。確率順位／代替頭の根拠で10点に採用",
+      "condition_tests": [],
+      "evidence": {
+        "average_st": 0.14,
+        "current_class": "A1",
+        "db_adjustment": {
+          "factor": 1.05856,
+          "motor_number": 39,
+          "racer_id": "3940",
+          "signals": [
+            "course=69.4/52.4",
+            "method=0.985",
+            "motor_grade=0.720",
+            "motor_rate=37.4/38.5"
+          ]
+        },
+        "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+        "exhibition_rank": 1,
+        "exhibition_st": 0.08,
+        "exhibition_st_signed": 0.08,
+        "exhibition_time": 6.87,
+        "hiyori_course_samples": 65.0,
+        "hiyori_course_win_rate": 0.615,
+        "hiyori_used": [
+          "course_rates",
+          "course_st",
+          "motor_last10"
+        ],
+        "motor_number": 39,
+        "motor_top2_rate": 38.46,
+        "national_win_rate": 6.34,
+        "previous_day_form": null,
+        "tilt": -0.5
+      },
+      "evidence_notes": [
+        "想定1コース。展示進入は本番を保証しない",
+        "平均ST=0.14、展示ST=0.08、モーター2連率=38.46%",
+        "全国勝率=6.34、級別=A1",
+        "モーター2連率の6艇中の取得値平均との差=+0.4pt。現在の足を保証しない"
+      ],
+      "excluded_accidents": true,
+      "factor_components": [
+        {
+          "field": "historical_st_vs_outside",
+          "log_factor": 0.055,
+          "observed_gap": -0.07669999999999999
+        },
+        {
+          "field": "motor_top2_vs_race_mean",
+          "log_factor": 0.0006766666666666606,
+          "observed_gap": 0.38666666666666316
+        },
+        {
+          "field": "national_win_rate_vs_race_mean",
+          "log_factor": 0.023770833333333338,
+          "observed_gap": 1.3583333333333334
+        }
+      ],
+      "head_probability": 0.5395319703618089,
+      "head_probability_before_scenarios": 0.5301349707807856,
+      "head_tickets": [
+        "1-3-4",
+        "1-3-2",
+        "1-4-3",
+        "1-3-6",
+        "1-3-5",
+        "1-2-3"
+      ],
+      "inference_type": "pre_race_unvalidated_hypothesis",
+      "inside_lane": null,
+      "lane": 1,
+      "loss_paths": [
+        "2コースの差し／外艇のまくりで先マイの優位を失う"
+      ],
+      "missing_fields": [
+        "previous_day_form"
+      ],
+      "name": "飯山泰",
+      "outside_lane": 2,
+      "predicted_course": 1,
+      "racer_id": "3940",
+      "scenario_factor": 1.0826887168796961,
+      "win_conditions": [
+        "外の攻撃より先に旋回位置を確保し、出口で流れない"
+      ],
+      "win_paths": [
+        "1コースから先マイし、差し場を小さく保って逃げる"
+      ]
+    },
+    {
+      "anticipated_methods": [
+        "差し",
+        "まくり"
+      ],
+      "axis_decision": "頭不採用",
+      "axis_reason": "補正後の頭確率5.8%。勝つ筋は検討したが、確率順位と根拠を比較した10点の採用枠外。勝てないという判断ではない",
+      "condition_tests": [
+        {
+          "kind": "st_advantage",
+          "other_lane": 1,
+          "threshold": 0.03
+        },
+        {
+          "kind": "outside_attack",
+          "other_lane": 3,
+          "threshold": 0.03
+        }
+      ],
+      "evidence": {
+        "average_st": 0.2167,
+        "current_class": "B2",
+        "db_adjustment": {
+          "factor": 1.06732,
+          "motor_number": 82,
+          "racer_id": "4340",
+          "signals": [
+            "method=1.050",
+            "motor_grade=0.837",
+            "motor_rate=34.5/36.4"
+          ]
+        },
+        "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+        "exhibition_rank": 5,
+        "exhibition_st": 0.14,
+        "exhibition_st_signed": 0.14,
+        "exhibition_time": 7.0,
+        "hiyori_course_samples": 7.0,
+        "hiyori_course_win_rate": 0.0,
+        "hiyori_used": [
+          "course_rates",
+          "course_st",
+          "motor_last10"
+        ],
+        "motor_number": 82,
+        "motor_top2_rate": 36.36,
+        "national_win_rate": 3.59,
+        "previous_day_form": null,
+        "tilt": -0.5
+      },
+      "evidence_notes": [
+        "想定2コース。展示進入は本番を保証しない",
+        "平均ST=0.2167、展示ST=0.14、モーター2連率=36.36%",
+        "全国勝率=3.59、級別=B2",
+        "内隣1号艇との平均ST差=-0.077秒（正なら自艇が早い）",
+        "展示で内隣1号艇とのST差=-0.060秒（展示のみ）",
+        "モーター2連率の6艇中の取得値平均との差=-1.7pt。現在の足を保証しない"
+      ],
+      "excluded_accidents": true,
+      "factor_components": [
+        {
+          "field": "historical_st_vs_inside",
+          "log_factor": -0.1,
+          "observed_gap": -0.07669999999999999
+        },
+        {
+          "field": "exhibition_st_vs_inside",
+          "log_factor": -0.026250000000000006,
+          "observed_gap": -0.06000000000000001
+        },
+        {
+          "field": "historical_st_vs_outside",
+          "log_factor": -0.055,
+          "observed_gap": 0.0567
+        },
+        {
+          "field": "motor_top2_vs_race_mean",
+          "log_factor": -0.0029983333333333424,
+          "observed_gap": -1.7133333333333383
+        },
+        {
+          "field": "national_win_rate_vs_race_mean",
+          "log_factor": -0.024354166666666666,
+          "observed_gap": -1.3916666666666666
+        }
+      ],
+      "head_probability": 0.05816002414250808,
+      "head_probability_before_scenarios": 0.07622411192644538,
+      "head_tickets": [],
+      "inference_type": "pre_race_unvalidated_hypothesis",
+      "inside_lane": 1,
+      "lane": 2,
+      "loss_paths": [
+        "インの旋回が小さく差し場がなく、外艇の攻撃に先を越される",
+        "平均STの優位は過去平均であり、本番で再現しない可能性がある",
+        "展示ST差が本番で消えると、この攻めの根拠は崩れる",
+        "外隣3号艇の平均STが0.057秒早く、攻撃を受ける条件"
+      ],
+      "missing_fields": [
+        "previous_day_form"
+      ],
+      "name": "土性雅也",
+      "outside_lane": 3,
+      "predicted_course": 2,
+      "racer_id": "4340",
+      "scenario_factor": 0.8117178293608334,
+      "win_conditions": [
+        "インの出口に差し場が生じ、外の攻撃より先に内側を取る"
+      ],
+      "win_paths": [
+        "1コース1号艇の旋回後に差し場を確保する"
+      ]
+    },
+    {
+      "anticipated_methods": [
+        "まくり",
+        "まくり差し"
+      ],
+      "axis_decision": "頭採用",
+      "axis_reason": "補正後の頭確率22.8%。確率順位／代替頭の根拠で10点に採用",
+      "condition_tests": [
+        {
+          "kind": "st_advantage",
+          "other_lane": 2,
+          "threshold": 0.03
+        }
+      ],
+      "evidence": {
+        "average_st": 0.16,
+        "current_class": "A1",
+        "db_adjustment": {
+          "factor": 1.1504,
+          "motor_number": 38,
+          "racer_id": "4776",
+          "signals": [
+            "course=21.7/13.2",
+            "method=0.998",
+            "motor_grade=0.953",
+            "motor_rate=47.1/47.0"
+          ]
+        },
+        "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+        "exhibition_rank": 4,
+        "exhibition_st": 0.11,
+        "exhibition_st_signed": 0.11,
+        "exhibition_time": 6.99,
+        "hiyori_course_samples": 42.0,
+        "hiyori_course_win_rate": 0.167,
+        "hiyori_used": [
+          "course_rates",
+          "course_st",
+          "motor_last10"
+        ],
+        "motor_number": 38,
+        "motor_top2_rate": 46.96,
+        "national_win_rate": 7.49,
+        "previous_day_form": null,
+        "tilt": -0.5
+      },
+      "evidence_notes": [
+        "想定3コース。展示進入は本番を保証しない",
+        "平均ST=0.16、展示ST=0.11、モーター2連率=46.96%",
+        "全国勝率=7.49、級別=A1",
+        "内隣2号艇との平均ST差=+0.057秒（正なら自艇が早い）",
+        "展示で内隣2号艇とのST差=+0.030秒（展示のみ）",
+        "モーター2連率の6艇中の取得値平均との差=+8.9pt。現在の足を保証しない"
+      ],
+      "excluded_accidents": true,
+      "factor_components": [
+        {
+          "field": "historical_st_vs_inside",
+          "log_factor": 0.1,
+          "observed_gap": 0.0567
+        },
+        {
+          "field": "exhibition_st_vs_inside",
+          "log_factor": 0.013125000000000006,
+          "observed_gap": 0.030000000000000013
+        },
+        {
+          "field": "historical_st_vs_outside",
+          "log_factor": -0.0,
+          "observed_gap": 0.0
+        },
+        {
+          "field": "motor_top2_vs_race_mean",
+          "log_factor": 0.015551666666666662,
+          "observed_gap": 8.886666666666663
+        },
+        {
+          "field": "national_win_rate_vs_race_mean",
+          "log_factor": 0.035,
+          "observed_gap": 2.5083333333333337
+        }
+      ],
+      "head_probability": 0.22829460998497647,
+      "head_probability_before_scenarios": 0.20619810285444043,
+      "head_tickets": [
+        "3-1-4",
+        "3-1-2"
+      ],
+      "inference_type": "pre_race_unvalidated_hypothesis",
+      "inside_lane": 2,
+      "lane": 3,
+      "loss_paths": [
+        "内隣2号艇が壁となるか、外艇に進路を取られる",
+        "平均STの優位は過去平均であり、本番で再現しない可能性がある",
+        "展示ST差が本番で消えると、この攻めの根拠は崩れる"
+      ],
+      "missing_fields": [
+        "previous_day_form"
+      ],
+      "name": "竹田和哉",
+      "outside_lane": 4,
+      "predicted_course": 3,
+      "racer_id": "4776",
+      "scenario_factor": 1.1778334207120855,
+      "win_conditions": [
+        "スタートと行き足の差が本番でも成立し、攻めの進路を確保する",
+        "平均STの内隣に対する優位0.057秒が本番でも再現する"
+      ],
+      "win_paths": [
+        "内隣2号艇の壁を越えてまくる／開いた間をまくり差す"
+      ]
+    },
+    {
+      "anticipated_methods": [
+        "まくり",
+        "まくり差し",
+        "差し"
+      ],
+      "axis_decision": "頭採用",
+      "axis_reason": "補正後の頭確率7.6%。確率順位／代替頭の根拠で10点に採用",
+      "condition_tests": [
+        {
+          "kind": "st_advantage",
+          "other_lane": 3,
+          "threshold": 0.03
+        }
+      ],
+      "evidence": {
+        "average_st": 0.16,
+        "current_class": "A1",
+        "db_adjustment": {
+          "factor": 1.02292,
+          "motor_number": 52,
+          "racer_id": "4384",
+          "signals": [
+            "course=14.3/12.1",
+            "method=0.983",
+            "motor_grade=0.743",
+            "motor_rate=35.3/33.6"
+          ]
+        },
+        "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+        "exhibition_rank": 2,
+        "exhibition_st": 0.32,
+        "exhibition_st_signed": 0.32,
+        "exhibition_time": 6.95,
+        "hiyori_course_samples": 40.0,
+        "hiyori_course_win_rate": 0.1,
+        "hiyori_used": [
+          "course_rates",
+          "course_st",
+          "motor_last10"
+        ],
+        "motor_number": 52,
+        "motor_top2_rate": 33.61,
+        "national_win_rate": 5.32,
+        "previous_day_form": null,
+        "tilt": -0.5
+      },
+      "evidence_notes": [
+        "想定4コース。展示進入は本番を保証しない",
+        "平均ST=0.16、展示ST=0.32、モーター2連率=33.61%",
+        "全国勝率=5.32、級別=A1",
+        "内隣3号艇との平均ST差=+0.000秒（正なら自艇が早い）",
+        "展示で内隣3号艇とのST差=-0.210秒（展示のみ）",
+        "モーター2連率の6艇中の取得値平均との差=-4.5pt。現在の足を保証しない"
+      ],
+      "excluded_accidents": true,
+      "factor_components": [
+        {
+          "field": "historical_st_vs_inside",
+          "log_factor": 0.0,
+          "observed_gap": 0.0
+        },
+        {
+          "field": "exhibition_st_vs_inside",
+          "log_factor": -0.035,
+          "observed_gap": -0.21000000000000002
+        },
+        {
+          "field": "historical_st_vs_outside",
+          "log_factor": 0.01100000000000001,
+          "observed_gap": -0.010000000000000009
+        },
+        {
+          "field": "motor_top2_vs_race_mean",
+          "log_factor": -0.007810833333333342,
+          "observed_gap": -4.463333333333338
+        },
+        {
+          "field": "national_win_rate_vs_race_mean",
+          "log_factor": 0.005920833333333342,
+          "observed_gap": 0.3383333333333338
+        }
+      ],
+      "head_probability": 0.07625377428390524,
+      "head_probability_before_scenarios": 0.08324882435157804,
+      "head_tickets": [
+        "4-1-3"
+      ],
+      "inference_type": "pre_race_unvalidated_hypothesis",
+      "inside_lane": 3,
+      "lane": 4,
+      "loss_paths": [
+        "内隣3号艇が壁となるか、外艇に進路を取られる",
+        "平均STの優位は過去平均であり、本番で再現しない可能性がある",
+        "展示ST差が本番で消えると、この攻めの根拠は崩れる"
+      ],
+      "missing_fields": [
+        "previous_day_form"
+      ],
+      "name": "鶴本崇文",
+      "outside_lane": 5,
+      "predicted_course": 4,
+      "racer_id": "4384",
+      "scenario_factor": 0.9744422723635497,
+      "win_conditions": [
+        "スタートと行き足の差が本番でも成立し、攻めの進路を確保する"
+      ],
+      "win_paths": [
+        "内隣3号艇の壁を越えてまくる／開いた間をまくり差す"
+      ]
+    },
+    {
+      "anticipated_methods": [
+        "まくり差し",
+        "差し",
+        "まくり"
+      ],
+      "axis_decision": "頭不採用",
+      "axis_reason": "補正後の頭確率4.7%。勝つ筋は検討したが、確率順位と根拠を比較した10点の採用枠外。勝てないという判断ではない",
+      "condition_tests": [
+        {
+          "kind": "st_advantage",
+          "other_lane": 4,
+          "threshold": 0.03
+        }
+      ],
+      "evidence": {
+        "average_st": 0.17,
+        "current_class": "B1",
+        "db_adjustment": {
+          "factor": 0.99569,
+          "motor_number": 17,
+          "racer_id": "3741",
+          "signals": [
+            "motor_grade=0.720",
+            "motor_rate=34.4/36.2"
+          ]
+        },
+        "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+        "exhibition_rank": 6,
+        "exhibition_st": 0.18,
+        "exhibition_st_signed": 0.18,
+        "exhibition_time": 7.08,
+        "hiyori_course_samples": 38.0,
+        "hiyori_course_win_rate": 0.0,
+        "hiyori_used": [
+          "course_rates",
+          "course_st",
+          "motor_last10"
+        ],
+        "motor_number": 17,
+        "motor_top2_rate": 36.21,
+        "national_win_rate": 3.44,
+        "previous_day_form": null,
+        "tilt": -0.5
+      },
+      "evidence_notes": [
+        "想定5コース。展示進入は本番を保証しない",
+        "平均ST=0.17、展示ST=0.18、モーター2連率=36.21%",
+        "全国勝率=3.44、級別=B1",
+        "内隣4号艇との平均ST差=-0.010秒（正なら自艇が早い）",
+        "展示で内隣4号艇とのST差=+0.140秒（展示のみ）",
+        "モーター2連率の6艇中の取得値平均との差=-1.9pt。現在の足を保証しない"
+      ],
+      "excluded_accidents": true,
+      "factor_components": [
+        {
+          "field": "historical_st_vs_inside",
+          "log_factor": -0.020000000000000018,
+          "observed_gap": -0.010000000000000009
+        },
+        {
+          "field": "exhibition_st_vs_inside",
+          "log_factor": 0.035,
+          "observed_gap": 0.14
+        },
+        {
+          "field": "historical_st_vs_outside",
+          "log_factor": -0.0,
+          "observed_gap": 0.0
+        },
+        {
+          "field": "motor_top2_vs_race_mean",
+          "log_factor": -0.00326083333333334,
+          "observed_gap": -1.8633333333333368
+        },
+        {
+          "field": "national_win_rate_vs_race_mean",
+          "log_factor": -0.026979166666666665,
+          "observed_gap": -1.5416666666666665
+        }
+      ],
+      "head_probability": 0.04682156422400851,
+      "head_probability_before_scenarios": 0.05057518113738657,
+      "head_tickets": [],
+      "inference_type": "pre_race_unvalidated_hypothesis",
+      "inside_lane": 4,
+      "lane": 5,
+      "loss_paths": [
+        "内側が競らず先行するか、外回りの距離ロスで攻めが届かない",
+        "平均STの優位は過去平均であり、本番で再現しない可能性がある",
+        "展示ST差が本番で消えると、この攻めの根拠は崩れる"
+      ],
+      "missing_fields": [
+        "previous_day_form"
+      ],
+      "name": "松尾基成",
+      "outside_lane": 6,
+      "predicted_course": 5,
+      "racer_id": "3741",
+      "scenario_factor": 0.9848755411065122,
+      "win_conditions": [
+        "内の競りによる進路と、自艇が追いつける行き足が同時に必要"
+      ],
+      "win_paths": [
+        "内側の攻めと競りに乗り、まくり差し／差しで空いた進路を取る"
+      ]
+    },
+    {
+      "anticipated_methods": [
+        "まくり差し",
+        "差し",
+        "まくり"
+      ],
+      "axis_decision": "頭採用",
+      "axis_reason": "補正後の頭確率5.1%。確率順位／代替頭の根拠で10点に採用",
+      "condition_tests": [
+        {
+          "kind": "st_advantage",
+          "other_lane": 5,
+          "threshold": 0.03
+        }
+      ],
+      "evidence": {
+        "average_st": 0.17,
+        "current_class": "B1",
+        "db_adjustment": {
+          "factor": 1.05333,
+          "motor_number": 55,
+          "racer_id": "4186",
+          "signals": [
+            "method=1.050",
+            "motor_grade=0.743",
+            "motor_rate=36.4/36.8"
+          ]
+        },
+        "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+        "exhibition_rank": 3,
+        "exhibition_st": 0.08,
+        "exhibition_st_signed": 0.08,
+        "exhibition_time": 6.97,
+        "hiyori_course_samples": 20.0,
+        "hiyori_course_win_rate": 0.0,
+        "hiyori_used": [
+          "course_rates",
+          "course_st",
+          "motor_last10"
+        ],
+        "motor_number": 55,
+        "motor_top2_rate": 36.84,
+        "national_win_rate": 3.71,
+        "previous_day_form": null,
+        "tilt": -0.5
+      },
+      "evidence_notes": [
+        "想定6コース。展示進入は本番を保証しない",
+        "平均ST=0.17、展示ST=0.08、モーター2連率=36.84%",
+        "全国勝率=3.71、級別=B1",
+        "内隣5号艇との平均ST差=+0.000秒（正なら自艇が早い）",
+        "展示で内隣5号艇とのST差=+0.100秒（展示のみ）",
+        "モーター2連率の6艇中の取得値平均との差=-1.2pt。現在の足を保証しない"
+      ],
+      "excluded_accidents": true,
+      "factor_components": [
+        {
+          "field": "historical_st_vs_inside",
+          "log_factor": 0.0,
+          "observed_gap": 0.0
+        },
+        {
+          "field": "exhibition_st_vs_inside",
+          "log_factor": 0.035,
+          "observed_gap": 0.09999999999999999
+        },
+        {
+          "field": "motor_top2_vs_race_mean",
+          "log_factor": -0.0021583333333333355,
+          "observed_gap": -1.2333333333333343
+        },
+        {
+          "field": "national_win_rate_vs_race_mean",
+          "log_factor": -0.022254166666666665,
+          "observed_gap": -1.2716666666666665
+        }
+      ],
+      "head_probability": 0.050938057002792775,
+      "head_probability_before_scenarios": 0.05361880894936393,
+      "head_tickets": [
+        "6-1-3"
+      ],
+      "inference_type": "pre_race_unvalidated_hypothesis",
+      "inside_lane": 5,
+      "lane": 6,
+      "loss_paths": [
+        "内側が競らず先行するか、外回りの距離ロスで攻めが届かない",
+        "平均STの優位は過去平均であり、本番で再現しない可能性がある",
+        "展示ST差が本番で消えると、この攻めの根拠は崩れる"
+      ],
+      "missing_fields": [
+        "previous_day_form"
+      ],
+      "name": "小川時光",
+      "outside_lane": null,
+      "predicted_course": 6,
+      "racer_id": "4186",
+      "scenario_factor": 1.0106437459040352,
+      "win_conditions": [
+        "内の競りによる進路と、自艇が追いつける行き足が同時に必要"
+      ],
+      "win_paths": [
+        "内側の攻めと競りに乗り、まくり差し／差しで空いた進路を取る"
+      ]
+    }
+  ],
+  "captured_at": "2026-10-14T18:04:31.304710+09:00",
+  "code_sha": "f4b1f11a7a7fd542ec49ee475900a7396f2a727e",
+  "context_available": true,
+  "created_at": "2026-10-14T18:04:51.380316+09:00",
+  "database": {
+    "enabled": true,
+    "lane_factors": {
+      "1": {
+        "factor": 1.05856,
+        "motor_number": 39,
+        "racer_id": "3940",
+        "signals": [
+          "course=69.4/52.4",
+          "method=0.985",
+          "motor_grade=0.720",
+          "motor_rate=37.4/38.5"
+        ]
+      },
+      "2": {
+        "factor": 1.06732,
+        "motor_number": 82,
+        "racer_id": "4340",
+        "signals": [
+          "method=1.050",
+          "motor_grade=0.837",
+          "motor_rate=34.5/36.4"
+        ]
+      },
+      "3": {
+        "factor": 1.1504,
+        "motor_number": 38,
+        "racer_id": "4776",
+        "signals": [
+          "course=21.7/13.2",
+          "method=0.998",
+          "motor_grade=0.953",
+          "motor_rate=47.1/47.0"
+        ]
+      },
+      "4": {
+        "factor": 1.02292,
+        "motor_number": 52,
+        "racer_id": "4384",
+        "signals": [
+          "course=14.3/12.1",
+          "method=0.983",
+          "motor_grade=0.743",
+          "motor_rate=35.3/33.6"
+        ]
+      },
+      "5": {
+        "factor": 0.99569,
+        "motor_number": 17,
+        "racer_id": "3741",
+        "signals": [
+          "motor_grade=0.720",
+          "motor_rate=34.4/36.2"
+        ]
+      },
+      "6": {
+        "factor": 1.05333,
+        "motor_number": 55,
+        "racer_id": "4186",
+        "signals": [
+          "method=1.050",
+          "motor_grade=0.743",
+          "motor_rate=36.4/36.8"
+        ]
+      }
+    },
+    "matched_lanes": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "motor_coverage_pct": 100.0,
+    "motor_matches": 6,
+    "player_coverage_pct": 83.3,
+    "player_matches": 5,
+    "probability_audit": {
+      "adjusted_heads": {
+        "1": 0.500588,
+        "2": 0.086081,
+        "3": 0.220425,
+        "4": 0.08051,
+        "5": 0.053712,
+        "6": 0.058683
+      },
+      "base_heads": {
+        "1": 0.504298,
+        "2": 0.086331,
+        "3": 0.208202,
+        "4": 0.083997,
+        "5": 0.057566,
+        "6": 0.059606
+      },
+      "base_probability": {
+        "1-2-3": 0.044669,
+        "1-2-4": 0.018021,
+        "1-2-5": 0.012351,
+        "1-2-6": 0.012788,
+        "1-3-2": 0.063604,
+        "1-3-4": 0.061883,
+        "1-3-5": 0.042411,
+        "1-3-6": 0.043914,
+        "1-4-2": 0.017919,
+        "1-4-3": 0.043214,
+        "1-4-5": 0.011948,
+        "1-4-6": 0.012372,
+        "1-5-2": 0.01154,
+        "1-5-3": 0.02783,
+        "1-5-4": 0.011228,
+        "1-5-6": 0.007967,
+        "1-6-2": 0.012004,
+        "1-6-3": 0.028951,
+        "1-6-4": 0.01168,
+        "1-6-5": 0.008005,
+        "2-1-3": 0.024235,
+        "2-1-4": 0.009777,
+        "2-1-5": 0.006701,
+        "2-1-6": 0.006938,
+        "2-3-1": 0.014063,
+        "2-3-4": 0.002342,
+        "2-3-5": 0.001605,
+        "2-3-6": 0.001662,
+        "2-4-1": 0.004824,
+        "2-4-3": 0.001992,
+        "2-4-5": 0.000551,
+        "2-4-6": 0.00057,
+        "2-5-1": 0.003204,
+        "2-5-3": 0.001323,
+        "2-5-4": 0.000534,
+        "2-5-6": 0.000379,
+        "2-6-1": 0.003326,
+        "2-6-3": 0.001373,
+        "2-6-4": 0.000554,
+        "2-6-5": 0.00038,
+        "3-1-2": 0.039819,
+        "3-1-4": 0.038742,
+        "3-1-5": 0.026551,
+        "3-1-6": 0.027492,
+        "3-2-1": 0.016227,
+        "3-2-4": 0.002703,
+        "3-2-5": 0.001852,
+        "3-2-6": 0.001918,
+        "3-4-1": 0.015736,
+        "3-4-2": 0.002694,
+        "3-4-5": 0.001796,
+        "3-4-6": 0.00186,
+        "3-5-1": 0.010397,
+        "3-5-2": 0.00178,
+        "3-5-4": 0.001732,
+        "3-5-6": 0.001229,
+        "3-6-1": 0.010795,
+        "3-6-2": 0.001848,
+        "3-6-4": 0.001798,
+        "3-6-5": 0.001232,
+        "4-1-2": 0.009697,
+        "4-1-3": 0.023386,
+        "4-1-5": 0.006466,
+        "4-1-6": 0.006695,
+        "4-2-1": 0.004812,
+        "4-2-3": 0.001987,
+        "4-2-5": 0.000549,
+        "4-2-6": 0.000569,
+        "4-3-1": 0.013603,
+        "4-3-2": 0.002329,
+        "4-3-5": 0.001553,
+        "4-3-6": 0.001608,
+        "4-5-1": 0.003101,
+        "4-5-2": 0.000531,
+        "4-5-3": 0.00128,
+        "4-5-6": 0.000367,
+        "4-6-1": 0.003219,
+        "4-6-2": 0.000551,
+        "4-6-3": 0.001329,
+        "4-6-5": 0.000367,
+        "5-1-2": 0.00607,
+        "5-1-3": 0.014638,
+        "5-1-4": 0.005905,
+        "5-1-6": 0.004191,
+        "5-2-1": 0.003106,
+        "5-2-3": 0.001282,
+        "5-2-4": 0.000517,
+        "5-2-6": 0.000367,
+        "5-3-1": 0.008735,
+        "5-3-2": 0.001495,
+        "5-3-4": 0.001455,
+        "5-3-6": 0.001032,
+        "5-4-1": 0.003014,
+        "5-4-2": 0.000516,
+        "5-4-3": 0.001244,
+        "5-4-6": 0.000356,
+        "5-6-1": 0.00208,
+        "5-6-2": 0.000356,
+        "5-6-3": 0.000859,
+        "5-6-4": 0.000346,
+        "6-1-2": 0.006328,
+        "6-1-3": 0.015261,
+        "6-1-4": 0.006157,
+        "6-1-5": 0.004219,
+        "6-2-1": 0.003231,
+        "6-2-3": 0.001334,
+        "6-2-4": 0.000538,
+        "6-2-5": 0.000369,
+        "6-3-1": 0.009089,
+        "6-3-2": 0.001556,
+        "6-3-4": 0.001514,
+        "6-3-5": 0.001038,
+        "6-4-1": 0.003135,
+        "6-4-2": 0.000537,
+        "6-4-3": 0.001294,
+        "6-4-5": 0.000358,
+        "6-5-1": 0.002084,
+        "6-5-2": 0.000357,
+        "6-5-3": 0.000861,
+        "6-5-4": 0.000347
+      },
+      "head_delta_pp": {
+        "1": -0.371,
+        "2": -0.025,
+        "3": 1.2223,
+        "4": -0.3486,
+        "5": -0.3854,
+        "6": -0.0923
+      },
+      "probability_delta_pp": {
+        "1-2-3": 0.003,
+        "1-2-4": -0.0406,
+        "1-2-5": -0.0344,
+        "1-2-6": -0.0215,
+        "1-3-2": 0.1247,
+        "1-3-4": 0.068,
+        "1-3-5": 0.0235,
+        "1-3-6": 0.0743,
+        "1-4-2": -0.0589,
+        "1-4-3": -0.079,
+        "1-4-5": -0.0552,
+        "1-4-6": -0.0438,
+        "1-5-2": -0.0514,
+        "1-5-3": -0.0838,
+        "1-5-4": -0.0591,
+        "1-5-6": -0.0375,
+        "1-6-2": -0.0241,
+        "1-6-3": -0.0152,
+        "1-6-4": -0.0331,
+        "1-6-5": -0.0269,
+        "2-1-3": 0.0127,
+        "2-1-4": -0.0177,
+        "2-1-5": -0.0157,
+        "2-1-6": -0.0086,
+        "2-3-1": 0.0371,
+        "2-3-4": 0.0045,
+        "2-3-5": 0.0022,
+        "2-3-6": 0.0042,
+        "2-4-1": -0.0128,
+        "2-4-3": -0.002,
+        "2-4-5": -0.0021,
+        "2-4-6": -0.0016,
+        "2-5-1": -0.0123,
+        "2-5-3": -0.0029,
+        "2-5-4": -0.0024,
+        "2-5-6": -0.0015,
+        "2-6-1": -0.0045,
+        "2-6-3": 0.0004,
+        "2-6-4": -0.0011,
+        "2-6-5": -0.001,
+        "3-1-2": 0.2682,
+        "3-1-4": 0.2259,
+        "3-1-5": 0.1397,
+        "3-1-6": 0.1774,
+        "3-2-1": 0.1129,
+        "3-2-4": 0.0168,
+        "3-2-5": 0.0105,
+        "3-2-6": 0.0131,
+        "3-4-1": 0.0776,
+        "3-4-2": 0.0137,
+        "3-4-5": 0.0066,
+        "3-4-6": 0.009,
+        "3-5-1": 0.0381,
+        "3-5-2": 0.0068,
+        "3-5-4": 0.0051,
+        "3-5-6": 0.0044,
+        "3-6-1": 0.0682,
+        "3-6-2": 0.012,
+        "3-6-4": 0.0101,
+        "3-6-5": 0.0062,
+        "4-1-2": -0.0494,
+        "4-1-3": -0.0856,
+        "4-1-5": -0.0414,
+        "4-1-6": -0.0358,
+        "4-2-1": -0.0236,
+        "4-2-3": -0.0066,
+        "4-2-5": -0.0033,
+        "4-2-6": -0.0028,
+        "4-3-1": -0.0222,
+        "4-3-2": -0.0034,
+        "4-3-5": -0.0044,
+        "4-3-6": -0.0028,
+        "4-5-1": -0.0243,
+        "4-5-2": -0.0041,
+        "4-5-3": -0.008,
+        "4-5-6": -0.0029,
+        "4-6-1": -0.0176,
+        "4-6-2": -0.0029,
+        "4-6-3": -0.0051,
+        "4-6-5": -0.0024,
+        "5-1-2": -0.0462,
+        "5-1-3": -0.0911,
+        "5-1-4": -0.0496,
+        "5-1-6": -0.0329,
+        "5-2-1": -0.0231,
+        "5-2-3": -0.0075,
+        "5-2-4": -0.0042,
+        "5-2-6": -0.0028,
+        "5-3-1": -0.0371,
+        "5-3-2": -0.0061,
+        "5-3-4": -0.0071,
+        "5-3-6": -0.0045,
+        "5-4-1": -0.0277,
+        "5-4-2": -0.0047,
+        "5-4-3": -0.0095,
+        "5-4-6": -0.0033,
+        "5-6-1": -0.0166,
+        "5-6-2": -0.0028,
+        "5-6-3": -0.0055,
+        "5-6-4": -0.003,
+        "6-1-2": -0.0144,
+        "6-1-3": -0.0121,
+        "6-1-4": -0.0191,
+        "6-1-5": -0.0153,
+        "6-2-1": -0.0067,
+        "6-2-3": -0.0006,
+        "6-2-4": -0.0015,
+        "6-2-5": -0.0012,
+        "6-3-1": 0.0117,
+        "6-3-2": 0.0023,
+        "6-3-4": 0.0009,
+        "6-3-5": 0.0001,
+        "6-4-1": -0.0123,
+        "6-4-2": -0.002,
+        "6-4-3": -0.003,
+        "6-4-5": -0.0018,
+        "6-5-1": -0.0106,
+        "6-5-2": -0.0018,
+        "6-5-3": -0.003,
+        "6-5-4": -0.002
+      },
+      "top_combination_shifts": [
+        {
+          "adjusted_ev": 1.343,
+          "adjusted_probability": 0.042501,
+          "base_probability": 0.039819,
+          "combination": "3-1-2",
+          "delta_pp": 0.2682,
+          "odds": 31.6
+        },
+        {
+          "adjusted_ev": 0.299,
+          "adjusted_probability": 0.041001,
+          "base_probability": 0.038742,
+          "combination": "3-1-4",
+          "delta_pp": 0.2259,
+          "odds": 7.3
+        },
+        {
+          "adjusted_ev": 1.858,
+          "adjusted_probability": 0.029267,
+          "base_probability": 0.027492,
+          "combination": "3-1-6",
+          "delta_pp": 0.1774,
+          "odds": 63.5
+        },
+        {
+          "adjusted_ev": 1.744,
+          "adjusted_probability": 0.027949,
+          "base_probability": 0.026551,
+          "combination": "3-1-5",
+          "delta_pp": 0.1397,
+          "odds": 62.4
+        },
+        {
+          "adjusted_ev": 1.31,
+          "adjusted_probability": 0.064851,
+          "base_probability": 0.063604,
+          "combination": "1-3-2",
+          "delta_pp": 0.1247,
+          "odds": 20.2
+        },
+        {
+          "adjusted_ev": 1.534,
+          "adjusted_probability": 0.017356,
+          "base_probability": 0.016227,
+          "combination": "3-2-1",
+          "delta_pp": 0.1129,
+          "odds": 88.4
+        },
+        {
+          "adjusted_ev": 1.863,
+          "adjusted_probability": 0.013727,
+          "base_probability": 0.014638,
+          "combination": "5-1-3",
+          "delta_pp": -0.0911,
+          "odds": 135.7
+        },
+        {
+          "adjusted_ev": 0.437,
+          "adjusted_probability": 0.02253,
+          "base_probability": 0.023386,
+          "combination": "4-1-3",
+          "delta_pp": -0.0856,
+          "odds": 19.4
+        },
+        {
+          "adjusted_ev": 2.205,
+          "adjusted_probability": 0.026992,
+          "base_probability": 0.02783,
+          "combination": "1-5-3",
+          "delta_pp": -0.0838,
+          "odds": 81.7
+        },
+        {
+          "adjusted_ev": 0.594,
+          "adjusted_probability": 0.042424,
+          "base_probability": 0.043214,
+          "combination": "1-4-3",
+          "delta_pp": -0.079,
+          "odds": 14.0
+        },
+        {
+          "adjusted_ev": 0.228,
+          "adjusted_probability": 0.016512,
+          "base_probability": 0.015736,
+          "combination": "3-4-1",
+          "delta_pp": 0.0776,
+          "odds": 13.8
+        },
+        {
+          "adjusted_ev": 2.01,
+          "adjusted_probability": 0.044657,
+          "base_probability": 0.043914,
+          "combination": "1-3-6",
+          "delta_pp": 0.0743,
+          "odds": 45.0
+        }
+      ]
+    },
+    "schema_version": "pt2-sheet-db-v2",
+    "snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+    "snapshot_motor_count": 1505,
+    "snapshot_player_count": 1660,
+    "snapshot_venue_count": 24,
+    "source": "Google Sheets 競艇AI データベース",
+    "spreadsheet_id": "1dbUPyfxjIRaT-G8F_LlGMX7Ld_ZB951UmF4HpW_PYJo",
+    "venue_match": true,
+    "venue_volatility": 47.6
+  },
+  "day": "20261014",
+  "deadline": "18:22",
+  "deadline_at": "2026-10-14T18:22:00+09:00",
+  "digest": "3c15aeac77e776bca190b8114dd7afcbac380e8830ac427d8e2167ba79f348bb",
+  "head_probabilities": {
+    "1": 0.5395319703618089,
+    "2": 0.05816002414250808,
+    "3": 0.22829460998497647,
+    "4": 0.07625377428390524,
+    "5": 0.04682156422400851,
+    "6": 0.050938057002792775
+  },
+  "hiyori_features": [
+    {
+      "course": 1,
+      "course_samples": 65.0,
+      "course_st": 0.13,
+      "course_top2_rate": 0.892,
+      "course_top3_rate": 0.939,
+      "course_win_rate": 0.615,
+      "lane": 1,
+      "methods": {
+        "course1_makuri": null,
+        "course1_makurisashi": null,
+        "course1_nigeritsu": "0.4290",
+        "course1_sashi": null
+      },
+      "motor_last10_ranks": [
+        5.0,
+        6.0,
+        2.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        2.0,
+        5.0,
+        2.0
+      ],
+      "preview": {
+        "chiruto": "-0.5",
+        "chokusen": null,
+        "comment": null,
+        "course": 1,
+        "display": "6.87",
+        "hiduke": 20261014,
+        "image": "/player/3940.jpg",
+        "kancho1_jikan": null,
+        "kancho1_takasa": null,
+        "kancho2_jikan": null,
+        "kancho2_takasa": null,
+        "kion": "22.0℃",
+        "koukan": "",
+        "mancho1_jikan": null,
+        "mancho1_takasa": null,
+        "mancho2_jikan": null,
+        "mancho2_takasa": null,
+        "mawariashi": null,
+        "name": "飯山泰",
+        "name_kana": "ｲｲﾔﾏ ﾔｽｼ",
+        "place_no": 12,
+        "player_no": 3940,
+        "propera": "新",
+        "race_no": 8,
+        "seibetsu": 1,
+        "shinnyuu": 1,
+        "shio": null,
+        "shukai": null,
+        "slow_dash": null,
+        "start": ".08",
+        "suion": "24.0℃",
+        "taiju": "51.5kg",
+        "tenji": null,
+        "tyousei": "0.5",
+        "wave": "2cm",
+        "weather": "晴",
+        "wind": "/img/icon_wind1_5.png",
+        "wind_speed": "5m"
+      },
+      "tilt": -0.5,
+      "used": [
+        "course_rates",
+        "course_st",
+        "motor_last10"
+      ],
+      "zenken_time": 6.77
+    },
+    {
+      "course": 2,
+      "course_samples": 7.0,
+      "course_st": 0.22,
+      "course_top2_rate": 0.143,
+      "course_top3_rate": 0.286,
+      "course_win_rate": 0.0,
+      "lane": 2,
+      "methods": {
+        "course1_nigeritsu": "0.4290",
+        "course2_makuri": "0.0000",
+        "course2_makurisashi": "0.0000",
+        "course2_sashi": "0.0000"
+      },
+      "motor_last10_ranks": [
+        3.0,
+        5.0,
+        5.0,
+        4.0,
+        5.0,
+        6.0,
+        2.0,
+        6.0,
+        4.0,
+        4.0
+      ],
+      "preview": {
+        "chiruto": "-0.5",
+        "chokusen": null,
+        "comment": null,
+        "course": 2,
+        "display": "7.00",
+        "hiduke": 20261014,
+        "image": "/player/4340.jpg",
+        "kancho1_jikan": null,
+        "kancho1_takasa": null,
+        "kancho2_jikan": null,
+        "kancho2_takasa": null,
+        "kion": "22.0℃",
+        "koukan": "",
+        "mancho1_jikan": null,
+        "mancho1_takasa": null,
+        "mancho2_jikan": null,
+        "mancho2_takasa": null,
+        "mawariashi": null,
+        "name": "土性雅也",
+        "name_kana": "ﾄﾞｼｮｳ ﾏｻﾔ",
+        "place_no": 12,
+        "player_no": 4340,
+        "propera": " ",
+        "race_no": 8,
+        "seibetsu": 1,
+        "shinnyuu": 2,
+        "shio": null,
+        "shukai": null,
+        "slow_dash": null,
+        "start": ".14",
+        "suion": "24.0℃",
+        "taiju": "53.8kg",
+        "tenji": null,
+        "tyousei": "0.0",
+        "wave": "2cm",
+        "weather": "晴",
+        "wind": "/img/icon_wind1_5.png",
+        "wind_speed": "5m"
+      },
+      "tilt": -0.5,
+      "used": [
+        "course_rates",
+        "course_st",
+        "motor_last10"
+      ],
+      "zenken_time": 6.76
+    },
+    {
+      "course": 3,
+      "course_samples": 42.0,
+      "course_st": 0.16,
+      "course_top2_rate": 0.571,
+      "course_top3_rate": 0.833,
+      "course_win_rate": 0.167,
+      "lane": 3,
+      "methods": {
+        "course1_nigeritsu": "0.8060",
+        "course3_makuri": "0.0480",
+        "course3_makurisashi": "0.0000",
+        "course3_sashi": "0.0000"
+      },
+      "motor_last10_ranks": [
+        4.0,
+        1.0,
+        1.0,
+        3.0,
+        5.0,
+        2.0,
+        3.0,
+        4.0,
+        4.0,
+        4.0
+      ],
+      "preview": {
+        "chiruto": "-0.5",
+        "chokusen": null,
+        "comment": null,
+        "course": 3,
+        "display": "6.99",
+        "hiduke": 20261014,
+        "image": "/player/4776.jpg",
+        "kancho1_jikan": null,
+        "kancho1_takasa": null,
+        "kancho2_jikan": null,
+        "kancho2_takasa": null,
+        "kion": "22.0℃",
+        "koukan": "",
+        "mancho1_jikan": null,
+        "mancho1_takasa": null,
+        "mancho2_jikan": null,
+        "mancho2_takasa": null,
+        "mawariashi": null,
+        "name": "竹田和哉",
+        "name_kana": "ﾀｹﾀﾞ ｶｽﾞﾔ",
+        "place_no": 12,
+        "player_no": 4776,
+        "propera": " ",
+        "race_no": 8,
+        "seibetsu": 1,
+        "shinnyuu": 3,
+        "shio": null,
+        "shukai": null,
+        "slow_dash": null,
+        "start": ".11",
+        "suion": "24.0℃",
+        "taiju": "52.9kg",
+        "tenji": null,
+        "tyousei": "0.0",
+        "wave": "2cm",
+        "weather": "晴",
+        "wind": "/img/icon_wind1_5.png",
+        "wind_speed": "5m"
+      },
+      "tilt": -0.5,
+      "used": [
+        "course_rates",
+        "course_st",
+        "motor_last10"
+      ],
+      "zenken_time": 6.76
+    },
+    {
+      "course": 4,
+      "course_samples": 40.0,
+      "course_st": 0.16,
+      "course_top2_rate": 0.25,
+      "course_top3_rate": 0.6,
+      "course_win_rate": 0.1,
+      "lane": 4,
+      "methods": {
+        "course1_nigeritsu": "0.5000",
+        "course4_makuri": "0.0000",
+        "course4_makurisashi": "0.0000",
+        "course4_sashi": "0.0000"
+      },
+      "motor_last10_ranks": [
+        2.0,
+        5.0,
+        1.0,
+        2.0,
+        1.0,
+        3.0,
+        1.0,
+        2.0,
+        2.0
+      ],
+      "preview": {
+        "chiruto": "-0.5",
+        "chokusen": null,
+        "comment": null,
+        "course": 4,
+        "display": "6.95",
+        "hiduke": 20261014,
+        "image": "/player/4384.jpg",
+        "kancho1_jikan": null,
+        "kancho1_takasa": null,
+        "kancho2_jikan": null,
+        "kancho2_takasa": null,
+        "kion": "22.0℃",
+        "koukan": "リング×２",
+        "mancho1_jikan": null,
+        "mancho1_takasa": null,
+        "mancho2_jikan": null,
+        "mancho2_takasa": null,
+        "mawariashi": null,
+        "name": "鶴本崇文",
+        "name_kana": "ﾂﾙﾓﾄ ﾀｶﾌﾐ",
+        "place_no": 12,
+        "player_no": 4384,
+        "propera": " ",
+        "race_no": 8,
+        "seibetsu": 1,
+        "shinnyuu": 4,
+        "shio": null,
+        "shukai": null,
+        "slow_dash": null,
+        "start": ".32",
+        "suion": "24.0℃",
+        "taiju": "53.4kg",
+        "tenji": null,
+        "tyousei": "0.0",
+        "wave": "2cm",
+        "weather": "晴",
+        "wind": "/img/icon_wind1_5.png",
+        "wind_speed": "5m"
+      },
+      "tilt": -0.5,
+      "used": [
+        "course_rates",
+        "course_st",
+        "motor_last10"
+      ],
+      "zenken_time": 6.77
+    },
+    {
+      "course": 5,
+      "course_samples": 38.0,
+      "course_st": 0.18,
+      "course_top2_rate": 0.026,
+      "course_top3_rate": 0.105,
+      "course_win_rate": 0.0,
+      "lane": 5,
+      "methods": {
+        "course1_nigeritsu": "0.2730",
+        "course5_makuri": "0.0000",
+        "course5_makurisashi": "0.0000",
+        "course5_sashi": "0.0000"
+      },
+      "motor_last10_ranks": [
+        6.0,
+        4.0,
+        6.0,
+        3.0,
+        5.0,
+        4.0,
+        6.0,
+        2.0,
+        2.0,
+        6.0
+      ],
+      "preview": {
+        "chiruto": "-0.5",
+        "chokusen": null,
+        "comment": null,
+        "course": 5,
+        "display": "7.08",
+        "hiduke": 20261014,
+        "image": "/player/3741.jpg",
+        "kancho1_jikan": null,
+        "kancho1_takasa": null,
+        "kancho2_jikan": null,
+        "kancho2_takasa": null,
+        "kion": "22.0℃",
+        "koukan": "",
+        "mancho1_jikan": null,
+        "mancho1_takasa": null,
+        "mancho2_jikan": null,
+        "mancho2_takasa": null,
+        "mawariashi": null,
+        "name": "松尾基成",
+        "name_kana": "ﾏﾂｵ ﾓﾄﾅﾘ",
+        "place_no": 12,
+        "player_no": 3741,
+        "propera": " ",
+        "race_no": 8,
+        "seibetsu": 1,
+        "shinnyuu": 5,
+        "shio": null,
+        "shukai": null,
+        "slow_dash": null,
+        "start": ".18",
+        "suion": "24.0℃",
+        "taiju": "55.1kg",
+        "tenji": null,
+        "tyousei": "0.0",
+        "wave": "2cm",
+        "weather": "晴",
+        "wind": "/img/icon_wind1_5.png",
+        "wind_speed": "5m"
+      },
+      "tilt": -0.5,
+      "used": [
+        "course_rates",
+        "course_st",
+        "motor_last10"
+      ],
+      "zenken_time": 6.86
+    },
+    {
+      "course": 6,
+      "course_samples": 20.0,
+      "course_st": 0.17,
+      "course_top2_rate": 0.0,
+      "course_top3_rate": 0.05,
+      "course_win_rate": 0.0,
+      "lane": 6,
+      "methods": {
+        "course1_nigeritsu": "0.2500",
+        "course6_makuri": "0.0000",
+        "course6_makurisashi": "0.0000",
+        "course6_sashi": "0.0000"
+      },
+      "motor_last10_ranks": [
+        6.0,
+        4.0,
+        6.0,
+        5.0,
+        4.0,
+        2.0,
+        5.0,
+        6.0,
+        5.0
+      ],
+      "preview": {
+        "chiruto": "-0.5",
+        "chokusen": null,
+        "comment": null,
+        "course": 6,
+        "display": "6.97",
+        "hiduke": 20261014,
+        "image": "/player/4186.jpg",
+        "kancho1_jikan": null,
+        "kancho1_takasa": null,
+        "kancho2_jikan": null,
+        "kancho2_takasa": null,
+        "kion": "22.0℃",
+        "koukan": "",
+        "mancho1_jikan": null,
+        "mancho1_takasa": null,
+        "mancho2_jikan": null,
+        "mancho2_takasa": null,
+        "mawariashi": null,
+        "name": "小川時光",
+        "name_kana": "ｵｶﾞﾜ ﾄｷﾐﾂ",
+        "place_no": 12,
+        "player_no": 4186,
+        "propera": " ",
+        "race_no": 8,
+        "seibetsu": 1,
+        "shinnyuu": 6,
+        "shio": null,
+        "shukai": null,
+        "slow_dash": null,
+        "start": ".08",
+        "suion": "24.0℃",
+        "taiju": "55.1kg",
+        "tenji": null,
+        "tyousei": "0.0",
+        "wave": "2cm",
+        "weather": "晴",
+        "wind": "/img/icon_wind1_5.png",
+        "wind_speed": "5m"
+      },
+      "tilt": -0.5,
+      "used": [
+        "course_rates",
+        "course_st",
+        "motor_last10"
+      ],
+      "zenken_time": 6.77
+    }
+  ],
+  "input_hashes": {
+    "existing": "827bdcfbe3b1c3713378f97299d55171634a62f9476c500c3b383ac7d302b2b9",
+    "hiyori": "4cd288bcb68f1d55f0269b850168359d817c99713c404ecb134935b735316196",
+    "knowledge_v2": "da3d51ebc3afe0ec6a787cf6ba0e8d3547897fb21125617e6a92c51cc0da518a",
+    "sheet_db": "a6b43d1f42df6bd6eee159075eb6e07e7716e2f58a3ee860504f3169fa16fa98"
+  },
+  "jcd": "12",
+  "key": "20261014_12_08",
+  "mode": "prospective_shadow",
+  "models": {
+    "control_existing_10": {
+      "comparison_group": "equal_budget",
+      "label": "existing・同額10点",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-2-3",
+        "1-3-6",
+        "1-4-3",
+        "1-3-5",
+        "3-1-2",
+        "3-1-4",
+        "1-6-3",
+        "1-5-3"
+      ],
+      "point_count": 10,
+      "stake_yen": 1000
+    },
+    "control_hiyori_10": {
+      "comparison_group": "equal_budget",
+      "label": "hiyori・同額10点",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-4-3",
+        "1-3-6",
+        "3-1-4",
+        "1-3-5",
+        "1-2-3",
+        "3-1-2",
+        "1-6-3",
+        "1-5-3"
+      ],
+      "point_count": 10,
+      "stake_yen": 1000
+    },
+    "control_knowledge_v2_10": {
+      "comparison_group": "equal_budget",
+      "label": "knowledge_v2・同額10点",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-4-3",
+        "1-2-3",
+        "1-3-5",
+        "1-3-6",
+        "3-1-4",
+        "3-1-2",
+        "1-6-3",
+        "1-5-3"
+      ],
+      "point_count": 10,
+      "stake_yen": 1000
+    },
+    "control_sheet_db_10": {
+      "comparison_group": "equal_budget",
+      "label": "sheet_db・同額10点",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-2-3",
+        "1-3-6",
+        "1-3-5",
+        "3-1-2",
+        "1-4-3",
+        "3-1-4",
+        "3-1-6",
+        "1-6-3"
+      ],
+      "point_count": 10,
+      "stake_yen": 1000
+    },
+    "fusion": {
+      "cover_picks": [
+        "4-1-3",
+        "6-1-3",
+        "1-2-3",
+        "3-1-2"
+      ],
+      "label": "新ゆうき・6艇展開融合10点",
+      "main_picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-4-3",
+        "3-1-4",
+        "1-3-6",
+        "1-3-5"
+      ],
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-4-3",
+        "3-1-4",
+        "1-3-6",
+        "1-3-5",
+        "4-1-3",
+        "6-1-3",
+        "1-2-3",
+        "3-1-2"
+      ],
+      "point_count": 10,
+      "selection_policy": "new-yuuki-six-boat-v2",
+      "stake_yen": 1000
+    },
+    "native_comparison_existing": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "既存",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-3-6",
+        "1-3-5",
+        "1-2-3",
+        "1-4-3",
+        "1-6-3",
+        "1-5-3",
+        "3-1-6",
+        "3-1-2"
+      ],
+      "point_count": 10,
+      "selected": null,
+      "selection_policy": "conviction-10-plus-existing-bridge",
+      "stake_yen": 1000
+    },
+    "native_comparison_hiyori": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "hiyori"
+      ],
+      "label": "日和",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-4-3",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4"
+      ],
+      "point_count": 10,
+      "selected": null,
+      "selection_policy": "conviction-10",
+      "stake_yen": 1000
+    },
+    "native_comparison_prototype1": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "嗅覚型予想家（PT1）",
+      "picks": [
+        "1-3-4",
+        "1-4-3",
+        "3-1-4",
+        "3-4-1",
+        "4-1-3",
+        "4-3-1",
+        "1-3-2",
+        "1-3-6",
+        "1-6-3",
+        "6-1-3",
+        "1-3-5"
+      ],
+      "point_count": 11,
+      "selected": null,
+      "selection_policy": "scent-box-exhibition-fusion-v1",
+      "stake_yen": 1100
+    },
+    "native_comparison_prototype2": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "プロトタイプ2（PT3×既存メイン圧縮）",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-4-3",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4",
+        "1-4-5",
+        "1-4-6"
+      ],
+      "point_count": 12,
+      "selected": null,
+      "selection_policy": "pt3-db-consensus-no-fixed-point-cap",
+      "stake_yen": 1200
+    },
+    "native_comparison_prototype3": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "hiyori"
+      ],
+      "label": "新人予想家 ゆうき（日和本線＋中穴抑え）",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-4-3",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4",
+        "1-4-5",
+        "1-4-6"
+      ],
+      "point_count": 12,
+      "selected": null,
+      "selection_policy": "hiyori-native-main-plus-mid-on-hiyori-cover-cap16",
+      "stake_yen": 1200
+    },
+    "native_db_native": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "db_native",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-3-6",
+        "1-3-5",
+        "1-2-3",
+        "1-4-3",
+        "1-6-3",
+        "1-5-3",
+        "1-2-4",
+        "1-4-2"
+      ],
+      "point_count": 10,
+      "selected": null,
+      "selection_policy": "native-live-rebuilt",
+      "stake_yen": 1000
+    },
+    "native_featured_overlap": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "featured_overlap",
+      "picks": [],
+      "point_count": 0,
+      "selected": false,
+      "selection_policy": null,
+      "stake_yen": 0
+    },
+    "native_featured_plan": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "X用AI統合候補",
+      "picks": [
+        "1-3-4",
+        "1-4-3",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4",
+        "3-1-4",
+        "4-1-3",
+        "2-1-3",
+        "6-1-3",
+        "5-1-3",
+        "4-3-1",
+        "3-4-1",
+        "3-1-6"
+      ],
+      "point_count": 18,
+      "selected": null,
+      "selection_policy": "featured-live-ticket-plan-without-daily-post-quota",
+      "stake_yen": 1800
+    },
+    "native_featured_value": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "featured_value",
+      "picks": [],
+      "point_count": 0,
+      "selected": false,
+      "selection_policy": null,
+      "stake_yen": 0
+    },
+    "native_hiyori": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "hiyori"
+      ],
+      "label": "hiyori",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-4-3",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4"
+      ],
+      "point_count": 10,
+      "selected": null,
+      "selection_policy": "native-live-rebuilt",
+      "stake_yen": 1000
+    },
+    "native_long": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "long候補",
+      "picks": [
+        "1-6-3",
+        "1-5-3",
+        "1-6-2",
+        "1-5-4",
+        "1-2-6",
+        "1-2-4",
+        "1-6-5",
+        "1-2-5",
+        "1-6-4",
+        "1-5-2"
+      ],
+      "point_count": 10,
+      "selected": null,
+      "selection_policy": "opportunity-score-v2-race-shape",
+      "stake_yen": 1000
+    },
+    "native_long_selected": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "long厳選",
+      "picks": [],
+      "point_count": 0,
+      "selected": false,
+      "selection_policy": null,
+      "stake_yen": 0
+    },
+    "native_main": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "main",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-3-6",
+        "1-3-5",
+        "1-2-3",
+        "1-4-3",
+        "1-6-3",
+        "1-5-3",
+        "3-1-6",
+        "3-1-2"
+      ],
+      "point_count": 10,
+      "selected": null,
+      "selection_policy": "native-live-rebuilt",
+      "stake_yen": 1000
+    },
+    "native_main_compressed_10": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "メイン頭固定10点",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-2-3",
+        "1-3-6",
+        "1-4-3",
+        "1-3-5",
+        "1-6-3",
+        "1-5-3",
+        "1-2-4",
+        "1-4-2"
+      ],
+      "point_count": 10,
+      "selected": null,
+      "selection_policy": null,
+      "stake_yen": 1000
+    },
+    "native_main_selected": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "メイン厳選",
+      "picks": [],
+      "point_count": 0,
+      "selected": false,
+      "selection_policy": null,
+      "stake_yen": 0
+    },
+    "native_mid": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "mid候補",
+      "picks": [
+        "1-2-3",
+        "1-3-5",
+        "1-3-6",
+        "1-3-2",
+        "1-4-3",
+        "1-2-4",
+        "1-4-2",
+        "1-4-5",
+        "1-4-6"
+      ],
+      "point_count": 9,
+      "selected": null,
+      "selection_policy": "opportunity-score-v2-race-shape",
+      "stake_yen": 900
+    },
+    "native_mid_selected": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "mid厳選",
+      "picks": [],
+      "point_count": 0,
+      "selected": false,
+      "selection_policy": null,
+      "stake_yen": 0
+    },
+    "native_pt2_balanced": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "総合型",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-4-3",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4",
+        "1-4-5",
+        "1-4-6"
+      ],
+      "point_count": 12,
+      "selected": null,
+      "selection_policy": "pt3-db-consensus-no-fixed-point-cap",
+      "stake_yen": 1200
+    },
+    "native_pt2_longshot": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "高配当型",
+      "picks": [
+        "6-1-3",
+        "1-6-3",
+        "6-3-1",
+        "5-3-1",
+        "2-1-3",
+        "2-3-1",
+        "1-5-3",
+        "3-6-1"
+      ],
+      "point_count": 8,
+      "selected": null,
+      "selection_policy": "odds60plus-db-probability-and-ev-filter",
+      "stake_yen": 800
+    },
+    "native_pt2_probability": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "本命型",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-2-3",
+        "1-3-6",
+        "1-3-5",
+        "3-1-2",
+        "1-4-3",
+        "3-1-4"
+      ],
+      "point_count": 8,
+      "selected": null,
+      "selection_policy": "db-adjusted-probability-top8",
+      "stake_yen": 800
+    },
+    "native_pt2_value": {
+      "comparison_group": "native_variable_budget",
+      "families": [
+        "official"
+      ],
+      "label": "妙味型",
+      "picks": [
+        "6-1-3",
+        "1-6-3",
+        "6-3-1",
+        "5-3-1",
+        "2-1-3",
+        "2-3-1",
+        "1-5-3",
+        "3-6-1"
+      ],
+      "point_count": 8,
+      "selected": null,
+      "selection_policy": "db-adjusted-ev-with-probability-floor",
+      "stake_yen": 800
+    }
+  },
+  "pre_race_boats": [
+    {
+      "avg_st": 0.14,
+      "boat_number": 88,
+      "boat_top2_rate": 31.82,
+      "boat_top3_rate": 52.73,
+      "course": 1,
+      "course_history_avg_st": 0.1506,
+      "course_history_samples": 17,
+      "course_top2_rate": 81.52,
+      "course_win_rate": 46.9,
+      "current_class": "A1",
+      "entry_shift": 0,
+      "exhibition_delta": 0.0,
+      "exhibition_flying": false,
+      "exhibition_grade": 0.7133333333333329,
+      "exhibition_rank": 1,
+      "exhibition_st": 0.08,
+      "exhibition_st_delta": 0.0,
+      "exhibition_st_rank": 1,
+      "exhibition_st_timing": 0.08,
+      "exhibition_time": 6.87,
+      "flying": false,
+      "front_entry": false,
+      "historical_class_signal": 0.0,
+      "in_escape_rate": 41.18,
+      "in_loss_rate": 58.82,
+      "lane": 1,
+      "local_top2_rate": 57.14,
+      "local_win_rate": 6.57,
+      "motor_number": 39,
+      "motor_top2_rate": 38.46,
+      "motor_top3_rate": 51.28,
+      "name": "飯山泰",
+      "predicted_course": 1,
+      "propeller_exchange": "新",
+      "racer_id": "3940",
+      "racer_profile_avg_st": 0.1412,
+      "racer_profile_best_courses": [
+        {
+          "course": 5,
+          "relative_strength": 1.647,
+          "samples": 13,
+          "top2_rate": 18.56,
+          "win_rate": 10.4
+        },
+        {
+          "course": 4,
+          "relative_strength": 1.432,
+          "samples": 19,
+          "top2_rate": 38.19,
+          "win_rate": 17.16
+        },
+        {
+          "course": 3,
+          "relative_strength": 1.108,
+          "samples": 14,
+          "top2_rate": 43.54,
+          "win_rate": 13.69
+        }
+      ],
+      "racer_profile_class_counts": {},
+      "racer_profile_class_last_seen": {},
+      "racer_profile_course_avg_st": 0.1506,
+      "racer_profile_course_samples": 17,
+      "racer_profile_course_win_methods": {
+        "逃げ": 7
+      },
+      "racer_profile_highest_class": null,
+      "racer_profile_latest_class": null,
+      "racer_profile_samples": 89,
+      "racer_profile_venue_samples": 7,
+      "racer_profile_win_methods": {
+        "まくり": 6,
+        "まくり差し": 2,
+        "差し": 1,
+        "抜き": 1,
+        "逃げ": 7
+      },
+      "racer_profile_years": {
+        "2026": {
+          "avg_st": 0.1412,
+          "st_samples": 89,
+          "st_sum": 12.57,
+          "starts": 89,
+          "top2": 40,
+          "top3": 57,
+          "weighted_starts": 89.0,
+          "weighted_top2": 40.0,
+          "weighted_top3": 57.0,
+          "weighted_wins": 17.0,
+          "win_methods": {
+            "まくり": 6,
+            "まくり差し": 2,
+            "差し": 1,
+            "抜き": 1,
+            "逃げ": 7
+          },
+          "wins": 17
+        }
+      },
+      "tilt": -0.5,
+      "top2_rate": 47.54,
+      "top3_rate": 65.57,
+      "win_rate": 6.34
+    },
+    {
+      "avg_st": 0.2167,
+      "boat_number": 73,
+      "boat_top2_rate": 40.91,
+      "boat_top3_rate": 59.09,
+      "course": 2,
+      "course_attack_rate": 0.0,
+      "course_history_avg_st": 0.2425,
+      "course_history_samples": 4,
+      "course_makuri_rate": 0.0,
+      "course_makurisashi_rate": 0.0,
+      "course_sashi_rate": 0.0,
+      "course_top2_rate": 29.25,
+      "course_win_rate": 11.25,
+      "current_class": "B2",
+      "entry_shift": 0,
+      "exhibition_delta": 0.13,
+      "exhibition_flying": false,
+      "exhibition_grade": 0.45333333333333314,
+      "exhibition_rank": 5,
+      "exhibition_st": 0.14,
+      "exhibition_st_delta": 0.06,
+      "exhibition_st_rank": 4,
+      "exhibition_st_timing": 0.14,
+      "exhibition_time": 7.0,
+      "flying": false,
+      "front_entry": false,
+      "historical_class_signal": 0.0,
+      "lane": 2,
+      "local_top2_rate": null,
+      "local_win_rate": null,
+      "motor_number": 82,
+      "motor_top2_rate": 36.36,
+      "motor_top3_rate": 60.91,
+      "name": "土性雅也",
+      "predicted_course": 2,
+      "racer_id": "4340",
+      "racer_profile_avg_st": 0.2167,
+      "racer_profile_best_courses": [
+        {
+          "course": 4,
+          "relative_strength": 0.891,
+          "samples": 13,
+          "top2_rate": 31.36,
+          "win_rate": 9.28
+        },
+        {
+          "course": 6,
+          "relative_strength": 0.63,
+          "samples": 11,
+          "top2_rate": 11.65,
+          "win_rate": 1.04
+        },
+        {
+          "course": 3,
+          "relative_strength": 0.59,
+          "samples": 10,
+          "top2_rate": 24.18,
+          "win_rate": 7.09
+        }
+      ],
+      "racer_profile_class_counts": {},
+      "racer_profile_class_last_seen": {},
+      "racer_profile_course_avg_st": 0.2425,
+      "racer_profile_course_samples": 4,
+      "racer_profile_course_win_methods": {},
+      "racer_profile_highest_class": null,
+      "racer_profile_latest_class": null,
+      "racer_profile_samples": 52,
+      "racer_profile_venue_samples": 0,
+      "racer_profile_win_methods": {
+        "差し": 1,
+        "逃げ": 1
+      },
+      "racer_profile_years": {
+        "2026": {
+          "avg_st": 0.2167,
+          "st_samples": 52,
+          "st_sum": 11.27,
+          "starts": 52,
+          "top2": 8,
+          "top3": 13,
+          "weighted_starts": 52.0,
+          "weighted_top2": 8.0,
+          "weighted_top3": 13.0,
+          "weighted_wins": 2.0,
+          "win_methods": {
+            "差し": 1,
+            "逃げ": 1
+          },
+          "wins": 2
+        }
+      },
+      "tilt": -0.5,
+      "top2_rate": 16.18,
+      "top3_rate": 29.41,
+      "win_rate": 3.59
+    },
+    {
+      "avg_st": 0.16,
+      "boat_number": 52,
+      "boat_top2_rate": 27.52,
+      "boat_top3_rate": 44.04,
+      "course": 3,
+      "course_attack_rate": 7.69,
+      "course_history_avg_st": 0.1646,
+      "course_history_samples": 13,
+      "course_makuri_rate": 7.69,
+      "course_makurisashi_rate": 0.0,
+      "course_sashi_rate": 0.0,
+      "course_top2_rate": 45.28,
+      "course_win_rate": 14.24,
+      "current_class": "A1",
+      "entry_shift": 0,
+      "exhibition_delta": 0.12,
+      "exhibition_flying": false,
+      "exhibition_grade": 0.4733333333333327,
+      "exhibition_rank": 4,
+      "exhibition_st": 0.11,
+      "exhibition_st_delta": 0.03,
+      "exhibition_st_rank": 3,
+      "exhibition_st_timing": 0.11,
+      "exhibition_time": 6.99,
+      "flying": false,
+      "front_entry": false,
+      "historical_class_signal": 0.0,
+      "lane": 3,
+      "local_top2_rate": 33.33,
+      "local_win_rate": 5.4,
+      "motor_number": 38,
+      "motor_top2_rate": 46.96,
+      "motor_top3_rate": 61.74,
+      "name": "竹田和哉",
+      "predicted_course": 3,
+      "racer_id": "4776",
+      "racer_profile_avg_st": 0.1478,
+      "racer_profile_best_courses": [
+        {
+          "course": 6,
+          "relative_strength": 2.357,
+          "samples": 9,
+          "top2_rate": 17.52,
+          "win_rate": 5.9
+        },
+        {
+          "course": 5,
+          "relative_strength": 2.219,
+          "samples": 16,
+          "top2_rate": 34.43,
+          "win_rate": 12.86
+        },
+        {
+          "course": 1,
+          "relative_strength": 1.324,
+          "samples": 23,
+          "top2_rate": 87.54,
+          "win_rate": 76.0
+        }
+      ],
+      "racer_profile_class_counts": {},
+      "racer_profile_class_last_seen": {},
+      "racer_profile_course_avg_st": 0.1646,
+      "racer_profile_course_samples": 13,
+      "racer_profile_course_win_methods": {
+        "まくり": 1,
+        "恵まれ": 1
+      },
+      "racer_profile_highest_class": null,
+      "racer_profile_latest_class": null,
+      "racer_profile_samples": 90,
+      "racer_profile_venue_samples": 0,
+      "racer_profile_win_methods": {
+        "まくり": 6,
+        "まくり差し": 2,
+        "差し": 2,
+        "恵まれ": 1,
+        "抜き": 2,
+        "逃げ": 19
+      },
+      "racer_profile_years": {
+        "2026": {
+          "avg_st": 0.1478,
+          "st_samples": 90,
+          "st_sum": 13.3,
+          "starts": 90,
+          "top2": 51,
+          "top3": 69,
+          "weighted_starts": 90.0,
+          "weighted_top2": 51.0,
+          "weighted_top3": 69.0,
+          "weighted_wins": 32.0,
+          "win_methods": {
+            "まくり": 6,
+            "まくり差し": 2,
+            "差し": 2,
+            "恵まれ": 1,
+            "抜き": 2,
+            "逃げ": 19
+          },
+          "wins": 32
+        }
+      },
+      "tilt": -0.5,
+      "top2_rate": 56.67,
+      "top3_rate": 78.33,
+      "win_rate": 7.49
+    },
+    {
+      "avg_st": 0.16,
+      "boat_number": 82,
+      "boat_top2_rate": 42.45,
+      "boat_top3_rate": 54.72,
+      "course": 4,
+      "course_attack_rate": 0.0,
+      "course_history_avg_st": 0.133,
+      "course_history_samples": 10,
+      "course_makuri_rate": 0.0,
+      "course_makurisashi_rate": 0.0,
+      "course_sashi_rate": 0.0,
+      "course_top2_rate": 31.09,
+      "course_win_rate": 6.0,
+      "current_class": "A1",
+      "entry_shift": 0,
+      "exhibition_delta": 0.08,
+      "exhibition_flying": false,
+      "exhibition_grade": 0.5533333333333328,
+      "exhibition_rank": 2,
+      "exhibition_st": 0.32,
+      "exhibition_st_delta": 0.24,
+      "exhibition_st_rank": 6,
+      "exhibition_st_timing": 0.32,
+      "exhibition_time": 6.95,
+      "flying": true,
+      "front_entry": false,
+      "historical_class_signal": 0.0,
+      "lane": 4,
+      "local_top2_rate": 46.27,
+      "local_win_rate": 6.27,
+      "motor_number": 52,
+      "motor_top2_rate": 33.61,
+      "motor_top3_rate": 52.1,
+      "name": "鶴本崇文",
+      "parts_exchange": "リング×2",
+      "predicted_course": 4,
+      "racer_id": "4384",
+      "racer_profile_avg_st": 0.1676,
+      "racer_profile_best_courses": [
+        {
+          "course": 1,
+          "relative_strength": 1.012,
+          "samples": 14,
+          "top2_rate": 71.69,
+          "win_rate": 56.15
+        },
+        {
+          "course": 3,
+          "relative_strength": 0.836,
+          "samples": 7,
+          "top2_rate": 43.79,
+          "win_rate": 8.21
+        },
+        {
+          "course": 4,
+          "relative_strength": 0.695,
+          "samples": 10,
+          "top2_rate": 31.09,
+          "win_rate": 6.0
+        }
+      ],
+      "racer_profile_class_counts": {},
+      "racer_profile_class_last_seen": {},
+      "racer_profile_course_avg_st": 0.133,
+      "racer_profile_course_samples": 10,
+      "racer_profile_course_win_methods": {},
+      "racer_profile_highest_class": null,
+      "racer_profile_latest_class": null,
+      "racer_profile_samples": 67,
+      "racer_profile_venue_samples": 0,
+      "racer_profile_win_methods": {
+        "逃げ": 8
+      },
+      "racer_profile_years": {
+        "2026": {
+          "avg_st": 0.1676,
+          "st_samples": 67,
+          "st_sum": 11.23,
+          "starts": 67,
+          "top2": 22,
+          "top3": 33,
+          "weighted_starts": 67.0,
+          "weighted_top2": 22.0,
+          "weighted_top3": 33.0,
+          "weighted_wins": 8.0,
+          "win_methods": {
+            "逃げ": 8
+          },
+          "wins": 8
+        }
+      },
+      "tilt": -0.5,
+      "top2_rate": 35.92,
+      "top3_rate": 50.49,
+      "win_rate": 5.32
+    },
+    {
+      "avg_st": 0.17,
+      "boat_number": 74,
+      "boat_top2_rate": 24.55,
+      "boat_top3_rate": 41.82,
+      "course": 5,
+      "course_attack_rate": 0.0,
+      "course_history_avg_st": 0.163,
+      "course_history_samples": 10,
+      "course_makuri_rate": 0.0,
+      "course_makurisashi_rate": 0.0,
+      "course_sashi_rate": 0.0,
+      "course_top2_rate": 12.0,
+      "course_win_rate": 2.73,
+      "current_class": "B1",
+      "entry_shift": 0,
+      "exhibition_delta": 0.21,
+      "exhibition_flying": false,
+      "exhibition_grade": 0.293333333333333,
+      "exhibition_rank": 6,
+      "exhibition_st": 0.18,
+      "exhibition_st_delta": 0.1,
+      "exhibition_st_rank": 5,
+      "exhibition_st_timing": 0.18,
+      "exhibition_time": 7.08,
+      "flying": false,
+      "front_entry": false,
+      "historical_class_signal": 0.0,
+      "lane": 5,
+      "local_top2_rate": 23.08,
+      "local_win_rate": 3.62,
+      "motor_number": 17,
+      "motor_top2_rate": 36.21,
+      "motor_top3_rate": 52.59,
+      "name": "松尾基成",
+      "predicted_course": 5,
+      "racer_id": "3741",
+      "racer_profile_avg_st": 0.1694,
+      "racer_profile_best_courses": [
+        {
+          "course": 1,
+          "relative_strength": 0.879,
+          "samples": 6,
+          "top2_rate": 64.67,
+          "win_rate": 47.78
+        },
+        {
+          "course": 2,
+          "relative_strength": 0.69,
+          "samples": 8,
+          "top2_rate": 33.4,
+          "win_rate": 9.0
+        },
+        {
+          "course": 3,
+          "relative_strength": 0.618,
+          "samples": 9,
+          "top2_rate": 25.33,
+          "win_rate": 7.43
+        }
+      ],
+      "racer_profile_class_counts": {},
+      "racer_profile_class_last_seen": {},
+      "racer_profile_course_avg_st": 0.163,
+      "racer_profile_course_samples": 10,
+      "racer_profile_course_win_methods": {},
+      "racer_profile_highest_class": null,
+      "racer_profile_latest_class": null,
+      "racer_profile_samples": 49,
+      "racer_profile_venue_samples": 4,
+      "racer_profile_win_methods": {
+        "逃げ": 2
+      },
+      "racer_profile_years": {
+        "2026": {
+          "avg_st": 0.1694,
+          "st_samples": 49,
+          "st_sum": 8.3,
+          "starts": 49,
+          "top2": 6,
+          "top3": 11,
+          "weighted_starts": 49.0,
+          "weighted_top2": 6.0,
+          "weighted_top3": 11.0,
+          "weighted_wins": 2.0,
+          "win_methods": {
+            "逃げ": 2
+          },
+          "wins": 2
+        }
+      },
+      "tilt": -0.5,
+      "top2_rate": 12.0,
+      "top3_rate": 26.67,
+      "win_rate": 3.44
+    },
+    {
+      "avg_st": 0.17,
+      "boat_number": 78,
+      "boat_top2_rate": 26.55,
+      "boat_top3_rate": 41.59,
+      "course": 6,
+      "course_attack_rate": 0.0,
+      "course_history_avg_st": 0.162,
+      "course_history_samples": 10,
+      "course_makuri_rate": 0.0,
+      "course_makurisashi_rate": 0.0,
+      "course_sashi_rate": 0.0,
+      "course_top2_rate": 7.64,
+      "course_win_rate": 1.09,
+      "current_class": "B1",
+      "entry_shift": 0,
+      "exhibition_delta": 0.1,
+      "exhibition_flying": false,
+      "exhibition_grade": 0.5133333333333336,
+      "exhibition_rank": 3,
+      "exhibition_st": 0.08,
+      "exhibition_st_delta": 0.0,
+      "exhibition_st_rank": 1,
+      "exhibition_st_timing": 0.08,
+      "exhibition_time": 6.97,
+      "flying": false,
+      "front_entry": false,
+      "historical_class_signal": 0.0,
+      "lane": 6,
+      "local_top2_rate": 0.0,
+      "local_win_rate": 1.0,
+      "motor_number": 55,
+      "motor_top2_rate": 36.84,
+      "motor_top3_rate": 52.63,
+      "name": "小川時光",
+      "predicted_course": 6,
+      "racer_id": "4186",
+      "racer_profile_avg_st": 0.1446,
+      "racer_profile_best_courses": [
+        {
+          "course": 1,
+          "relative_strength": 0.879,
+          "samples": 12,
+          "top2_rate": 73.5,
+          "win_rate": 44.17
+        },
+        {
+          "course": 4,
+          "relative_strength": 0.785,
+          "samples": 15,
+          "top2_rate": 25.33,
+          "win_rate": 8.59
+        },
+        {
+          "course": 3,
+          "relative_strength": 0.702,
+          "samples": 15,
+          "top2_rate": 23.41,
+          "win_rate": 9.48
+        }
+      ],
+      "racer_profile_class_counts": {},
+      "racer_profile_class_last_seen": {},
+      "racer_profile_course_avg_st": 0.162,
+      "racer_profile_course_samples": 10,
+      "racer_profile_course_win_methods": {},
+      "racer_profile_highest_class": null,
+      "racer_profile_latest_class": null,
+      "racer_profile_samples": 79,
+      "racer_profile_venue_samples": 0,
+      "racer_profile_win_methods": {
+        "まくり": 2,
+        "逃げ": 4
+      },
+      "racer_profile_years": {
+        "2026": {
+          "avg_st": 0.1446,
+          "st_samples": 79,
+          "st_sum": 11.42,
+          "starts": 79,
+          "top2": 17,
+          "top3": 25,
+          "weighted_starts": 79.0,
+          "weighted_top2": 17.0,
+          "weighted_top3": 25.0,
+          "weighted_wins": 6.0,
+          "win_methods": {
+            "まくり": 2,
+            "逃げ": 4
+          },
+          "wins": 6
+        }
+      },
+      "tilt": -0.5,
+      "top2_rate": 19.0,
+      "top3_rate": 28.0,
+      "win_rate": 3.71
+    }
+  ],
+  "pre_race_weather": {
+    "air_temp_c": 22.0,
+    "boats": {
+      "1": {
+        "exhibition_delta": 0.0,
+        "exhibition_flying": false,
+        "exhibition_grade": 0.7133333333333329,
+        "exhibition_rank": 1,
+        "exhibition_st": 0.08,
+        "exhibition_st_delta": 0.0,
+        "exhibition_st_rank": 1,
+        "exhibition_st_timing": 0.08,
+        "exhibition_time": 6.87,
+        "predicted_course": 1,
+        "propeller_exchange": "新",
+        "tilt": -0.5
+      },
+      "2": {
+        "exhibition_delta": 0.13,
+        "exhibition_flying": false,
+        "exhibition_grade": 0.45333333333333314,
+        "exhibition_rank": 5,
+        "exhibition_st": 0.14,
+        "exhibition_st_delta": 0.06,
+        "exhibition_st_rank": 4,
+        "exhibition_st_timing": 0.14,
+        "exhibition_time": 7.0,
+        "predicted_course": 2,
+        "tilt": -0.5
+      },
+      "3": {
+        "exhibition_delta": 0.12,
+        "exhibition_flying": false,
+        "exhibition_grade": 0.4733333333333327,
+        "exhibition_rank": 4,
+        "exhibition_st": 0.11,
+        "exhibition_st_delta": 0.03,
+        "exhibition_st_rank": 3,
+        "exhibition_st_timing": 0.11,
+        "exhibition_time": 6.99,
+        "predicted_course": 3,
+        "tilt": -0.5
+      },
+      "4": {
+        "exhibition_delta": 0.08,
+        "exhibition_flying": false,
+        "exhibition_grade": 0.5533333333333328,
+        "exhibition_rank": 2,
+        "exhibition_st": 0.32,
+        "exhibition_st_delta": 0.24,
+        "exhibition_st_rank": 6,
+        "exhibition_st_timing": 0.32,
+        "exhibition_time": 6.95,
+        "parts_exchange": "リング×2",
+        "predicted_course": 4,
+        "tilt": -0.5
+      },
+      "5": {
+        "exhibition_delta": 0.21,
+        "exhibition_flying": false,
+        "exhibition_grade": 0.293333333333333,
+        "exhibition_rank": 6,
+        "exhibition_st": 0.18,
+        "exhibition_st_delta": 0.1,
+        "exhibition_st_rank": 5,
+        "exhibition_st_timing": 0.18,
+        "exhibition_time": 7.08,
+        "predicted_course": 5,
+        "tilt": -0.5
+      },
+      "6": {
+        "exhibition_delta": 0.1,
+        "exhibition_flying": false,
+        "exhibition_grade": 0.5133333333333336,
+        "exhibition_rank": 3,
+        "exhibition_st": 0.08,
+        "exhibition_st_delta": 0.0,
+        "exhibition_st_rank": 1,
+        "exhibition_st_timing": 0.08,
+        "exhibition_time": 6.97,
+        "predicted_course": 6,
+        "tilt": -0.5
+      }
+    },
+    "entry_observed": true,
+    "exhibition_count": 6,
+    "tide": {
+      "applicable": false,
+      "available": false,
+      "reason": null,
+      "status": "excluded_no_tidal_difference",
+      "water_type": "淡水"
+    },
+    "water_temp_c": 24.0,
+    "wave_cm": 2.0,
+    "wind_speed": 5.0
+  },
+  "probabilities_are_calibrated": false,
+  "provenance": {
+    "delivery": "All native cards are rebuilt for research; they are not claims of delivered cards.",
+    "hiyori_input_hash": "fb893c4ab6566ab5a2352ad2f44a905e0fcbd9b10d091d7cd1de6af12ec60551",
+    "learning": "Existing bridge policy retained; all_ai_learning is a report, not an independent engine.",
+    "legacy_fusion_available": false,
+    "legacy_fusion_reason": "Original kyoteibiyori_adapter.race_model is explicitly not ready; real Hiyori model used instead.",
+    "official_urls": {
+      "beforeinfo": "https://www.boatrace.jp/owpc/pc/race/beforeinfo?hd=20261014&jcd=12&rno=8",
+      "odds3t": "https://www.boatrace.jp/owpc/pc/race/odds3t?hd=20261014&jcd=12&rno=8",
+      "racelist": "https://www.boatrace.jp/owpc/pc/race/racelist?hd=20261014&jcd=12&rno=8"
+    },
+    "snapshot_sha256": "fe6903cfbdd4e5844881dbce9adea60dd36d1cceec32df2cf2937f30c1f78a99",
+    "source_url": "https://kyoteibiyori.com/race_shusso.php?hiduke=20261014&place_no=12&race_no=8"
+  },
+  "research_context": {
+    "alert": false,
+    "baseline_in_loss_suppressed": false,
+    "captured_at": "2026-10-14T18:04:31.304710+09:00",
+    "data_guard": "six_boats_before_deadline_unsettled",
+    "day": "20261014",
+    "deadline": "2026-10-14T18:22:00+09:00",
+    "jcd": "12",
+    "key": "20261014_12_08",
+    "lead_minutes": 17.1,
+    "observed_at": "2026-10-14T18:04:51.376331+09:00",
+    "outcome": null,
+    "pre_boats": [
+      {
+        "class": "A1",
+        "ex_course": 1.0,
+        "ex_rank": 1.0,
+        "ex_st": 0.08,
+        "ex_st_rank": 1.0,
+        "ex_time": 6.87,
+        "lane": 1,
+        "motor_number": 39,
+        "parts_exchange": null,
+        "propeller_exchange": "新",
+        "racer_id": "3940",
+        "racer_name": "飯山泰",
+        "tilt": -0.5
+      },
+      {
+        "class": "B2",
+        "ex_course": 2.0,
+        "ex_rank": 5.0,
+        "ex_st": 0.14,
+        "ex_st_rank": 4.0,
+        "ex_time": 7.0,
+        "lane": 2,
+        "motor_number": 82,
+        "parts_exchange": null,
+        "propeller_exchange": null,
+        "racer_id": "4340",
+        "racer_name": "土性雅也",
+        "tilt": -0.5
+      },
+      {
+        "class": "A1",
+        "ex_course": 3.0,
+        "ex_rank": 4.0,
+        "ex_st": 0.11,
+        "ex_st_rank": 3.0,
+        "ex_time": 6.99,
+        "lane": 3,
+        "motor_number": 38,
+        "parts_exchange": null,
+        "propeller_exchange": null,
+        "racer_id": "4776",
+        "racer_name": "竹田和哉",
+        "tilt": -0.5
+      },
+      {
+        "class": "A1",
+        "ex_course": 4.0,
+        "ex_rank": 2.0,
+        "ex_st": 0.32,
+        "ex_st_rank": 6.0,
+        "ex_time": 6.95,
+        "lane": 4,
+        "motor_number": 52,
+        "parts_exchange": "リング×2",
+        "propeller_exchange": null,
+        "racer_id": "4384",
+        "racer_name": "鶴本崇文",
+        "tilt": -0.5
+      },
+      {
+        "class": "B1",
+        "ex_course": 5.0,
+        "ex_rank": 6.0,
+        "ex_st": 0.18,
+        "ex_st_rank": 5.0,
+        "ex_time": 7.08,
+        "lane": 5,
+        "motor_number": 17,
+        "parts_exchange": null,
+        "propeller_exchange": null,
+        "racer_id": "3741",
+        "racer_name": "松尾基成",
+        "tilt": -0.5
+      },
+      {
+        "class": "B1",
+        "ex_course": 6.0,
+        "ex_rank": 3.0,
+        "ex_st": 0.08,
+        "ex_st_rank": 1.0,
+        "ex_time": 6.97,
+        "lane": 6,
+        "motor_number": 55,
+        "parts_exchange": null,
+        "propeller_exchange": null,
+        "racer_id": "4186",
+        "racer_name": "小川時光",
+        "tilt": -0.5
+      }
+    ],
+    "pre_inner_dip_s": -0.03,
+    "pre_lane1_rank": 1.0,
+    "pre_lane5_rank": 6.0,
+    "pre_lane6_rank": 3.0,
+    "pre_outer_fast_gap_s": -0.08,
+    "pre_wave_cm": 2.0,
+    "pre_wind_m": 5.0,
+    "rno": 8,
+    "rule": "manshu-shadow-20261010-v2-venue-aware",
+    "sniper_integration_status": "research_only",
+    "sniper_join_key": "20261014_12_08",
+    "types": [],
+    "venue": "住之江",
+    "venue_context": {
+      "a1_2or3_lanes": [],
+      "attacker_evidence": [],
+      "baseline_course1_win_pct": null,
+      "baseline_period": null,
+      "baseline_source": null,
+      "decision_reason": "通常の展示・気象条件が未成立",
+      "generic_in_loss_triggered": false,
+      "in_loss_suppressed_as_baseline": false,
+      "normal_outside_head_context": false,
+      "policy_version": "course1-venue-baseline-20260701-20260930-v1",
+      "strong_attacker_lanes": [],
+      "strong_exception": false,
+      "verified_baseline": false,
+      "weak_in_baseline": false
+    },
+    "venue_policy_version": "course1-venue-baseline-20260701-20260930-v1"
+  },
+  "research_only": true,
+  "rno": 8,
+  "scenario_coefficients_are_calibrated": false,
+  "scenario_version": "new-yuuki-six-boat-v2",
+  "source_fetched_at": "2026-10-14T18:04:51.177360+09:00",
+  "source_versions": {
+    "existing": "kyoutei-navi-course-v7-market-structure",
+    "hiyori": "hiyori-inputs-v1-unvalidated",
+    "knowledge_v2": "kyoutei-navi-knowledge-v2",
+    "sheet_db": "kyoutei-navi-course-v7-market-structure"
+  },
+  "strategies": {
+    "comparison_existing": {
+      "families": [
+        "official"
+      ],
+      "label": "既存",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-3-6",
+        "1-3-5",
+        "1-2-3",
+        "1-4-3",
+        "1-6-3",
+        "1-5-3",
+        "3-1-6",
+        "3-1-2"
+      ],
+      "point_count": 10,
+      "selection_policy": "conviction-10-plus-existing-bridge",
+      "stake_yen": 1000
+    },
+    "comparison_hiyori": {
+      "families": [
+        "hiyori"
+      ],
+      "label": "日和",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-4-3",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4"
+      ],
+      "point_count": 10,
+      "selection_policy": "conviction-10",
+      "stake_yen": 1000
+    },
+    "comparison_prototype1": {
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "嗅覚型予想家（PT1）",
+      "picks": [
+        "1-3-4",
+        "1-4-3",
+        "3-1-4",
+        "3-4-1",
+        "4-1-3",
+        "4-3-1",
+        "1-3-2",
+        "1-3-6",
+        "1-6-3",
+        "6-1-3",
+        "1-3-5"
+      ],
+      "point_count": 11,
+      "selection_policy": "scent-box-exhibition-fusion-v1",
+      "stake_yen": 1100
+    },
+    "comparison_prototype2": {
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "プロトタイプ2（PT3×既存メイン圧縮）",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-4-3",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4",
+        "1-4-5",
+        "1-4-6"
+      ],
+      "point_count": 12,
+      "selection_policy": "pt3-db-consensus-no-fixed-point-cap",
+      "stake_yen": 1200
+    },
+    "comparison_prototype3": {
+      "families": [
+        "hiyori"
+      ],
+      "label": "新人予想家 ゆうき（日和本線＋中穴抑え）",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-4-3",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4",
+        "1-4-5",
+        "1-4-6"
+      ],
+      "point_count": 12,
+      "selection_policy": "hiyori-native-main-plus-mid-on-hiyori-cover-cap16",
+      "stake_yen": 1200
+    },
+    "db_native": {
+      "families": [
+        "official"
+      ],
+      "label": "db_native",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-3-6",
+        "1-3-5",
+        "1-2-3",
+        "1-4-3",
+        "1-6-3",
+        "1-5-3",
+        "1-2-4",
+        "1-4-2"
+      ],
+      "point_count": 10,
+      "selection_policy": "native-live-rebuilt",
+      "stake_yen": 1000
+    },
+    "featured_overlap": {
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "featured_overlap",
+      "picks": [],
+      "point_count": 0,
+      "score": null,
+      "selected": false,
+      "stake_yen": 0
+    },
+    "featured_plan": {
+      "cover_picks": [
+        "3-1-4",
+        "4-1-3",
+        "2-1-3",
+        "6-1-3",
+        "5-1-3",
+        "4-3-1",
+        "3-4-1",
+        "3-1-6"
+      ],
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "X用AI統合候補",
+      "main_picks": [
+        "1-3-4",
+        "1-4-3",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4"
+      ],
+      "picks": [
+        "1-3-4",
+        "1-4-3",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4",
+        "3-1-4",
+        "4-1-3",
+        "2-1-3",
+        "6-1-3",
+        "5-1-3",
+        "4-3-1",
+        "3-4-1",
+        "3-1-6"
+      ],
+      "point_count": 18,
+      "selection_policy": "featured-live-ticket-plan-without-daily-post-quota",
+      "stake_yen": 1800
+    },
+    "featured_value": {
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "featured_value",
+      "picks": [],
+      "point_count": 0,
+      "score": null,
+      "selected": false,
+      "stake_yen": 0
+    },
+    "hiyori": {
+      "families": [
+        "hiyori"
+      ],
+      "label": "hiyori",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-4-3",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4"
+      ],
+      "point_count": 10,
+      "selection_policy": "native-live-rebuilt",
+      "stake_yen": 1000
+    },
+    "long": {
+      "families": [
+        "official"
+      ],
+      "label": "long候補",
+      "picks": [
+        "1-6-3",
+        "1-5-3",
+        "1-6-2",
+        "1-5-4",
+        "1-2-6",
+        "1-2-4",
+        "1-6-5",
+        "1-2-5",
+        "1-6-4",
+        "1-5-2"
+      ],
+      "point_count": 10,
+      "score": 97,
+      "selection_policy": "opportunity-score-v2-race-shape",
+      "stake_yen": 1000
+    },
+    "long_selected": {
+      "families": [
+        "official"
+      ],
+      "label": "long厳選",
+      "picks": [],
+      "point_count": 0,
+      "score": 97,
+      "selected": false,
+      "stake_yen": 0
+    },
+    "main": {
+      "families": [
+        "official"
+      ],
+      "label": "main",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-3-6",
+        "1-3-5",
+        "1-2-3",
+        "1-4-3",
+        "1-6-3",
+        "1-5-3",
+        "3-1-6",
+        "3-1-2"
+      ],
+      "point_count": 10,
+      "selection_policy": "native-live-rebuilt",
+      "stake_yen": 1000
+    },
+    "main_compressed_10": {
+      "families": [
+        "official"
+      ],
+      "label": "メイン頭固定10点",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-2-3",
+        "1-3-6",
+        "1-4-3",
+        "1-3-5",
+        "1-6-3",
+        "1-5-3",
+        "1-2-4",
+        "1-4-2"
+      ],
+      "point_count": 10,
+      "stake_yen": 1000
+    },
+    "main_selected": {
+      "families": [
+        "official"
+      ],
+      "label": "メイン厳選",
+      "picks": [],
+      "point_count": 0,
+      "selected": false,
+      "stake_yen": 0
+    },
+    "mid": {
+      "families": [
+        "official"
+      ],
+      "label": "mid候補",
+      "picks": [
+        "1-2-3",
+        "1-3-5",
+        "1-3-6",
+        "1-3-2",
+        "1-4-3",
+        "1-2-4",
+        "1-4-2",
+        "1-4-5",
+        "1-4-6"
+      ],
+      "point_count": 9,
+      "score": 94,
+      "selection_policy": "opportunity-score-v2-race-shape",
+      "stake_yen": 900
+    },
+    "mid_selected": {
+      "families": [
+        "official"
+      ],
+      "label": "mid厳選",
+      "picks": [],
+      "point_count": 0,
+      "score": 94,
+      "selected": false,
+      "stake_yen": 0
+    },
+    "pt2_balanced": {
+      "families": [
+        "official",
+        "hiyori"
+      ],
+      "label": "総合型",
+      "picks": [
+        "1-3-4",
+        "1-3-2",
+        "1-3-6",
+        "1-3-5",
+        "1-4-3",
+        "1-2-3",
+        "1-6-3",
+        "1-5-3",
+        "1-4-2",
+        "1-2-4",
+        "1-4-5",
+        "1-4-6"
+      ],
+      "point_count": 12,
+      "selection_policy": "pt3-db-consensus-no-fixed-point-cap",
+      "stake_yen": 1200,
+      "version": "pt2-multi-strategy-v1"
+    },
+    "pt2_longshot": {
+      "families": [
+        "official"
+      ],
+      "label": "高配当型",
+      "picks": [
+        "6-1-3",
+        "1-6-3",
+        "6-3-1",
+        "5-3-1",
+        "2-1-3",
+        "2-3-1",
+        "1-5-3",
+        "3-6-1"
+      ],
+      "point_count": 8,
+      "selection_policy": "odds60plus-db-probability-and-ev-filter",
+      "stake_yen": 800,
+      "version": "pt2-multi-strategy-v1"
+    },
+    "pt2_probability": {
+      "families": [
+        "official"
+      ],
+      "label": "本命型",
+      "picks": [
+        "1-3-2",
+        "1-3-4",
+        "1-2-3",
+        "1-3-6",
+        "1-3-5",
+        "3-1-2",
+        "1-4-3",
+        "3-1-4"
+      ],
+      "point_count": 8,
+      "selection_policy": "db-adjusted-probability-top8",
+      "stake_yen": 800,
+      "version": "pt2-multi-strategy-v1"
+    },
+    "pt2_value": {
+      "families": [
+        "official"
+      ],
+      "label": "妙味型",
+      "picks": [
+        "6-1-3",
+        "1-6-3",
+        "6-3-1",
+        "5-3-1",
+        "2-1-3",
+        "2-3-1",
+        "1-5-3",
+        "3-6-1"
+      ],
+      "point_count": 8,
+      "selection_policy": "db-adjusted-ev-with-probability-floor",
+      "stake_yen": 800,
+      "version": "pt2-multi-strategy-v1"
+    }
+  },
+  "ticket_reasons": {
+    "1-2-3": {
+      "bucket": "cover",
+      "conditions": [
+        "外の攻撃より先に旋回位置を確保し、出口で流れない"
+      ],
+      "expected_value": 2.1543400186376003,
+      "finishers_evidence": {
+        "1": {
+          "average_st": 0.14,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.05856,
+            "motor_number": 39,
+            "racer_id": "3940",
+            "signals": [
+              "course=69.4/52.4",
+              "method=0.985",
+              "motor_grade=0.720",
+              "motor_rate=37.4/38.5"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 1,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.87,
+          "hiyori_course_samples": 65.0,
+          "hiyori_course_win_rate": 0.615,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 39,
+          "motor_top2_rate": 38.46,
+          "national_win_rate": 6.34,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "2": {
+          "average_st": 0.2167,
+          "current_class": "B2",
+          "db_adjustment": {
+            "factor": 1.06732,
+            "motor_number": 82,
+            "racer_id": "4340",
+            "signals": [
+              "method=1.050",
+              "motor_grade=0.837",
+              "motor_rate=34.5/36.4"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 5,
+          "exhibition_st": 0.14,
+          "exhibition_st_signed": 0.14,
+          "exhibition_time": 7.0,
+          "hiyori_course_samples": 7.0,
+          "hiyori_course_win_rate": 0.0,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 82,
+          "motor_top2_rate": 36.36,
+          "national_win_rate": 3.59,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "3": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.1504,
+            "motor_number": 38,
+            "racer_id": "4776",
+            "signals": [
+              "course=21.7/13.2",
+              "method=0.998",
+              "motor_grade=0.953",
+              "motor_rate=47.1/47.0"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 4,
+          "exhibition_st": 0.11,
+          "exhibition_st_signed": 0.11,
+          "exhibition_time": 6.99,
+          "hiyori_course_samples": 42.0,
+          "hiyori_course_win_rate": 0.167,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 38,
+          "motor_top2_rate": 46.96,
+          "national_win_rate": 7.49,
+          "previous_day_form": null,
+          "tilt": -0.5
+        }
+      },
+      "head_win_path": [
+        "1コースから先マイし、差し場を小さく保って逃げる"
+      ],
+      "note": "頭条件付きの2・3着確率は融合120通りから算出。確率・研究係数は未校正",
+      "odds": 47.7,
+      "probability": 0.04516436097772747,
+      "second_given_head": 0.1614775882448872,
+      "support_families": [
+        "official",
+        "hiyori"
+      ],
+      "third_given_head_second": 0.5184017169799201
+    },
+    "1-3-2": {
+      "bucket": "main",
+      "conditions": [
+        "外の攻撃より先に旋回位置を確保し、出口で流れない"
+      ],
+      "expected_value": 1.3555129489739801,
+      "finishers_evidence": {
+        "1": {
+          "average_st": 0.14,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.05856,
+            "motor_number": 39,
+            "racer_id": "3940",
+            "signals": [
+              "course=69.4/52.4",
+              "method=0.985",
+              "motor_grade=0.720",
+              "motor_rate=37.4/38.5"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 1,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.87,
+          "hiyori_course_samples": 65.0,
+          "hiyori_course_win_rate": 0.615,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 39,
+          "motor_top2_rate": 38.46,
+          "national_win_rate": 6.34,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "2": {
+          "average_st": 0.2167,
+          "current_class": "B2",
+          "db_adjustment": {
+            "factor": 1.06732,
+            "motor_number": 82,
+            "racer_id": "4340",
+            "signals": [
+              "method=1.050",
+              "motor_grade=0.837",
+              "motor_rate=34.5/36.4"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 5,
+          "exhibition_st": 0.14,
+          "exhibition_st_signed": 0.14,
+          "exhibition_time": 7.0,
+          "hiyori_course_samples": 7.0,
+          "hiyori_course_win_rate": 0.0,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 82,
+          "motor_top2_rate": 36.36,
+          "national_win_rate": 3.59,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "3": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.1504,
+            "motor_number": 38,
+            "racer_id": "4776",
+            "signals": [
+              "course=21.7/13.2",
+              "method=0.998",
+              "motor_grade=0.953",
+              "motor_rate=47.1/47.0"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 4,
+          "exhibition_st": 0.11,
+          "exhibition_st_signed": 0.11,
+          "exhibition_time": 6.99,
+          "hiyori_course_samples": 42.0,
+          "hiyori_course_win_rate": 0.167,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 38,
+          "motor_top2_rate": 46.96,
+          "national_win_rate": 7.49,
+          "previous_day_form": null,
+          "tilt": -0.5
+        }
+      },
+      "head_win_path": [
+        "1コースから先マイし、差し場を小さく保って逃げる"
+      ],
+      "note": "頭条件付きの2・3着確率は融合120通りから算出。確率・研究係数は未校正",
+      "odds": 20.2,
+      "probability": 0.06710460143435545,
+      "second_given_head": 0.43620303132975136,
+      "support_families": [
+        "official",
+        "hiyori"
+      ],
+      "third_given_head_second": 0.28513231338648864
+    },
+    "1-3-4": {
+      "bucket": "main",
+      "conditions": [
+        "外の攻撃より先に旋回位置を確保し、出口で流れない"
+      ],
+      "expected_value": 0.5421578314485203,
+      "finishers_evidence": {
+        "1": {
+          "average_st": 0.14,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.05856,
+            "motor_number": 39,
+            "racer_id": "3940",
+            "signals": [
+              "course=69.4/52.4",
+              "method=0.985",
+              "motor_grade=0.720",
+              "motor_rate=37.4/38.5"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 1,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.87,
+          "hiyori_course_samples": 65.0,
+          "hiyori_course_win_rate": 0.615,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 39,
+          "motor_top2_rate": 38.46,
+          "national_win_rate": 6.34,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "3": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.1504,
+            "motor_number": 38,
+            "racer_id": "4776",
+            "signals": [
+              "course=21.7/13.2",
+              "method=0.998",
+              "motor_grade=0.953",
+              "motor_rate=47.1/47.0"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 4,
+          "exhibition_st": 0.11,
+          "exhibition_st_signed": 0.11,
+          "exhibition_time": 6.99,
+          "hiyori_course_samples": 42.0,
+          "hiyori_course_win_rate": 0.167,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 38,
+          "motor_top2_rate": 46.96,
+          "national_win_rate": 7.49,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "4": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.02292,
+            "motor_number": 52,
+            "racer_id": "4384",
+            "signals": [
+              "course=14.3/12.1",
+              "method=0.983",
+              "motor_grade=0.743",
+              "motor_rate=35.3/33.6"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 2,
+          "exhibition_st": 0.32,
+          "exhibition_st_signed": 0.32,
+          "exhibition_time": 6.95,
+          "hiyori_course_samples": 40.0,
+          "hiyori_course_win_rate": 0.1,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 52,
+          "motor_top2_rate": 33.61,
+          "national_win_rate": 5.32,
+          "previous_day_form": null,
+          "tilt": -0.5
+        }
+      },
+      "head_win_path": [
+        "1コースから先マイし、差し場を小さく保って逃げる"
+      ],
+      "note": "頭条件付きの2・3着確率は融合120通りから算出。確率・研究係数は未校正",
+      "odds": 7.2,
+      "probability": 0.07529969881229448,
+      "second_given_head": 0.43620303132975136,
+      "support_families": [
+        "official",
+        "hiyori"
+      ],
+      "third_given_head_second": 0.3199538759001286
+    },
+    "1-3-5": {
+      "bucket": "main",
+      "conditions": [
+        "外の攻撃より先に旋回位置を確保し、出口で流れない"
+      ],
+      "expected_value": 2.2456262201775896,
+      "finishers_evidence": {
+        "1": {
+          "average_st": 0.14,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.05856,
+            "motor_number": 39,
+            "racer_id": "3940",
+            "signals": [
+              "course=69.4/52.4",
+              "method=0.985",
+              "motor_grade=0.720",
+              "motor_rate=37.4/38.5"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 1,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.87,
+          "hiyori_course_samples": 65.0,
+          "hiyori_course_win_rate": 0.615,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 39,
+          "motor_top2_rate": 38.46,
+          "national_win_rate": 6.34,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "3": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.1504,
+            "motor_number": 38,
+            "racer_id": "4776",
+            "signals": [
+              "course=21.7/13.2",
+              "method=0.998",
+              "motor_grade=0.953",
+              "motor_rate=47.1/47.0"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 4,
+          "exhibition_st": 0.11,
+          "exhibition_st_signed": 0.11,
+          "exhibition_time": 6.99,
+          "hiyori_course_samples": 42.0,
+          "hiyori_course_win_rate": 0.167,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 38,
+          "motor_top2_rate": 46.96,
+          "national_win_rate": 7.49,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "5": {
+          "average_st": 0.17,
+          "current_class": "B1",
+          "db_adjustment": {
+            "factor": 0.99569,
+            "motor_number": 17,
+            "racer_id": "3741",
+            "signals": [
+              "motor_grade=0.720",
+              "motor_rate=34.4/36.2"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 6,
+          "exhibition_st": 0.18,
+          "exhibition_st_signed": 0.18,
+          "exhibition_time": 7.08,
+          "hiyori_course_samples": 38.0,
+          "hiyori_course_win_rate": 0.0,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 17,
+          "motor_top2_rate": 36.21,
+          "national_win_rate": 3.44,
+          "previous_day_form": null,
+          "tilt": -0.5
+        }
+      },
+      "head_win_path": [
+        "1コースから先マイし、差し場を小さく保って逃げる"
+      ],
+      "note": "頭条件付きの2・3着確率は融合120通りから算出。確率・研究係数は未校正",
+      "odds": 49.5,
+      "probability": 0.04536618626621393,
+      "second_given_head": 0.43620303132975136,
+      "support_families": [
+        "official",
+        "hiyori"
+      ],
+      "third_given_head_second": 0.1927642123358984
+    },
+    "1-3-6": {
+      "bucket": "main",
+      "conditions": [
+        "外の攻撃より先に旋回位置を確保し、出口で流れない"
+      ],
+      "expected_value": 2.1408747506221846,
+      "finishers_evidence": {
+        "1": {
+          "average_st": 0.14,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.05856,
+            "motor_number": 39,
+            "racer_id": "3940",
+            "signals": [
+              "course=69.4/52.4",
+              "method=0.985",
+              "motor_grade=0.720",
+              "motor_rate=37.4/38.5"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 1,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.87,
+          "hiyori_course_samples": 65.0,
+          "hiyori_course_win_rate": 0.615,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 39,
+          "motor_top2_rate": 38.46,
+          "national_win_rate": 6.34,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "3": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.1504,
+            "motor_number": 38,
+            "racer_id": "4776",
+            "signals": [
+              "course=21.7/13.2",
+              "method=0.998",
+              "motor_grade=0.953",
+              "motor_rate=47.1/47.0"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 4,
+          "exhibition_st": 0.11,
+          "exhibition_st_signed": 0.11,
+          "exhibition_time": 6.99,
+          "hiyori_course_samples": 42.0,
+          "hiyori_course_win_rate": 0.167,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 38,
+          "motor_top2_rate": 46.96,
+          "national_win_rate": 7.49,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "6": {
+          "average_st": 0.17,
+          "current_class": "B1",
+          "db_adjustment": {
+            "factor": 1.05333,
+            "motor_number": 55,
+            "racer_id": "4186",
+            "signals": [
+              "method=1.050",
+              "motor_grade=0.743",
+              "motor_rate=36.4/36.8"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 3,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.97,
+          "hiyori_course_samples": 20.0,
+          "hiyori_course_win_rate": 0.0,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 55,
+          "motor_top2_rate": 36.84,
+          "national_win_rate": 3.71,
+          "previous_day_form": null,
+          "tilt": -0.5
+        }
+      },
+      "head_win_path": [
+        "1コースから先マイし、差し場を小さく保って逃げる"
+      ],
+      "note": "頭条件付きの2・3着確率は融合120通りから算出。確率・研究係数は未校正",
+      "odds": 45.0,
+      "probability": 0.047574994458270764,
+      "second_given_head": 0.43620303132975136,
+      "support_families": [
+        "official",
+        "hiyori"
+      ],
+      "third_given_head_second": 0.20214959837748442
+    },
+    "1-4-3": {
+      "bucket": "main",
+      "conditions": [
+        "外の攻撃より先に旋回位置を確保し、出口で流れない"
+      ],
+      "expected_value": 0.7227794734030789,
+      "finishers_evidence": {
+        "1": {
+          "average_st": 0.14,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.05856,
+            "motor_number": 39,
+            "racer_id": "3940",
+            "signals": [
+              "course=69.4/52.4",
+              "method=0.985",
+              "motor_grade=0.720",
+              "motor_rate=37.4/38.5"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 1,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.87,
+          "hiyori_course_samples": 65.0,
+          "hiyori_course_win_rate": 0.615,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 39,
+          "motor_top2_rate": 38.46,
+          "national_win_rate": 6.34,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "3": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.1504,
+            "motor_number": 38,
+            "racer_id": "4776",
+            "signals": [
+              "course=21.7/13.2",
+              "method=0.998",
+              "motor_grade=0.953",
+              "motor_rate=47.1/47.0"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 4,
+          "exhibition_st": 0.11,
+          "exhibition_st_signed": 0.11,
+          "exhibition_time": 6.99,
+          "hiyori_course_samples": 42.0,
+          "hiyori_course_win_rate": 0.167,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 38,
+          "motor_top2_rate": 46.96,
+          "national_win_rate": 7.49,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "4": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.02292,
+            "motor_number": 52,
+            "racer_id": "4384",
+            "signals": [
+              "course=14.3/12.1",
+              "method=0.983",
+              "motor_grade=0.743",
+              "motor_rate=35.3/33.6"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 2,
+          "exhibition_st": 0.32,
+          "exhibition_st_signed": 0.32,
+          "exhibition_time": 6.95,
+          "hiyori_course_samples": 40.0,
+          "hiyori_course_win_rate": 0.1,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 52,
+          "motor_top2_rate": 33.61,
+          "national_win_rate": 5.32,
+          "previous_day_form": null,
+          "tilt": -0.5
+        }
+      },
+      "head_win_path": [
+        "1コースから先マイし、差し場を小さく保って逃げる"
+      ],
+      "note": "頭条件付きの2・3着確率は融合120通りから算出。確率・研究係数は未校正",
+      "odds": 14.0,
+      "probability": 0.051627105243077065,
+      "second_given_head": 0.1797721905038869,
+      "support_families": [
+        "official",
+        "hiyori"
+      ],
+      "third_given_head_second": 0.532277465320436
+    },
+    "3-1-2": {
+      "bucket": "cover",
+      "conditions": [
+        "スタートと行き足の差が本番でも成立し、攻めの進路を確保する",
+        "平均STの内隣に対する優位0.057秒が本番でも再現する"
+      ],
+      "expected_value": 1.3746045748020628,
+      "finishers_evidence": {
+        "1": {
+          "average_st": 0.14,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.05856,
+            "motor_number": 39,
+            "racer_id": "3940",
+            "signals": [
+              "course=69.4/52.4",
+              "method=0.985",
+              "motor_grade=0.720",
+              "motor_rate=37.4/38.5"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 1,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.87,
+          "hiyori_course_samples": 65.0,
+          "hiyori_course_win_rate": 0.615,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 39,
+          "motor_top2_rate": 38.46,
+          "national_win_rate": 6.34,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "2": {
+          "average_st": 0.2167,
+          "current_class": "B2",
+          "db_adjustment": {
+            "factor": 1.06732,
+            "motor_number": 82,
+            "racer_id": "4340",
+            "signals": [
+              "method=1.050",
+              "motor_grade=0.837",
+              "motor_rate=34.5/36.4"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 5,
+          "exhibition_st": 0.14,
+          "exhibition_st_signed": 0.14,
+          "exhibition_time": 7.0,
+          "hiyori_course_samples": 7.0,
+          "hiyori_course_win_rate": 0.0,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 82,
+          "motor_top2_rate": 36.36,
+          "national_win_rate": 3.59,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "3": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.1504,
+            "motor_number": 38,
+            "racer_id": "4776",
+            "signals": [
+              "course=21.7/13.2",
+              "method=0.998",
+              "motor_grade=0.953",
+              "motor_rate=47.1/47.0"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 4,
+          "exhibition_st": 0.11,
+          "exhibition_st_signed": 0.11,
+          "exhibition_time": 6.99,
+          "hiyori_course_samples": 42.0,
+          "hiyori_course_win_rate": 0.167,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 38,
+          "motor_top2_rate": 46.96,
+          "national_win_rate": 7.49,
+          "previous_day_form": null,
+          "tilt": -0.5
+        }
+      },
+      "head_win_path": [
+        "内隣2号艇の壁を越えてまくる／開いた間をまくり差す"
+      ],
+      "note": "頭条件付きの2・3着確率は融合120通りから算出。確率・研究係数は未校正",
+      "odds": 31.6,
+      "probability": 0.04350014477221718,
+      "second_given_head": 0.6660848743458829,
+      "support_families": [
+        "official"
+      ],
+      "third_given_head_second": 0.2860654923589102
+    },
+    "3-1-4": {
+      "bucket": "main",
+      "conditions": [
+        "スタートと行き足の差が本番でも成立し、攻めの進路を確保する",
+        "平均STの内隣に対する優位0.057秒が本番でも再現する"
+      ],
+      "expected_value": 0.35329603168026386,
+      "finishers_evidence": {
+        "1": {
+          "average_st": 0.14,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.05856,
+            "motor_number": 39,
+            "racer_id": "3940",
+            "signals": [
+              "course=69.4/52.4",
+              "method=0.985",
+              "motor_grade=0.720",
+              "motor_rate=37.4/38.5"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 1,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.87,
+          "hiyori_course_samples": 65.0,
+          "hiyori_course_win_rate": 0.615,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 39,
+          "motor_top2_rate": 38.46,
+          "national_win_rate": 6.34,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "3": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.1504,
+            "motor_number": 38,
+            "racer_id": "4776",
+            "signals": [
+              "course=21.7/13.2",
+              "method=0.998",
+              "motor_grade=0.953",
+              "motor_rate=47.1/47.0"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 4,
+          "exhibition_st": 0.11,
+          "exhibition_st_signed": 0.11,
+          "exhibition_time": 6.99,
+          "hiyori_course_samples": 42.0,
+          "hiyori_course_win_rate": 0.167,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 38,
+          "motor_top2_rate": 46.96,
+          "national_win_rate": 7.49,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "4": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.02292,
+            "motor_number": 52,
+            "racer_id": "4384",
+            "signals": [
+              "course=14.3/12.1",
+              "method=0.983",
+              "motor_grade=0.743",
+              "motor_rate=35.3/33.6"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 2,
+          "exhibition_st": 0.32,
+          "exhibition_st_signed": 0.32,
+          "exhibition_time": 6.95,
+          "hiyori_course_samples": 40.0,
+          "hiyori_course_win_rate": 0.1,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 52,
+          "motor_top2_rate": 33.61,
+          "national_win_rate": 5.32,
+          "previous_day_form": null,
+          "tilt": -0.5
+        }
+      },
+      "head_win_path": [
+        "内隣2号艇の壁を越えてまくる／開いた間をまくり差す"
+      ],
+      "note": "頭条件付きの2・3着確率は融合120通りから算出。確率・研究係数は未校正",
+      "odds": 7.3,
+      "probability": 0.048396716668529294,
+      "second_given_head": 0.6660848743458829,
+      "support_families": [
+        "official",
+        "hiyori"
+      ],
+      "third_given_head_second": 0.31826631048777215
+    },
+    "4-1-3": {
+      "bucket": "cover",
+      "conditions": [
+        "スタートと行き足の差が本番でも成立し、攻めの進路を確保する"
+      ],
+      "expected_value": 0.45557323603052724,
+      "finishers_evidence": {
+        "1": {
+          "average_st": 0.14,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.05856,
+            "motor_number": 39,
+            "racer_id": "3940",
+            "signals": [
+              "course=69.4/52.4",
+              "method=0.985",
+              "motor_grade=0.720",
+              "motor_rate=37.4/38.5"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 1,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.87,
+          "hiyori_course_samples": 65.0,
+          "hiyori_course_win_rate": 0.615,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 39,
+          "motor_top2_rate": 38.46,
+          "national_win_rate": 6.34,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "3": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.1504,
+            "motor_number": 38,
+            "racer_id": "4776",
+            "signals": [
+              "course=21.7/13.2",
+              "method=0.998",
+              "motor_grade=0.953",
+              "motor_rate=47.1/47.0"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 4,
+          "exhibition_st": 0.11,
+          "exhibition_st_signed": 0.11,
+          "exhibition_time": 6.99,
+          "hiyori_course_samples": 42.0,
+          "hiyori_course_win_rate": 0.167,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 38,
+          "motor_top2_rate": 46.96,
+          "national_win_rate": 7.49,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "4": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.02292,
+            "motor_number": 52,
+            "racer_id": "4384",
+            "signals": [
+              "course=14.3/12.1",
+              "method=0.983",
+              "motor_grade=0.743",
+              "motor_rate=35.3/33.6"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 2,
+          "exhibition_st": 0.32,
+          "exhibition_st_signed": 0.32,
+          "exhibition_time": 6.95,
+          "hiyori_course_samples": 40.0,
+          "hiyori_course_win_rate": 0.1,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 52,
+          "motor_top2_rate": 33.61,
+          "national_win_rate": 5.32,
+          "previous_day_form": null,
+          "tilt": -0.5
+        }
+      },
+      "head_win_path": [
+        "内隣3号艇の壁を越えてまくる／開いた間をまくり差す"
+      ],
+      "note": "頭条件付きの2・3着確率は融合120通りから算出。確率・研究係数は未校正",
+      "odds": 19.4,
+      "probability": 0.023483156496418932,
+      "second_given_head": 0.5795299474646347,
+      "support_families": [
+        "official",
+        "hiyori"
+      ],
+      "third_given_head_second": 0.5313971789902925
+    },
+    "6-1-3": {
+      "bucket": "cover",
+      "conditions": [
+        "内の競りによる進路と、自艇が追いつける行き足が同時に必要"
+      ],
+      "expected_value": 4.062899224609556,
+      "finishers_evidence": {
+        "1": {
+          "average_st": 0.14,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.05856,
+            "motor_number": 39,
+            "racer_id": "3940",
+            "signals": [
+              "course=69.4/52.4",
+              "method=0.985",
+              "motor_grade=0.720",
+              "motor_rate=37.4/38.5"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 1,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.87,
+          "hiyori_course_samples": 65.0,
+          "hiyori_course_win_rate": 0.615,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 39,
+          "motor_top2_rate": 38.46,
+          "national_win_rate": 6.34,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "3": {
+          "average_st": 0.16,
+          "current_class": "A1",
+          "db_adjustment": {
+            "factor": 1.1504,
+            "motor_number": 38,
+            "racer_id": "4776",
+            "signals": [
+              "course=21.7/13.2",
+              "method=0.998",
+              "motor_grade=0.953",
+              "motor_rate=47.1/47.0"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 4,
+          "exhibition_st": 0.11,
+          "exhibition_st_signed": 0.11,
+          "exhibition_time": 6.99,
+          "hiyori_course_samples": 42.0,
+          "hiyori_course_win_rate": 0.167,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 38,
+          "motor_top2_rate": 46.96,
+          "national_win_rate": 7.49,
+          "previous_day_form": null,
+          "tilt": -0.5
+        },
+        "6": {
+          "average_st": 0.17,
+          "current_class": "B1",
+          "db_adjustment": {
+            "factor": 1.05333,
+            "motor_number": 55,
+            "racer_id": "4186",
+            "signals": [
+              "method=1.050",
+              "motor_grade=0.743",
+              "motor_rate=36.4/36.8"
+            ]
+          },
+          "db_snapshot_at": "2026-10-14T15:40:16.707134+09:00",
+          "exhibition_rank": 3,
+          "exhibition_st": 0.08,
+          "exhibition_st_signed": 0.08,
+          "exhibition_time": 6.97,
+          "hiyori_course_samples": 20.0,
+          "hiyori_course_win_rate": 0.0,
+          "hiyori_used": [
+            "course_rates",
+            "course_st",
+            "motor_last10"
+          ],
+          "motor_number": 55,
+          "motor_top2_rate": 36.84,
+          "national_win_rate": 3.71,
+          "previous_day_form": null,
+          "tilt": -0.5
+        }
+      },
+      "head_win_path": [
+        "内側の攻めと競りに乗り、まくり差し／差しで空いた進路を取る"
+      ],
+      "note": "頭条件付きの2・3着確率は融合120通りから算出。確率・研究係数は未校正",
+      "odds": 291.2,
+      "probability": 0.013952263820774573,
+      "second_given_head": 0.5585688739417224,
+      "support_families": [
+        "official",
+        "hiyori"
+      ],
+      "third_given_head_second": 0.49037189751589355
+    }
+  },
+  "trifecta": [
+    {
+      "combination": "1-3-4",
+      "context_bonus": 0,
+      "cover_score": 0.08132367471727803,
+      "expected_value": 0.5421578314485203,
+      "odds": 7.2,
+      "probability": 0.07529969881229448,
+      "rank_score": 0.09035963857475338,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "1-3-2",
+      "context_bonus": 0,
+      "cover_score": 0.08857807389334921,
+      "expected_value": 1.3555129489739801,
+      "odds": 20.2,
+      "probability": 0.06710460143435545,
+      "rank_score": 0.08052552172122655,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "1-4-3",
+      "context_bonus": 0,
+      "cover_score": 0.05575727366252323,
+      "expected_value": 0.7227794734030789,
+      "odds": 14.0,
+      "probability": 0.051627105243077065,
+      "rank_score": 0.06195252629169247,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "3-1-4",
+      "context_bonus": 0,
+      "cover_score": 0.05226845400201163,
+      "expected_value": 0.35329603168026386,
+      "odds": 7.3,
+      "probability": 0.048396716668529294,
+      "rank_score": 0.05807606000223515,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "1-3-6",
+      "context_bonus": 0,
+      "cover_score": 0.06279899268491741,
+      "expected_value": 2.1408747506221846,
+      "odds": 45.0,
+      "probability": 0.047574994458270764,
+      "rank_score": 0.057089993349924914,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "1-3-5",
+      "context_bonus": 0,
+      "cover_score": 0.05988336587140239,
+      "expected_value": 2.2456262201775896,
+      "odds": 49.5,
+      "probability": 0.04536618626621393,
+      "rank_score": 0.054439423519456714,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "1-2-3",
+      "context_bonus": 0,
+      "cover_score": 0.059616956490600254,
+      "expected_value": 2.1543400186376003,
+      "odds": 47.7,
+      "probability": 0.04516436097772747,
+      "rank_score": 0.054197233173272956,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "3-1-2",
+      "context_bonus": 0,
+      "cover_score": 0.05263517517438279,
+      "expected_value": 1.3746045748020628,
+      "odds": 31.6,
+      "probability": 0.04350014477221718,
+      "rank_score": 0.047850159249438896,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "3-1-6",
+      "context_bonus": 0,
+      "cover_score": 0.04065606992772786,
+      "expected_value": 1.9558033639475148,
+      "odds": 63.5,
+      "probability": 0.030800052975551412,
+      "rank_score": 0.03696006357066169,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "1-6-3",
+      "context_bonus": 0,
+      "cover_score": 0.03988920764658258,
+      "expected_value": 3.432889385342258,
+      "odds": 113.6,
+      "probability": 0.030219096701956497,
+      "rank_score": 0.0362629160423478,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "1-5-3",
+      "context_bonus": 0,
+      "cover_score": 0.03768435673357414,
+      "expected_value": 2.33243329176743,
+      "odds": 81.7,
+      "probability": 0.028548755101192536,
+      "rank_score": 0.03425850612143104,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "3-1-5",
+      "context_bonus": 0,
+      "cover_score": 0.03230333940832626,
+      "expected_value": 1.8324803446177806,
+      "odds": 62.4,
+      "probability": 0.029366672189387513,
+      "rank_score": 0.029366672189387513,
+      "support_families": []
+    },
+    {
+      "combination": "4-1-3",
+      "context_bonus": 0,
+      "cover_score": 0.025361809016132445,
+      "expected_value": 0.45557323603052724,
+      "odds": 19.4,
+      "probability": 0.023483156496418932,
+      "rank_score": 0.028179787795702717,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "1-4-2",
+      "context_bonus": 0,
+      "cover_score": 0.020534619162179413,
+      "expected_value": 0.8594118390097311,
+      "odds": 45.2,
+      "probability": 0.019013536261277234,
+      "rank_score": 0.022816243513532678,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "1-2-4",
+      "context_bonus": 0,
+      "cover_score": 0.022448435485708323,
+      "expected_value": 1.021428710349967,
+      "odds": 54.8,
+      "probability": 0.01863921004288261,
+      "rank_score": 0.02236705205145913,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "3-4-1",
+      "context_bonus": 0,
+      "cover_score": 0.019343586073214864,
+      "expected_value": 0.24716804426885658,
+      "odds": 13.8,
+      "probability": 0.017910727845569317,
+      "rank_score": 0.02149287341468318,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "2-1-3",
+      "context_bonus": 0,
+      "cover_score": 0.022756831536918338,
+      "expected_value": 1.6067702266975679,
+      "odds": 93.2,
+      "probability": 0.017240023891604804,
+      "rank_score": 0.02068802866992576,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "6-1-3",
+      "context_bonus": 0,
+      "cover_score": 0.018416988243422437,
+      "expected_value": 4.062899224609556,
+      "odds": 291.2,
+      "probability": 0.013952263820774573,
+      "rank_score": 0.016742716584929488,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "1-4-6",
+      "context_bonus": 0,
+      "cover_score": 0.014569090919222961,
+      "expected_value": 0.7594813136594932,
+      "odds": 56.3,
+      "probability": 0.01348989899928052,
+      "rank_score": 0.016187878799136624,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "3-2-1",
+      "context_bonus": 0,
+      "cover_score": 0.017714778542690993,
+      "expected_value": 1.423624021067167,
+      "odds": 88.4,
+      "probability": 0.016104344129719082,
+      "rank_score": 0.016104344129719082,
+      "support_families": []
+    },
+    {
+      "combination": "1-4-5",
+      "context_bonus": 0,
+      "cover_score": 0.013908412477868809,
+      "expected_value": 0.9170822506147438,
+      "odds": 71.3,
+      "probability": 0.012862303655185748,
+      "rank_score": 0.015434764386222896,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "5-1-3",
+      "context_bonus": 0,
+      "cover_score": 0.016784744040196708,
+      "expected_value": 1.725522550192949,
+      "odds": 135.7,
+      "probability": 0.0127157151819672,
+      "rank_score": 0.015258858218360642,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "4-3-1",
+      "context_bonus": 0,
+      "cover_score": 0.013666974992471947,
+      "expected_value": 0.3884964187674896,
+      "odds": 30.7,
+      "probability": 0.012654606474511061,
+      "rank_score": 0.015185527769413275,
+      "support_families": [
+        "official",
+        "hiyori"
+      ]
+    },
+    {
+      "combination": "1-6-4",
+      "context_bonus": 0,
+      "cover_score": 0.014813205061950985,
+      "expected_value": 1.097584531092868,
+      "odds": 87.9,
+      "probability": 0.01248674096806448,
+      "rank_score": 0.01373541506487093,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "1-2-6",
+      "context_bonus": 0,
+      "cover_score": 0.01443220517638532,
+      "expected_value": 1.412209167672745,
+      "odds": 118.4,
+      "probability": 0.01192744229453332,
+      "rank_score": 0.013120186523986653,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "1-5-4",
+      "context_bonus": 0,
+      "cover_score": 0.014272530849661128,
+      "expected_value": 1.831838050373862,
+      "odds": 155.3,
+      "probability": 0.011795480041042253,
+      "rank_score": 0.01297502804514648,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "1-2-5",
+      "context_bonus": 0,
+      "cover_score": 0.013783482728271092,
+      "expected_value": 1.153939504441208,
+      "odds": 101.3,
+      "probability": 0.011391308039893465,
+      "rank_score": 0.01253043884388281,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "1-6-2",
+      "context_bonus": 0,
+      "cover_score": 0.013621666894648277,
+      "expected_value": 1.5580485109250588,
+      "odds": 138.4,
+      "probability": 0.01125757594599031,
+      "rank_score": 0.012383333540589342,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "3-6-1",
+      "context_bonus": 0,
+      "cover_score": 0.013331711186524974,
+      "expected_value": 2.053744599312607,
+      "odds": 186.4,
+      "probability": 0.01101794312935948,
+      "rank_score": 0.012119737442295428,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "1-5-2",
+      "context_bonus": 0,
+      "cover_score": 0.01082689223589118,
+      "expected_value": 0.9410161179929162,
+      "odds": 88.4,
+      "probability": 0.010644978710327106,
+      "rank_score": 0.011709476581359818,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "2-3-1",
+      "context_bonus": 0,
+      "cover_score": 0.0114825322332243,
+      "expected_value": 1.489882281501004,
+      "odds": 157.0,
+      "probability": 0.009489696060515949,
+      "rank_score": 0.010438665666567544,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "3-5-1",
+      "context_bonus": 0,
+      "cover_score": 0.011478415243351359,
+      "expected_value": 1.6570657642219964,
+      "odds": 158.8,
+      "probability": 0.010434922948501235,
+      "rank_score": 0.010434922948501235,
+      "support_families": []
+    },
+    {
+      "combination": "4-1-2",
+      "context_bonus": 0,
+      "cover_score": 0.009549609610085757,
+      "expected_value": 1.019203789294607,
+      "odds": 117.4,
+      "probability": 0.008681463281896142,
+      "rank_score": 0.008681463281896142,
+      "support_families": []
+    },
+    {
+      "combination": "6-3-1",
+      "context_bonus": 0,
+      "cover_score": 0.009505174729591158,
+      "expected_value": 2.3872914052254153,
+      "odds": 303.9,
+      "probability": 0.007855516305447237,
+      "rank_score": 0.008641067935991962,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "1-6-5",
+      "context_bonus": 0,
+      "cover_score": 0.00919106949689572,
+      "expected_value": 2.003045476306943,
+      "odds": 263.7,
+      "probability": 0.007595925204046049,
+      "rank_score": 0.008355517724450654,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "5-3-1",
+      "context_bonus": 0,
+      "cover_score": 0.008679142233482626,
+      "expected_value": 2.046412627448424,
+      "odds": 285.3,
+      "probability": 0.007172844821060021,
+      "rank_score": 0.007890129303166023,
+      "support_families": [
+        "official"
+      ]
+    },
+    {
+      "combination": "1-5-6",
+      "context_bonus": 0,
+      "cover_score": 0.008275048324617416,
+      "expected_value": 1.4601698907347642,
+      "odds": 194.1,
+      "probability": 0.007522771204197652,
+      "rank_score": 0.007522771204197652,
+      "support_families": []
+    },
+    {
+      "combination": "2-1-4",
+      "context_bonus": 0,
+      "cover_score": 0.007810649251512921,
+      "expected_value": 0.9102956673126874,
+      "odds": 128.2,
+      "probability": 0.007100590228648109,
+      "rank_score": 0.007100590228648109,
+      "support_families": []
+    },
+    {
+      "combination": "4-1-6",
+      "context_bonus": 0,
+      "cover_score": 0.005541772869242434,
+      "expected_value": 0.5855806665166171,
+      "odds": 95.1,
+      "probability": 0.00615752541026937,
+      "rank_score": 0.00615752541026937,
+      "support_families": []
+    },
+    {
+      "combination": "4-1-5",
+      "context_bonus": 0,
+      "cover_score": 0.0052822805545325495,
+      "expected_value": 0.6074622637712431,
+      "odds": 103.5,
+      "probability": 0.005869200616147277,
+      "rank_score": 0.005869200616147277,
+      "support_families": []
+    },
+    {
+      "combination": "6-1-4",
+      "context_bonus": 0,
+      "cover_score": 0.006330363286145647,
+      "expected_value": 1.318442026232698,
+      "odds": 229.1,
+      "probability": 0.005754875714677861,
+      "rank_score": 0.005754875714677861,
+      "support_families": []
+    },
+    {
+      "combination": "5-1-4",
+      "context_bonus": 0,
+      "cover_score": 0.005770785857837748,
+      "expected_value": 1.2018973091187528,
+      "odds": 229.1,
+      "probability": 0.00524616896167068,
+      "rank_score": 0.00524616896167068,
+      "support_families": []
+    },
+    {
+      "combination": "6-1-2",
+      "context_bonus": 0,
+      "cover_score": 0.005018415109648654,
+      "expected_value": 0.9126249754619115,
+      "odds": 174.7,
+      "probability": 0.00522395521157362,
+      "rank_score": 0.00522395521157362,
+      "support_families": []
+    },
+    {
+      "combination": "5-1-2",
+      "context_bonus": 0,
+      "cover_score": 0.005238214463845526,
+      "expected_value": 1.305267804127326,
+      "odds": 274.1,
+      "probability": 0.004762013148950478,
+      "rank_score": 0.004762013148950478,
+      "support_families": []
+    },
+    {
+      "combination": "2-1-6",
+      "context_bonus": 0,
+      "cover_score": 0.004117032517322275,
+      "expected_value": 0.5196609932975672,
+      "odds": 113.6,
+      "probability": 0.004574480574802528,
+      "rank_score": 0.004574480574802528,
+      "support_families": []
+    },
+    {
+      "combination": "2-1-5",
+      "context_bonus": 0,
+      "cover_score": 0.004723519328569805,
+      "expected_value": 0.825115850199176,
+      "odds": 188.9,
+      "probability": 0.0043680034420284595,
+      "rank_score": 0.0043680034420284595,
+      "support_families": []
+    },
+    {
+      "combination": "4-2-1",
+      "context_bonus": 0,
+      "cover_score": 0.003582721053717611,
+      "expected_value": 0.7320693353096319,
+      "odds": 183.9,
+      "probability": 0.003980801170797346,
+      "rank_score": 0.003980801170797346,
+      "support_families": []
+    },
+    {
+      "combination": "6-1-5",
+      "context_bonus": 0,
+      "cover_score": 0.0037238068782663083,
+      "expected_value": 1.0046321377520453,
+      "odds": 285.3,
+      "probability": 0.0035213183938031726,
+      "rank_score": 0.0035213183938031726,
+      "support_families": []
+    },
+    {
+      "combination": "5-1-6",
+      "context_bonus": 0,
+      "cover_score": 0.0030270283194016433,
+      "expected_value": 0.5529371730107002,
+      "odds": 164.4,
+      "probability": 0.0033633647993351595,
+      "rank_score": 0.0033633647993351595,
+      "support_families": []
+    },
+    {
+      "combination": "2-4-1",
+      "context_bonus": 0,
+      "cover_score": 0.002979883293723387,
+      "expected_value": 0.4244678202837091,
+      "odds": 128.2,
+      "probability": 0.0033109814374704303,
+      "rank_score": 0.0033109814374704303,
+      "support_families": []
+    },
+    {
+      "combination": "6-4-1",
+      "context_bonus": 0,
+      "cover_score": 0.002492824063203231,
+      "expected_value": 0.6453644519181697,
+      "odds": 233.0,
+      "probability": 0.0027698045146702563,
+      "rank_score": 0.0027698045146702563,
+      "support_families": []
+    },
+    {
+      "combination": "4-6-1",
+      "context_bonus": 0,
+      "cover_score": 0.0024765163589907085,
+      "expected_value": 0.4419205858376753,
+      "odds": 160.6,
+      "probability": 0.0027516848433230094,
+      "rank_score": 0.0027516848433230094,
+      "support_families": []
+    },
+    {
+      "combination": "4-5-1",
+      "context_bonus": 0,
+      "cover_score": 0.002347257300979938,
+      "expected_value": 0.4094659958376114,
+      "odds": 157.0,
+      "probability": 0.0026080636677554866,
+      "rank_score": 0.0026080636677554866,
+      "support_families": []
+    },
+    {
+      "combination": "3-4-2",
+      "context_bonus": 0,
+      "cover_score": 0.002330222803745503,
+      "expected_value": 0.0836291072899775,
+      "odds": 32.3,
+      "probability": 0.0025891364486061146,
+      "rank_score": 0.0025891364486061146,
+      "support_families": []
+    },
+    {
+      "combination": "3-2-4",
+      "context_bonus": 0,
+      "cover_score": 0.002311119473684818,
+      "expected_value": 0.1918229163158399,
+      "odds": 74.7,
+      "probability": 0.0025679105263164644,
+      "rank_score": 0.0025679105263164644,
+      "support_families": []
+    },
+    {
+      "combination": "5-4-1",
+      "context_bonus": 0,
+      "cover_score": 0.002279790636999264,
+      "expected_value": 0.8235110400982897,
+      "odds": 325.1,
+      "probability": 0.00253310070777696,
+      "rank_score": 0.00253310070777696,
+      "support_families": []
+    },
+    {
+      "combination": "6-2-1",
+      "context_bonus": 0,
+      "cover_score": 0.00226354733792759,
+      "expected_value": 0.7811753368447882,
+      "odds": 310.6,
+      "probability": 0.002515052597697322,
+      "rank_score": 0.002515052597697322,
+      "support_families": []
+    },
+    {
+      "combination": "5-2-1",
+      "context_bonus": 0,
+      "cover_score": 0.0020684116347379614,
+      "expected_value": 0.3870227992109697,
+      "odds": 168.4,
+      "probability": 0.002298235149708846,
+      "rank_score": 0.002298235149708846,
+      "support_families": []
+    },
+    {
+      "combination": "2-6-1",
+      "context_bonus": 0,
+      "cover_score": 0.0020230744861979588,
+      "expected_value": 0.7437997696048005,
+      "odds": 358.4,
+      "probability": 0.002075334178584823,
+      "rank_score": 0.002075334178584823,
+      "support_families": []
+    },
+    {
+      "combination": "2-5-1",
+      "context_bonus": 0,
+      "cover_score": 0.0017716099988125751,
+      "expected_value": 0.6710464984391188,
+      "odds": 340.9,
+      "probability": 0.0019684555542361947,
+      "rank_score": 0.0019684555542361947,
+      "support_families": []
+    },
+    {
+      "combination": "3-4-6",
+      "context_bonus": 0,
+      "cover_score": 0.0016459228913037025,
+      "expected_value": 0.11356867949995546,
+      "odds": 62.1,
+      "probability": 0.0018288032125596692,
+      "rank_score": 0.0018288032125596692,
+      "support_families": []
+    },
+    {
+      "combination": "4-3-2",
+      "context_bonus": 0,
+      "cover_score": 0.0016399415348088001,
+      "expected_value": 0.16326529057652053,
+      "odds": 89.6,
+      "probability": 0.0018221572608986669,
+      "rank_score": 0.0018221572608986669,
+      "support_families": []
+    },
+    {
+      "combination": "3-6-4",
+      "context_bonus": 0,
+      "cover_score": 0.0015799617839008363,
+      "expected_value": 0.318625626420002,
+      "odds": 181.5,
+      "probability": 0.0017555130932231514,
+      "rank_score": 0.0017555130932231514,
+      "support_families": []
+    },
+    {
+      "combination": "3-4-5",
+      "context_bonus": 0,
+      "cover_score": 0.0015701779706442773,
+      "expected_value": 0.11828674045520222,
+      "odds": 67.8,
+      "probability": 0.0017446421896047527,
+      "rank_score": 0.0017446421896047527,
+      "support_families": []
+    },
+    {
+      "combination": "3-2-6",
+      "context_bonus": 0,
+      "cover_score": 0.001510041621863457,
+      "expected_value": 0.3006660651532572,
+      "odds": 179.2,
+      "probability": 0.00167782402429273,
+      "rank_score": 0.00167782402429273,
+      "support_families": []
+    },
+    {
+      "combination": "3-5-4",
+      "context_bonus": 0,
+      "cover_score": 0.0014962594319914897,
+      "expected_value": 0.23707399444665156,
+      "odds": 142.6,
+      "probability": 0.001662510479990544,
+      "rank_score": 0.001662510479990544,
+      "support_families": []
+    },
+    {
+      "combination": "6-5-1",
+      "context_bonus": 0,
+      "cover_score": 0.0014759393667413373,
+      "expected_value": 0.7642086054460702,
+      "odds": 466.0,
+      "probability": 0.001639932629712597,
+      "rank_score": 0.001639932629712597,
+      "support_families": []
+    },
+    {
+      "combination": "3-6-2",
+      "context_bonus": 0,
+      "cover_score": 0.0014604398203967135,
+      "expected_value": 0.5815795907002024,
+      "odds": 358.4,
+      "probability": 0.001622710911551904,
+      "rank_score": 0.001622710911551904,
+      "support_families": []
+    },
+    {
+      "combination": "3-2-5",
+      "context_bonus": 0,
+      "cover_score": 0.0014422541102468833,
+      "expected_value": 0.18508927748168336,
+      "odds": 115.5,
+      "probability": 0.0016025045669409814,
+      "rank_score": 0.0016025045669409814,
+      "support_families": []
+    },
+    {
+      "combination": "5-6-1",
+      "context_bonus": 0,
+      "cover_score": 0.001451900166751527,
+      "expected_value": 0.8501442693106714,
+      "odds": 537.7,
+      "probability": 0.0015810754497129838,
+      "rank_score": 0.0015810754497129838,
+      "support_families": []
+    },
+    {
+      "combination": "4-2-3",
+      "context_bonus": 0,
+      "cover_score": 0.0013858831683935073,
+      "expected_value": 0.18232063015310143,
+      "odds": 118.4,
+      "probability": 0.001539870187103897,
+      "rank_score": 0.001539870187103897,
+      "support_families": []
+    },
+    {
+      "combination": "3-5-2",
+      "context_bonus": 0,
+      "cover_score": 0.0013840728754613315,
+      "expected_value": 0.21714565557237775,
+      "odds": 141.2,
+      "probability": 0.0015378587505125905,
+      "rank_score": 0.0015378587505125905,
+      "support_families": []
+    },
+    {
+      "combination": "2-3-4",
+      "context_bonus": 0,
+      "cover_score": 0.0013609238556727748,
+      "expected_value": 0.21563082424326407,
+      "odds": 142.6,
+      "probability": 0.0015121376174141942,
+      "rank_score": 0.0015121376174141942,
+      "support_families": []
+    },
+    {
+      "combination": "4-3-6",
+      "context_bonus": 0,
+      "cover_score": 0.001159408520587038,
+      "expected_value": 0.12006319346523547,
+      "odds": 93.2,
+      "probability": 0.001288231689541153,
+      "rank_score": 0.001288231689541153,
+      "support_families": []
+    },
+    {
+      "combination": "2-4-3",
+      "context_bonus": 0,
+      "cover_score": 0.0011541019832817878,
+      "expected_value": 0.18478455087878404,
+      "odds": 144.1,
+      "probability": 0.0012823355369797644,
+      "rank_score": 0.0012823355369797644,
+      "support_families": []
+    },
+    {
+      "combination": "6-3-4",
+      "context_bonus": 0,
+      "cover_score": 0.0011257963744422768,
+      "expected_value": 0.3497474069934007,
+      "odds": 279.6,
+      "probability": 0.0012508848604914186,
+      "rank_score": 0.0012508848604914186,
+      "support_families": []
+    },
+    {
+      "combination": "4-3-5",
+      "context_bonus": 0,
+      "cover_score": 0.0011058816255525483,
+      "expected_value": 0.12262998470016034,
+      "odds": 99.8,
+      "probability": 0.0012287573617250536,
+      "rank_score": 0.0012287573617250536,
+      "support_families": []
+    },
+    {
+      "combination": "6-3-2",
+      "context_bonus": 0,
+      "cover_score": 0.0010388766389014753,
+      "expected_value": 0.5977003595813154,
+      "odds": 517.8,
+      "probability": 0.0011543073765571947,
+      "rank_score": 0.0011543073765571947,
+      "support_families": []
+    },
+    {
+      "combination": "5-3-4",
+      "context_bonus": 0,
+      "cover_score": 0.0010275553281827092,
+      "expected_value": 0.31294768383875626,
+      "odds": 274.1,
+      "probability": 0.0011417281424252325,
+      "rank_score": 0.0011417281424252325,
+      "support_families": []
+    },
+    {
+      "combination": "3-6-5",
+      "context_bonus": 0,
+      "cover_score": 0.000981888086865923,
+      "expected_value": 0.39100965592527426,
+      "odds": 358.4,
+      "probability": 0.001090986763184359,
+      "rank_score": 0.001090986763184359,
+      "support_families": []
+    },
+    {
+      "combination": "3-5-6",
+      "context_bonus": 0,
+      "cover_score": 0.0009744159234228409,
+      "expected_value": 0.20181236458446394,
+      "odds": 186.4,
+      "probability": 0.001082684359358712,
+      "rank_score": 0.001082684359358712,
+      "support_families": []
+    },
+    {
+      "combination": "6-4-3",
+      "context_bonus": 0,
+      "cover_score": 0.0009630100891483583,
+      "expected_value": 0.213681238669919,
+      "odds": 199.7,
+      "probability": 0.0010700112101648424,
+      "rank_score": 0.0010700112101648424,
+      "support_families": []
+    },
+    {
+      "combination": "4-6-3",
+      "context_bonus": 0,
+      "cover_score": 0.0009557641944752693,
+      "expected_value": 0.15462140746177694,
+      "odds": 145.6,
+      "probability": 0.0010619602160836328,
+      "rank_score": 0.0010619602160836328,
+      "support_families": []
+    },
+    {
+      "combination": "5-3-2",
+      "context_bonus": 0,
+      "cover_score": 0.0009479625447498019,
+      "expected_value": 0.21339690174034426,
+      "odds": 202.6,
+      "probability": 0.0010532917163886687,
+      "rank_score": 0.0010532917163886687,
+      "support_families": []
+    },
+    {
+      "combination": "4-5-3",
+      "context_bonus": 0,
+      "cover_score": 0.0009058568339149652,
+      "expected_value": 0.12339783093108303,
+      "odds": 122.6,
+      "probability": 0.0010065075932388502,
+      "rank_score": 0.0010065075932388502,
+      "support_families": []
+    },
+    {
+      "combination": "2-3-6",
+      "context_bonus": 0,
+      "cover_score": 0.000888497750201712,
+      "expected_value": 0.2555911861413591,
+      "odds": 258.9,
+      "probability": 0.0009872197224463466,
+      "rank_score": 0.0009872197224463466,
+      "support_families": []
+    },
+    {
+      "combination": "6-2-3",
+      "context_bonus": 0,
+      "cover_score": 0.0008830448973692829,
+      "expected_value": 0.3809848151649917,
+      "odds": 388.3,
+      "probability": 0.000981160997076981,
+      "rank_score": 0.000981160997076981,
+      "support_families": []
+    },
+    {
+      "combination": "5-4-3",
+      "context_bonus": 0,
+      "cover_score": 0.0008800533153396276,
+      "expected_value": 0.23976563657919628,
+      "odds": 245.2,
+      "probability": 0.0009778370170440305,
+      "rank_score": 0.0009778370170440305,
+      "support_families": []
+    },
+    {
+      "combination": "2-3-5",
+      "context_bonus": 0,
+      "cover_score": 0.0008487475440008018,
+      "expected_value": 0.1711640880401617,
+      "odds": 181.5,
+      "probability": 0.0009430528266675576,
+      "rank_score": 0.0009430528266675576,
+      "support_families": []
+    },
+    {
+      "combination": "5-2-3",
+      "context_bonus": 0,
+      "cover_score": 0.000806306281005762,
+      "expected_value": 0.17389338793690934,
+      "odds": 194.1,
+      "probability": 0.00089589586778418,
+      "rank_score": 0.00089589586778418,
+      "support_families": []
+    },
+    {
+      "combination": "2-6-3",
+      "context_bonus": 0,
+      "cover_score": 0.0007289892614979332,
+      "expected_value": 0.35380278824699685,
+      "odds": 436.8,
+      "probability": 0.0008099880683310368,
+      "rank_score": 0.0008099880683310368,
+      "support_families": []
+    },
+    {
+      "combination": "6-3-5",
+      "context_bonus": 0,
+      "cover_score": 0.0006986783906729516,
+      "expected_value": 0.32884462921006924,
+      "odds": 423.6,
+      "probability": 0.0007763093229699462,
+      "rank_score": 0.0007763093229699462,
+      "support_families": []
+    },
+    {
+      "combination": "2-5-3",
+      "context_bonus": 0,
+      "cover_score": 0.0006913910020120343,
+      "expected_value": 0.1651656282584304,
+      "odds": 215.0,
+      "probability": 0.0007682122244578158,
+      "rank_score": 0.0007682122244578158,
+      "support_families": []
+    },
+    {
+      "combination": "5-3-6",
+      "context_bonus": 0,
+      "cover_score": 0.0006677053535632041,
+      "expected_value": 0.24119001160377515,
+      "odds": 325.1,
+      "probability": 0.0007418948372924489,
+      "rank_score": 0.0007418948372924489,
+      "support_families": []
+    },
+    {
+      "combination": "6-5-3",
+      "context_bonus": 0,
+      "cover_score": 0.000574586061260405,
+      "expected_value": 0.3570094727297983,
+      "odds": 559.2,
+      "probability": 0.0006384289569560056,
+      "rank_score": 0.0006384289569560056,
+      "support_families": []
+    },
+    {
+      "combination": "5-6-3",
+      "context_bonus": 0,
+      "cover_score": 0.0005535537782998256,
+      "expected_value": 0.26865810040151533,
+      "odds": 436.8,
+      "probability": 0.0006150597536664728,
+      "rank_score": 0.0006150597536664728,
+      "support_families": []
+    },
+    {
+      "combination": "4-2-6",
+      "context_bonus": 0,
+      "cover_score": 0.00036943535475554817,
+      "expected_value": 0.0925230321798895,
+      "odds": 225.4,
+      "probability": 0.0004104837275061646,
+      "rank_score": 0.0004104837275061646,
+      "support_families": []
+    },
+    {
+      "combination": "6-4-2",
+      "context_bonus": 0,
+      "cover_score": 0.0003633341905663061,
+      "expected_value": 0.18203042947371936,
+      "odds": 450.9,
+      "probability": 0.0004037046561847846,
+      "rank_score": 0.0004037046561847846,
+      "support_families": []
+    },
+    {
+      "combination": "6-2-4",
+      "context_bonus": 0,
+      "cover_score": 0.00036150276484328884,
+      "expected_value": 0.24413486719083438,
+      "odds": 607.8,
+      "probability": 0.00040166973871476536,
+      "rank_score": 0.00040166973871476536,
+      "support_families": []
+    },
+    {
+      "combination": "4-6-2",
+      "context_bonus": 0,
+      "cover_score": 0.00036031207604037257,
+      "expected_value": 0.1142189281047981,
+      "odds": 285.3,
+      "probability": 0.0004003467511559695,
+      "rank_score": 0.0004003467511559695,
+      "support_families": []
+    },
+    {
+      "combination": "4-2-5",
+      "context_bonus": 0,
+      "cover_score": 0.0003527653226323422,
+      "expected_value": 0.0782747054774208,
+      "odds": 199.7,
+      "probability": 0.00039196146959149126,
+      "rank_score": 0.00039196146959149126,
+      "support_families": []
+    },
+    {
+      "combination": "4-5-2",
+      "context_bonus": 0,
+      "cover_score": 0.00034175616496526484,
+      "expected_value": 0.1153996650366044,
+      "odds": 303.9,
+      "probability": 0.00037972907218362755,
+      "rank_score": 0.00037972907218362755,
+      "support_families": []
+    },
+    {
+      "combination": "5-4-2",
+      "context_bonus": 0,
+      "cover_score": 0.0003320778166947637,
+      "expected_value": 0.18422939319521722,
+      "odds": 499.3,
+      "probability": 0.00036897535188307076,
+      "rank_score": 0.00036897535188307076,
+      "support_families": []
+    },
+    {
+      "combination": "5-2-4",
+      "context_bonus": 0,
+      "cover_score": 0.00033019578844693695,
+      "expected_value": 0.1654280900119154,
+      "odds": 450.9,
+      "probability": 0.0003668842093854855,
+      "rank_score": 0.0003668842093854855,
+      "support_families": []
+    },
+    {
+      "combination": "2-4-6",
+      "context_bonus": 0,
+      "cover_score": 0.00030798362746674405,
+      "expected_value": 0.0869540441547774,
+      "odds": 254.1,
+      "probability": 0.0003422040305186045,
+      "rank_score": 0.0003422040305186045,
+      "support_families": []
+    },
+    {
+      "combination": "2-6-4",
+      "context_bonus": 0,
+      "cover_score": 0.000298364748818447,
+      "expected_value": 0.14948073915804194,
+      "odds": 450.9,
+      "probability": 0.0003315163875760522,
+      "rank_score": 0.0003315163875760522,
+      "support_families": []
+    },
+    {
+      "combination": "2-4-5",
+      "context_bonus": 0,
+      "cover_score": 0.00029411538111552804,
+      "expected_value": 0.1305218702417132,
+      "odds": 399.4,
+      "probability": 0.00032679486790614223,
+      "rank_score": 0.00032679486790614223,
+      "support_families": []
+    },
+    {
+      "combination": "2-5-4",
+      "context_bonus": 0,
+      "cover_score": 0.0002829689241757126,
+      "expected_value": 0.1071823402794449,
+      "odds": 340.9,
+      "probability": 0.00031440991575079174,
+      "rank_score": 0.00031440991575079174,
+      "support_families": []
+    },
+    {
+      "combination": "6-4-5",
+      "context_bonus": 0,
+      "cover_score": 0.0002445836650194468,
+      "expected_value": 0.15196798386541627,
+      "odds": 559.2,
+      "probability": 0.0002717596277993853,
+      "rank_score": 0.0002717596277993853,
+      "support_families": []
+    },
+    {
+      "combination": "4-6-5",
+      "context_bonus": 0,
+      "cover_score": 0.00024258163535510193,
+      "expected_value": 0.08762587739327071,
+      "odds": 325.1,
+      "probability": 0.0002695351503945577,
+      "rank_score": 0.0002695351503945577,
+      "support_families": []
+    },
+    {
+      "combination": "4-5-6",
+      "context_bonus": 0,
+      "cover_score": 0.00024095865902719313,
+      "expected_value": 0.06133736531458883,
+      "odds": 229.1,
+      "probability": 0.00026773184336354794,
+      "rank_score": 0.00026773184336354794,
+      "support_families": []
+    },
+    {
+      "combination": "6-5-4",
+      "context_bonus": 0,
+      "cover_score": 0.00023548750863044185,
+      "expected_value": 0.14631623869571456,
+      "odds": 559.2,
+      "probability": 0.0002616527873671576,
+      "rank_score": 0.0002616527873671576,
+      "support_families": []
+    },
+    {
+      "combination": "5-4-6",
+      "context_bonus": 0,
+      "cover_score": 0.0002341433612346404,
+      "expected_value": 0.07130966146046104,
+      "odds": 274.1,
+      "probability": 0.00026015929026071156,
+      "rank_score": 0.00026015929026071156,
+      "support_families": []
+    },
+    {
+      "combination": "5-6-4",
+      "context_bonus": 0,
+      "cover_score": 0.00022694986242280477,
+      "expected_value": 0.14101151451870272,
+      "odds": 559.2,
+      "probability": 0.00025216651380311644,
+      "rank_score": 0.00025216651380311644,
+      "support_families": []
+    },
+    {
+      "combination": "6-2-5",
+      "context_bonus": 0,
+      "cover_score": 0.00022671076672241898,
+      "expected_value": 0.1956513916814476,
+      "odds": 776.7,
+      "probability": 0.0002519008519137989,
+      "rank_score": 0.0002519008519137989,
+      "support_families": []
+    },
+    {
+      "combination": "6-5-2",
+      "context_bonus": 0,
+      "cover_score": 0.0002191926854158732,
+      "expected_value": 0.22698620311954867,
+      "odds": 932.0,
+      "probability": 0.0002435474282398591,
+      "rank_score": 0.0002435474282398591,
+      "support_families": []
+    },
+    {
+      "combination": "5-2-6",
+      "context_bonus": 0,
+      "cover_score": 0.00021659436564516892,
+      "expected_value": 0.05174198734856813,
+      "odds": 215.0,
+      "probability": 0.0002406604062724099,
+      "rank_score": 0.0002406604062724099,
+      "support_families": []
+    },
+    {
+      "combination": "5-6-2",
+      "context_bonus": 0,
+      "cover_score": 0.00021104360785831536,
+      "expected_value": 0.15610192194586725,
+      "odds": 665.7,
+      "probability": 0.00023449289762035038,
+      "rank_score": 0.00023449289762035038,
+      "support_families": []
+    },
+    {
+      "combination": "2-6-5",
+      "context_bonus": 0,
+      "cover_score": 0.00018724549074017273,
+      "expected_value": 0.13849924798414778,
+      "odds": 665.7,
+      "probability": 0.0002080505452668586,
+      "rank_score": 0.0002080505452668586,
+      "support_families": []
+    },
+    {
+      "combination": "2-5-6",
+      "context_bonus": 0,
+      "cover_score": 0.000185883328171458,
+      "expected_value": 0.08748908645936623,
+      "odds": 423.6,
+      "probability": 0.00020653703130162,
+      "rank_score": 0.00020653703130162,
+      "support_families": []
+    }
+  ],
+  "unit_yen": 100,
+  "venue": "住之江",
+  "version": "new-yuuki-fusion-shadow-v2",
+  "weights": {
+    "existing": 0.2,
+    "hiyori": 0.5,
+    "knowledge_v2": 0.05,
+    "sheet_db": 0.25
+  }
+}
