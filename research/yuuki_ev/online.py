@@ -18,7 +18,7 @@ def discover(now):
     tree=json.loads(get(base+'/git/trees/'+sha+'?recursive=1'))
     if tree.get('truncated'):raise RuntimeError('source tree truncated: coverage not proven')
     today=now.strftime('%Y%m%d')
-    paths=[x['path'] for x in tree['tree'] if x.get('type')=='blob' and x['path'].startswith('data/prototype12_delivery/predictions/'+today+'_') and x['path'].endswith('.json')]
+    paths=[x['path'] for x in tree['tree'] if x.get('type')=='blob' and x['path'].startswith('data/prototype3_delivery/predictions/'+today+'_') and x['path'].endswith('.json')]
     return sha,paths
 
 def raw(sha,path):
@@ -34,7 +34,11 @@ def run(root,output,limit=6):
     inputs=[];errors=[]
     for path in candidates[-24:]:
         try:
-            source=raw(sha,path)
+            yuuki=raw(sha,path)
+            core.write_once(root/'source_yuuki'/yuuki['day']/(yuuki['key']+'.json'),{
+                'source_sha':sha,'observed_at':datetime.now(core.JST).isoformat(),'source':yuuki})
+            try:source=raw(sha,'data/prototype12_delivery/predictions/'+yuuki['key']+'.json')
+            except Exception:source=yuuki
             close=core.deadline(source)
             inputs.append((0 if close and close>now else 1,close.isoformat() if close else '',source))
         except Exception as exc:errors.append({'path':path,'status':'source_get_failed','error_type':type(exc).__name__})
@@ -62,7 +66,7 @@ def run(root,output,limit=6):
             else:errors.append({'race_key':key,'status':'official_pending'})
     event={'observed_at':datetime.now(core.JST).isoformat(),'source_sha':sha,'today_source_races':len(paths),
            'new_candidate_races':len(candidates),'processed_limit':limit,'errors':errors,
-           'coverage_note':'最高頻度1時間・今回上限6レース。全レースの締切前捕捉を保証しない。'}
+           'coverage_note':'15分間隔予定・今回上限6レース。全レースの締切前捕捉を保証しない。'}
     core.write_once(root/'coverage'/(now.strftime('%Y%m%dT%H%M%S')+'.json'),event)
     prepare(root,output)
     (Path(output)/'collection.json').write_text(core.dumps(event))

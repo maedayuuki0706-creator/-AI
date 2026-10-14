@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from . import core
 from .runner import parse_result, collect_source
-from .sheets import payloads
+from .sheets import payloads,targeted_sync
 
 def fixture():
     # Synthetic fixtures are only used locally, never in user performance logs.
@@ -69,5 +69,19 @@ class ResearchTest(unittest.TestCase):
             for request in batch:self.assertEqual(len(request),1)
         self.assertTrue(all(t['mark']=='★EV1.4+' for t in fs[0]['tickets']))
         self.assertFalse(any('Webhook' in core.dumps(x) or 'discord' in core.dumps(x).lower() for x in batches))
+
+    def test_targeted_sync_preserves_rows_and_controls(self):
+        old=[['id','forecast','result'],['one','fixed','pending'],['user-note','keep','keep']]
+        new=[['id','forecast','result'],['one','fixed','settled'],['two','fixed2','pending']]
+        req=targeted_sync(1,old,new,[0],{2})
+        self.assertEqual(len(req),2)
+        self.assertEqual(req[0]['updateCells']['start'],{'sheetId':1,'rowIndex':1,'columnIndex':2})
+        self.assertEqual(req[1]['updateCells']['range']['startRowIndex'],3)
+        with self.assertRaises(ValueError):targeted_sync(1,old,[old[0],['one','changed','settled']],[0],{2})
+
+    def test_unavailable_is_not_a_losing_prediction(self):
+        f=core.build_snapshots(fixture(),'a','2026-10-14T17:00:00+09:00',replay=True)[2]
+        r=core.evaluate(f,{'status':'settled','payouts':{'1-2-3':6000}},'2026-10-14T18:00:00+09:00')
+        self.assertIsNone(r['hit']);self.assertIsNone(r['adopted_virtual_investment'])
 
 if __name__=='__main__':unittest.main()

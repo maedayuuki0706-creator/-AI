@@ -12,7 +12,8 @@ IDS={'新ゆうき予想LOG':141400001,'艇別勝ち負けLOG':141400002,'研究
 
 FORECAST_HEADERS=['予想ID','日付','場','R','モデル','データ区分','予想生成時刻','締切','モデル版','本線','抑え','BOX','全採用買い目',
                   '1頭確率','2頭確率','3頭確率','4頭確率','5頭確率','6頭確率','原本確率件数','オッズ件数','記録状態','未取得項目',
-                  '事前原本SHA256','元GitHub SHA','参照原本','結果状態','的中','検証理由','原本モデル版']
+                  '事前原本SHA256','元GitHub SHA','参照原本','結果状態','採用買い目の的中','検証理由','原本モデル版',
+                  '採用買い目仮想投資','採用買い目仮想払戻','採用買い目仮想純益','採用買い目ROI','原本予想発行時刻']
 BET_HEADERS=['予想日(YYYYMMDD)','場','R','AI/モデル','研究プラン','買い目(1-2-3)','予想発行時刻','締切時刻','事前推定確率(0-1)',
              '事前オッズ(倍)','EV(自動)','EV1.4印(固定1.4)','仮想投資額(円)','的中','仮想払戻額(円)','結果状態','純損益','券回収率','実結果3連単','レースキー','出典・予想ID','原本オッズ保存時刻','データ区分','備考']
 METRIC_HEADERS=['データ区分','モデル','集計区分','EV閾値','対象レース','対象買い目','的中券','券的中率','的中レース','レース的中率',
@@ -35,6 +36,49 @@ def write(sheet,start,rows):
 def formula(sheet,row,col,text):
     return {'updateCells':{'start':{'sheetId':sheet,'rowIndex':row,'columnIndex':col},'rows':[{'values':[{'userEnteredValue':{'formulaValue':text}}]}], 'fields':'userEnteredValue'}}
 
+def targeted_sync(sheet, current, desired, key_columns, mutable_columns, *, append_only=False):
+    """Preserve existing rows/controls; append new keys and patch owned fields.
+
+    No deletes, clears or whole-table replacement. Current data must be a fresh
+    UNFORMATTED_VALUE read of this exact table. Static-field mismatches stop.
+    """
+    def same(a,b):
+        if a in (None,'') and b in (None,''):return True
+        if isinstance(a,(int,float)) and not isinstance(a,bool) and isinstance(b,(int,float)) and not isinstance(b,bool):
+            return abs(a-b)<=1e-10
+        return a==b
+    def key(row):return tuple(row[i] if i<len(row) else '' for i in key_columns)
+    requests=[]
+    header=current[0] if current else []
+    for col,title in enumerate(desired[0]):
+        if col>=len(header) or header[col] in (None,''):
+            requests.append({'updateCells':{'start':{'sheetId':sheet,'rowIndex':0,'columnIndex':col},'rows':[{'values':[cell(title)]}],'fields':'userEnteredValue'}})
+        elif header[col]!=title:
+            # These are exact prior labels from this implementation's v1 view.
+            aliases={'的中':'採用買い目の的中'}
+            if aliases.get(header[col])!=title:raise ValueError('research_table_header_changed')
+            requests.append({'updateCells':{'start':{'sheetId':sheet,'rowIndex':0,'columnIndex':col},'rows':[{'values':[cell(title)]}],'fields':'userEnteredValue'}})
+    index={}
+    for i,row in enumerate(current[1:],1):
+        if not row or all(v in (None,'') for v in row):continue
+        k=key(row)
+        if k in index:raise ValueError('existing_research_duplicate_key')
+        index[k]=(i,row)
+    fresh=[]
+    for row in desired[1:]:
+        entry=index.get(key(row))
+        if not entry:
+            fresh.append(row);continue
+        position,old=entry
+        if append_only:continue
+        for col,value in enumerate(row):
+            previous=old[col] if col<len(old) else None
+            if same(previous,value):continue
+            if col not in mutable_columns:raise ValueError('research_static_field_changed')
+            requests.append({'updateCells':{'start':{'sheetId':sheet,'rowIndex':position,'columnIndex':col},'rows':[{'values':[cell(value)]}],'fields':'userEnteredValue'}})
+    for i in range(0,len(fresh),100):requests.append(write(sheet,max(len(current),1)+i,fresh[i:i+100]))
+    return requests
+
 def layout(sheet,width,rows):
     return [
       {'updateSheetProperties':{'properties':{'sheetId':sheet,'gridProperties':{'frozenRowCount':1,'frozenColumnCount':1}},'fields':'gridProperties.frozenRowCount,gridProperties.frozenColumnCount'}},
@@ -54,11 +98,17 @@ def tables(records,results,receipts):
     betrows=[]
     for f in records:
         r=rmap.get(f['id']);off=r['official'] if r else None
+        generated=f['availability']=='記録可'
+        adopted=[core.payoff({'combination':c},off) for c in set(f['picks'])] if off and generated else []
+        adopted_inv=sum(x[0] for x in adopted);adopted_pay=sum(x[1] for x in adopted)
         logs.append([f['id'],f['day'],f['venue'],f['rno'],f['model'],f['cohort'],f['generated_at'],f['deadline'],f['version'],
                      ' / '.join(f['main']),' / '.join(f['cover']),' / '.join(f['box']),' / '.join(f['picks']),
                      *[f['heads'][str(i)] for i in range(1,7)],sum(t['probability'] is not None for t in f['tickets']),sum(t['odds'] is not None for t in f['tickets']),
                      f['availability'],' / '.join(f['missing']),f['hash'],f['source_sha'],'研究予想原本:'+f['id'],
-                     off['status'] if off else '未確定',('○' if r['hit'] else '×') if r else '', ' / '.join(r['review']) if r else '結果待ち',f['source_model_version']])
+                     off['status'] if off else '未確定',('○' if r['hit'] else '×') if r and generated else '対象外（予想未生成）' if not generated else '',
+                     ' / '.join(r['review']) if r and generated else '未取得／標本不足。成績除外。' if not generated else '結果待ち',f['source_model_version'],
+                     adopted_inv if adopted else None,adopted_pay if adopted else None,adopted_pay-adopted_inv if adopted else None,
+                     adopted_pay/adopted_inv if adopted_inv else None,f['source_created_at']])
         for s in f['scenarios']:
             boats.append([f['id'],f['day'],f['venue'],f['rno'],f['model'],f['cohort'],s['lane'],s['predicted_course'],f['heads'][str(s['lane'])],s['win_path'],s['conditions'],s['lose_path'],core.dumps(s['evidence']),s['non_axis_reason'],' / '.join(s['missing']),s['evidence_status']])
         if f['missing']:missing.append([f['id'],f['day'],f['venue'],f['rno'],f['model'],f['cohort'],f['availability'],' / '.join(f['missing']),f['generated_at']])
@@ -73,9 +123,9 @@ def tables(records,results,receipts):
     stats=core.metrics(records,results,receipts)
     out['EV閾値比較']=[METRIC_HEADERS]+[[s[k] for k in METRIC_KEYS] for s in stats if s['group'] in ('総計','全モデル共通')]
     out['日別場別AI成績']=[METRIC_HEADERS]+[[s[k] for k in METRIC_KEYS] for s in stats if s['group'] not in ('総計','全モデル共通')]
-    out['EV買い目ログ']=[BET_HEADERS]+sorted(betrows,key=lambda r:(r[0],r[7],r[20]),reverse=True)[:1000]
+    out['EV買い目ログ']=[BET_HEADERS]+sorted(betrows,key=lambda r:(r[0],r[7],r[20]),reverse=True)
     # All six thresholds are applied to all valid 120 outcomes, not just main/cover.
-    out['研究ジョブ稼働']=[['項目','値'],['実装版',core.VERSION],['研究原本数',len(records)],['実レース数',len(set(f['race_key'] for f in records))],['締切前保存確認',sum(r['eligible_live'] for r in receipts)],['履歴の上書き','禁止／原本SHA256照合'],['テスト混入','テスト用fixtureはこのログへ入れない'],['定期方式','認証複製を伴わない接続済みアプリの独立タスク。最高頻度1時間。'],['高頻度Cron','未稼働：認証複製が自動審査で拒否された'],['配信処理','通知・X投稿・既存Actions呼出しなし'],['EV券詳細表示','直近1000券。全120通りと全件集計は研究予想原本・EV閾値比較に保持'],['継続ROI120%','まだ未検証。過去再計算をライブ成績と混ぜない']]
+    out['研究ジョブ稼働']=[['項目','値'],['実装版',core.VERSION],['研究原本数',len(records)],['実レース数',len(set(f['race_key'] for f in records))],['締切前保存確認',sum(r['eligible_live'] for r in receipts)],['履歴の上書き','禁止／原本SHA256照合'],['テスト混入','テスト用fixtureはこのログへ入れない'],['定期方式','独立GitHub研究ジョブ。認証はGitHub内のみで利用。登録・稼働確認中。'],['高頻度Cron','15分間隔予定。既存ジョブの待機・高負荷時は研究をスキップ。'],['配信処理','通知・X投稿・既存Actions呼出しなし'],['EV券詳細表示','追記履歴を保持。全120通りは研究予想原本、全件集計はEV閾値比較。'],['継続ROI120%','まだ未検証。過去再計算をライブ成績と混ぜない']]
     latest=next((f for f in reversed(records) if f['availability']=='記録可'),None)
     rows=[['最新の研究原本の120通り','モデル','区分','確率','原本オッズ','EV','★EV1.4+']]
     if latest:

@@ -139,7 +139,10 @@ def build_snapshots(source, source_sha, observed_at, *, replay=False, features=N
     for lane in map(str, range(1,7)):
         b = boats.get(lane, {})
         avg, ex = number(b.get('avg_st')), number(b.get('exhibition_st'))
-        history = b.get('prior_actual_st', [])
+        history = [number(x.get('st')) for x in b.get('prior_actual_st', []) if isinstance(x,dict)
+                   and aware(x.get('observed_at')) and aware(x['observed_at'])<observed
+                   and aware(x.get('race_deadline')) and aware(x['race_deadline'])<created]
+        history = [x for x in history if x is not None and 0 <= x <= 1]
         if avg is None or ex is None or len(history) < 5:
             break
         cf[lane] = 2*(.17-avg) + .4*(.15-max(0, ex)) - statistics.pstdev(history)
@@ -149,7 +152,10 @@ def build_snapshots(source, source_sha, observed_at, *, replay=False, features=N
     for lane in map(str, range(1,7)):
         b = boats.get(lane, {})
         prev, current = number(b.get('prior_exhibition_time')), number(b.get('exhibition_time'))
-        if prev is None or current is None or not b.get('same_motor_period') or not b.get('foot_observation'):
+        prior_at=aware(b.get('prior_exhibition_observed_at'))
+        foot_at=aware(b.get('foot_observed_at'))
+        if (prev is None or current is None or not b.get('same_motor_period') or not b.get('foot_observation')
+                or not prior_at or prior_at>=observed or not foot_at or foot_at>observed):
             break
         df[lane] = max(-.15,min(.15,(prev-current)*.3))
     gates['D'] = [] if len(df)==6 and not missing else list(missing)+['同一使用期間の前検・節間推移と出足／回り足／伸びの観測']
@@ -158,6 +164,7 @@ def build_snapshots(source, source_sha, observed_at, *, replay=False, features=N
     ef = features.get('preregistered_environment_factors', {})
     env_required = ('wind_speed','wind_direction','wave_cm','tide_level','tide_trend','tide_station','tide_observed_at')
     gates['E'] = [] if (not missing and all(environment.get(k) is not None for k in env_required)
+                         and aware(environment.get('tide_observed_at')) and aware(environment['tide_observed_at'])<=observed
                          and set(ef)==set(map(str,range(1,7)))
                          and features.get('environment_training_end') and aware(features['environment_training_end'])
                          and aware(features['environment_training_end']) < observed) else list(missing)+['24場別の事前風向・風速・波・潮位・観測所・潮位方向・チルトと過去学習済み補正']
@@ -212,6 +219,8 @@ def evaluate(record, official, settled_at):
     winning = set(payouts)
     selected = set(record['picks'])
     hit = bool(winning & selected)
+    if record['availability']!='記録可':
+        hit = None
     reasons = []
     for combo in winning:
         if combo in selected:
@@ -220,8 +229,15 @@ def evaluate(record, official, settled_at):
             reasons.append('勝ち艇の頭は採用したが、2・3着の組合せを採用していない。')
         else:
             reasons.append('確定した勝ち艇を頭とする買い目を採用していない。直接の展開原因は未確認。')
+    if hit is None:
+        reasons=['予想未生成：未取得／標本不足。公式結果だけ記録し不的中には分類しない。']
+    adopted=[payoff({'combination':c},official) for c in selected] if hit is not None else []
+    investment=sum(x[0] for x in adopted);returned=sum(x[1] for x in adopted)
     return {'id':record['id'], 'forecast_hash':record['hash'], 'settled_at':settled_at,
             'official':official, 'hit':hit, 'review':reasons,
+            'adopted_virtual_investment':investment if hit is not None else None,
+            'adopted_virtual_payout':returned if hit is not None else None,
+            'adopted_virtual_profit':returned-investment if hit is not None else None,
             'path_verified':'未検証：決まり手・STだけでは勝ち筋成立／事故因果は断定できない',
             'hypothesis':'次期評価期間で頭別2・3着の残り筋を比較。今回の原本は変更しない。'}
 
@@ -235,7 +251,7 @@ def payoff(ticket, official):
     return 100,pay,bool(pay)
 
 def summarize(pairs, threshold):
-    events=[]; bets=hits=investment=returns=0; racehits=0; mid=big=midpay=bigpay=midcost=bigcost=0
+    events=[]; capital_by_race=defaultdict(int); bets=hits=investment=returns=0; racehits=0; mid=big=midpay=bigpay=midcost=bigcost=0
     for forecast,result in pairs:
         selected=[t for t in forecast['tickets'] if t['ev'] is not None and t['ev']>=threshold]
         if not selected or forecast['availability']!='記録可':continue
@@ -253,6 +269,7 @@ def summarize(pairs, threshold):
         if payout>=10000: big+=h;bigpay+=ret;bigcost+=inv
         bets+=valid_bets;hits+=h;investment+=inv;returns+=ret;racehits+=int(h>0)
         events.append((forecast['deadline'],forecast['race_key'],ret-inv,h>0))
+        capital_by_race[forecast['race_key']]+=inv
     grouped={}
     for close,key,profit,hit in events:
         old=grouped.get(key,(close,key,0,False))
@@ -269,7 +286,7 @@ def summarize(pairs, threshold):
             'profit':returns-investment,'max_loss_streak_races':maxstreak,'max_drawdown_yen':maxdd,
             'mid_hits':mid,'manshu_hits':big,'mid_gross_payout':midpay,'manshu_gross_payout':bigpay,
             'mid_net_contribution':midpay-midcost,'manshu_net_contribution':bigpay-bigcost,
-            'needed_capital_yen':maxdd+max((sum(100 for t in f['tickets'] if t['ev'] is not None and t['ev']>=threshold) for f,r in pairs),default=0),
+            'needed_capital_yen':maxdd+max(capital_by_race.values(),default=0),
             'assessment':'標本不足／継続性未検証' if len(events)<100 else '期間内成績。将来のROI120%を保証しない。',
             'units':'券的中率とレース的中率を分離。全モデル合算は重複購入を含む研究ポートフォリオ。'}
 
