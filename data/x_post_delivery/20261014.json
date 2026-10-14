@@ -73,9 +73,10 @@
   "x_result_attempts": {
     "20261014:04:6": {
       "at": "2026-10-14T13:02:37.157432+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "1368d10b14fb475ea7406b9529617568",
-      "status": "reserved"
+      "retry_at": "2026-10-14T13:03:10.643672+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {
@@ -1091,10 +1092,12 @@
       "attempt": 1,
       "claimed_at": "2026-10-14T13:02:37.157432+09:00",
       "content_sha256": "0455d52144042e5f9afd1b7bb21423321ce8900ed31b3227e5845f020453e26d",
+      "error_type": "DefiniteRejection",
       "key": "result:20261014:04:6",
       "owner": "1368d10b14fb475ea7406b9529617568",
       "parent_post_id": "2110213308964024612",
       "phase": "result",
+      "request_started_at": "2026-10-14T13:02:38.873161+09:00",
       "row": {
         "day": "20261014",
         "deadline": "12:53",
@@ -1137,7 +1140,14 @@
         "source": "配当期待本線",
         "venue": "平和島"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "official result pending",
+        "retryable": true,
+        "transport_http_status": 409
+      },
+      "updated_at": "2026-10-14T13:02:40.643672+09:00"
     },
     "result:20261014:06:2": {
       "attempt": 1,
