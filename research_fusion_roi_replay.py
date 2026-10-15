@@ -130,10 +130,13 @@ def score(tickets: list[str], result: dict) -> dict:
 def aggregate(root: Path) -> dict:
     if not (root / "predictions").is_dir():
         raise ValueError("Missing predictions directory: cannot report an empty replay")
+    prediction_paths = sorted((root / "predictions").glob("*/*.json"))
+    if not prediction_paths:
+        raise ValueError("No prediction files: cannot report an empty replay")
     totals = {name: Counter() for name in VARIANTS}
     daily = {}
     skipped = Counter()
-    for path in sorted((root / "predictions").glob("*/*.json")):
+    for path in prediction_paths:
         key, day = path.stem, path.parent.name
         companions = [root / folder / day / path.name for folder in
                       ("checkpoints", "results", "evaluations")]
