@@ -36,6 +36,17 @@ class ReplayTests(unittest.TestCase):
         bad_checkpoint = dict(checkpoint, prediction_committed_at=record["deadline_at"])
         with self.assertRaisesRegex(ValueError, "before deadline"):
             verify(key, record, bad_checkpoint, result, evaluation)
+        for invalid_ev in (True, -1, float("inf"), float("nan")):
+            with self.subTest(invalid_ev=invalid_ev):
+                bad = copy.deepcopy(record)
+                bad["trifecta"][0]["expected_value"] = invalid_ev
+                payload = {k: v for k, v in bad.items() if k != "digest"}
+                bad["digest"] = hashlib.sha256(json.dumps(payload, ensure_ascii=False,
+                    sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+                cp = dict(checkpoint, prediction_digest=bad["digest"])
+                ev = dict(evaluation, prediction_digest=bad["digest"])
+                with self.assertRaises(ValueError):
+                    verify(key, bad, cp, result, ev)
 
     def test_missing_input_fails_instead_of_reporting_zero(self):
         with tempfile.TemporaryDirectory() as directory:
