@@ -1,11 +1,42 @@
 import tempfile
+import copy
+import hashlib
+import json
 import unittest
 from pathlib import Path
 
-from research_fusion_roi_replay import aggregate, score, ticket_sets
+from research_fusion_roi_replay import ALL_COMBOS, aggregate, score, ticket_sets, verify
 
 
 class ReplayTests(unittest.TestCase):
+    def test_rejects_tampering_and_post_deadline_checkpoint(self):
+        key = "20261014_04_01"
+        record = {"key": key, "mode": "prospective_shadow", "research_only": True,
+                  "created_at": "2026-10-14T10:00:00+09:00",
+                  "deadline_at": "2026-10-14T10:10:00+09:00",
+                  "trifecta": [{"combination": c, "expected_value": 1.1}
+                               for c in sorted(ALL_COMBOS)],
+                  "models": {name: {"picks": ["1-2-3"]} for name in
+                             ("fusion", "control_existing_10", "control_hiyori_10")}}
+        record["digest"] = hashlib.sha256(json.dumps(record, ensure_ascii=False,
+            sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        checkpoint = {"key": key, "prediction_digest": record["digest"],
+                      "eligible_checkpoint": True, "commit_sha": "frozen",
+                      "prediction_committed_at": "2026-10-14T10:01:00+09:00"}
+        result = {"key": key, "prediction_commit_sha": "frozen",
+                  "prediction_committed_at": checkpoint["prediction_committed_at"],
+                  "observed_at": "2026-10-14T10:20:00+09:00", "status": "settled",
+                  "payouts": {"1-2-3": 1000}}
+        evaluation = {"key": key, "prediction_digest": record["digest"]}
+        verify(key, record, checkpoint, result, evaluation)
+        bad = copy.deepcopy(record)
+        bad["research_only"] = False
+        with self.assertRaises(ValueError):
+            verify(key, bad, checkpoint, result, evaluation)
+        bad_checkpoint = dict(checkpoint, prediction_committed_at=record["deadline_at"])
+        with self.assertRaisesRegex(ValueError, "before deadline"):
+            verify(key, record, bad_checkpoint, result, evaluation)
+
     def test_missing_input_fails_instead_of_reporting_zero(self):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(ValueError, "Missing predictions"):
