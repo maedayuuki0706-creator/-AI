@@ -131,6 +131,7 @@ def aggregate(root: Path) -> dict:
     if not (root / "predictions").is_dir():
         raise ValueError("Missing predictions directory: cannot report an empty replay")
     totals = {name: Counter() for name in VARIANTS}
+    daily = {}
     skipped = Counter()
     for path in sorted((root / "predictions").glob("*/*.json")):
         key, day = path.stem, path.parent.name
@@ -163,11 +164,20 @@ def aggregate(root: Path) -> dict:
                 summary["stake_yen"] += row["stake"]
                 summary["return_yen"] += row["returned"]
                 summary["refund_yen"] += row["refund"]
+                day_summary = daily.setdefault(day, {n: Counter() for n in VARIANTS})[name]
+                day_summary.update({"races": 1, "eligible_races": int(row["active"]),
+                    "selected_races": int(bool(picks)), "hits": int(row["hit"] and row["active"]),
+                    "stake_yen": row["stake"], "return_yen": row["returned"]})
         except (KeyError, ValueError, TypeError, json.JSONDecodeError) as exc:
             # A bad record is not silently counted as a losing race.
             skipped[type(exc).__name__+":"+str(exc)[:90]] += 1
     return {"label": "EXPLORATORY_REPLAY_NOT_PROSPECTIVE", "research_only": True,
             "source": str(root), "skipped": dict(skipped),
+            "by_day": {day: {name: {**dict(s),
+                        "roi_pct": round(100*s["return_yen"]/s["stake_yen"], 2)
+                        if s["stake_yen"] else None,
+                        "profit_yen": s["return_yen"]-s["stake_yen"]}
+                        for name, s in models.items()} for day, models in daily.items()},
             "models": {name: {**dict(s), "hit_rate_pct": round(100*s["hits"]/s["eligible_races"],2)
                               if s["eligible_races"] else None,
                               "roi_pct": round(100*s["return_yen"]/s["stake_yen"],2)
