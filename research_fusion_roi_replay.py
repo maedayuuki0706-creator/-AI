@@ -12,6 +12,7 @@ from datetime import datetime
 from hashlib import sha256
 from itertools import permutations
 import json
+import math
 from pathlib import Path
 
 UNIT = 100
@@ -67,7 +68,9 @@ def verify(key: str, record: dict, checkpoint: dict, result: dict, evaluation: d
     if len(trifecta) != 120 or {r.get("combination") for r in trifecta} != ALL_COMBOS:
         raise ValueError("Incomplete 120-combination pre-race probabilities")
     for r in trifecta:
-        if r.get("expected_value") is not None and not isinstance(r["expected_value"], (int, float)):
+        if r.get("expected_value") is not None and (
+                type(r["expected_value"]) not in (int, float) or
+                not math.isfinite(r["expected_value"]) or r["expected_value"] < 0):
             raise ValueError("Invalid frozen EV")
     for name in ("fusion", "control_existing_10", "control_hiyori_10"):
         check_unique(record["models"][name]["picks"])
@@ -78,7 +81,8 @@ def verify(key: str, record: dict, checkpoint: dict, result: dict, evaluation: d
         raise ValueError("Unsettled race marked settled")
     if any(str(l) not in {"1", "2", "3", "4", "5", "6"} for l in (result.get("refund_lanes") or [])):
         raise ValueError("Invalid refund lane")
-    if result["status"] == "special" and not isinstance(result.get("special_per_100"), int):
+    if result["status"] == "special" and (type(result.get("special_per_100")) is not int or
+                                           result["special_per_100"] < 0):
         raise ValueError("Missing special payout")
 
 
@@ -124,6 +128,8 @@ def score(tickets: list[str], result: dict) -> dict:
 
 
 def aggregate(root: Path) -> dict:
+    if not (root / "predictions").is_dir():
+        raise ValueError("Missing predictions directory: cannot report an empty replay")
     totals = {name: Counter() for name in VARIANTS}
     skipped = Counter()
     for path in sorted((root / "predictions").glob("*/*.json")):
@@ -166,6 +172,8 @@ def aggregate(root: Path) -> dict:
                               if s["eligible_races"] else None,
                               "roi_pct": round(100*s["return_yen"]/s["stake_yen"],2)
                               if s["stake_yen"] else None,
+                              "skip_rate_pct": round(100*(s["races"]-s["selected_races"])/s["races"],2)
+                              if s["races"] else None,
                               "profit_yen": s["return_yen"] - s["stake_yen"]}
                        for name,s in totals.items()}}
 
@@ -180,3 +188,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
