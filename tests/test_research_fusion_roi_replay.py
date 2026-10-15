@@ -52,6 +52,9 @@ class ReplayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(ValueError, "Missing predictions"):
                 aggregate(Path(directory))
+            (Path(directory) / "predictions").mkdir()
+            with self.assertRaisesRegex(ValueError, "No prediction files"):
+                aggregate(Path(directory))
 
     def test_refund_is_not_a_hit_and_reduces_at_risk_stake(self):
         row = score(["1-2-3", "4-5-6"], {
