@@ -194,13 +194,19 @@ def verify_commit(root, commit_sha, *, git_show, confirmed_at=None):
         remote = json.loads(git_show(commit_sha, remote_path))
         if remote != record:
             raise ValueError("Remote Git object mismatch")
+        receipt_path = root / "receipts" / record["race_id"][:8] / (record["race_id"] + ".json")
+        if receipt_path.exists():
+            previous = _read_json(receipt_path)
+            if previous.get("race_id") != record["race_id"] or previous.get("digest") != record["digest"]:
+                raise ValueError("Existing receipt identity/digest mismatch")
+            confirmed.append(previous)
+            continue
         deadline = datetime.fromisoformat(record["deadline_at"])
         valid = saved_at < deadline
         receipt = {"race_id": record["race_id"], "digest": record["digest"],
                    "commit_sha": commit_sha, "checked_at": saved_at.isoformat(),
                    "status": "confirmed_before_deadline" if valid else "late_remote_save_excluded"}
-        save_immutable(root / "receipts" / record["race_id"][:8] /
-                       f'{record["race_id"]}.json', receipt)
+        save_immutable(receipt_path, receipt)
         confirmed.append(receipt)
     return confirmed
 
