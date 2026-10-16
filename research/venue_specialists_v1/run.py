@@ -163,6 +163,29 @@ def run(root, *, clock=None, official=None, max_workers=4):
         for future in as_completed(futures):
             output.append(future.result())
     output.sort(key=lambda item: item["race_id"])
+    # Audit ALL elapsed scheduled races, including those missed by every tick.
+    missed = []
+    for code, profile in VENUES.items():
+        if day < profile["first_day"]:
+            continue
+        try:
+            deadlines = official.deadlines(day, code)
+        except Exception:
+            continue  # A schedule retrieval error was already recorded above.
+        for rno, hhmm in enumerate(deadlines[:12], start=1):
+            cutoff = _deadline(day, hhmm)
+            if (cutoff-clock()).total_seconds() >= 180:
+                continue
+            key = race_id(day, code, rno)
+            target = Path(root) / "forecasts" / day / (key + ".json")
+            if not target.is_file():
+                missed.append({"race_id": key, "deadline": hhmm,
+                               "status": "no_frozen_forecast_before_deadline"})
+            else:
+                receipt = Path(root) / "receipts" / day / (key + ".json")
+                if not receipt.is_file():
+                    missed.append({"race_id": key, "deadline": hhmm,
+                                   "status": "remote_checkpoint_pending_or_missing"})
     report = {"version": "venue-specialist-collector-v1", "research_only": True,
               "day": day, "started_at": start.isoformat(), "finished_at": clock().isoformat(),
               "active_venues": {k: v["name"] for k,v in VENUES.items()
@@ -170,7 +193,8 @@ def run(root, *, clock=None, official=None, max_workers=4):
               "due": len(due), "capture_results": output,
               "schedule_errors": errors, "forecast_count": sum(
                   x["status"] in ("already_frozen", "locally_frozen_uncheckpointed") for x in output),
-              "missing_count": sum(x["status"] == "missing" for x in output)}
+              "missing_count": sum(x["status"] == "missing" for x in output),
+              "elapsed_races_without_confirmed_forecast": missed}
     coverage = Path(root) / "coverage" / day / (
         start.strftime("%H%M%S") + "_" + str(os.getenv("GITHUB_RUN_ID") or "manual") + ".json")
     save_immutable(coverage, report)
