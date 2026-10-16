@@ -69,6 +69,8 @@ def evaluate(forecast, receipt, result):
         "forecast_digest": forecast["digest"],
         "confirmed_commit_sha": receipt["commit_sha"],
         "source": "BOAT RACE official raceresult",
+        "official_observed_at": result.get("observed_at"),
+        "official_source_url": result.get("source_url"),
         "status": "excluded" if exclude else "graded",
         "exclusion_reason": (status if status != "settled" else "refund_or_incomplete_card") if exclude else None,
         "official_trifectas": payouts, "refund_lanes": result.get("refund_lanes", []),
@@ -128,8 +130,7 @@ def run(root, *, now=None, official=None, max_fetch=24):
         if not forecast:
             continue
         key = forecast["race_id"]
-        out_path = root / "reviews" / forecast["captured_at"][:4].replace("-","") / (key+".json")
-        # Directory is the race-day, not observation instant.
+        # Only result-day files, never the immutable pre-race snapshot.
         out_path = root / "reviews" / key[:8] / (key + ".json")
         if out_path.exists():
             continue
@@ -143,6 +144,8 @@ def run(root, *, now=None, official=None, max_fetch=24):
         try:
             url = official.official_url("raceresult",key[:8], forecast["jcd"], int(key[-2:]))
             result = parse_payout(official.fetch(url))
+            result["observed_at"] = now.isoformat()
+            result["source_url"] = url
             if result.get("status") == "pending":
                 continue
             review = evaluate(forecast, receipt, result)
