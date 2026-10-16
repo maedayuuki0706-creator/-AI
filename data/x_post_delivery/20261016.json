@@ -11,7 +11,8 @@
       "at": "2026-10-16T12:01:45.043279+09:00",
       "attempt": 1,
       "id": "805320de5abe46508d61b85bf9ca2d85",
-      "status": "reserved"
+      "retry_at": "2026-10-16T12:02:47.944607+09:00",
+      "status": "blocked"
     },
     "20261016:03:2": {
       "at": "2026-10-16T11:29:22.273342+09:00",
@@ -150,10 +151,12 @@
       "attempt": 1,
       "claimed_at": "2026-10-16T12:01:45.043279+09:00",
       "content_sha256": "18466a682618d46bf9c105b864a4cd1d777096571a0a5b90c6ff5f0f228eb083",
+      "error_type": "DefiniteRejection",
       "key": "prediction:20261016:02:4",
       "owner": "805320de5abe46508d61b85bf9ca2d85",
       "parent_post_id": null,
       "phase": "prediction",
+      "request_started_at": "2026-10-16T12:01:46.480103+09:00",
       "row": {
         "day": "20261016",
         "deadline": "12:14",
@@ -203,7 +206,14 @@
         "source": "AI重なり本線",
         "venue": "戸田"
       },
-      "status": "sending"
+      "status": "failed",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "X HTTP 402",
+        "retryable": false,
+        "transport_http_status": 502
+      },
+      "updated_at": "2026-10-16T12:01:47.944607+09:00"
     },
     "prediction:20261016:03:2": {
       "attempt": 1,
