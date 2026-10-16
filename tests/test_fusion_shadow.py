@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -206,9 +207,40 @@ class EvaluationTests(unittest.TestCase):
             self.assertEqual(summary["pending_races"], 0)
             self.assertEqual(summary["models"]["fusion"]["eligible_races"], 1)
             self.assertEqual(summary["models"]["fusion"]["roi_pct"], 1200)
+            old_engine = deepcopy(prediction)
+            old_engine["version"] = "all-ai-fusion-shadow-v1"
+            fusion.write_once(root / "predictions/20261012/old-engine.json", old_engine)
+            summary = fusion.summarize(root)
+            self.assertEqual(summary["excluded_other_engine_races"], 1)
+            self.assertEqual(summary["pending_races"], 0)
 
 
 class RunnerIsolationTests(unittest.TestCase):
+    def test_later_official_details_are_appended_without_replacing_forecast_or_first_result(self):
+        import direct_discord_notify as base
+        import daily_report
+        import race_context
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);p=record();filename=p['key']+'.json'
+            forecast=root/'predictions'/p['day']/filename
+            original=root/'evaluations'/p['day']/filename
+            fusion.write_once(forecast,p)
+            fusion.write_once(root/'checkpoints'/p['day']/filename,{
+                'prediction_digest':p['digest'],'prediction_committed_at':'2026-10-12T10:01:00+09:00','commit_sha':'a'*40})
+            outcome=fusion.evaluate(p,result(p),NOW+timedelta(minutes=20))
+            fusion.write_once(original,outcome)
+            before=(forecast.read_bytes(),original.read_bytes())
+            details={'method':'逃げ','finish':[{'lane':l,'status':'finished','course':l,'st':.12} for l in range(1,7)]}
+            with patch.object(runner,'now_jst',return_value=NOW+timedelta(minutes=20)), \
+                 patch.object(base,'fetch',return_value='official-fixture-only'), \
+                 patch.object(daily_report,'parse_payout',return_value=result(p)), \
+                 patch.object(race_context,'parse_result',return_value=details):
+                self.assertEqual(runner.collect_results(root,time.monotonic()+60)['settled'],1)
+                self.assertEqual(runner.collect_results(root,time.monotonic()+60)['settled'],0)
+            self.assertEqual(before,(forecast.read_bytes(),original.read_bytes()))
+            extra=runner.load(root/'official_verifications'/p['day']/filename)
+            self.assertTrue(extra['evaluation']['scenario_review']['boats'][0]['method_matches_win_hypothesis'])
+
     def test_outside_race_hours_writes_readiness_but_no_forecast(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(runner, "now_jst", return_value=NOW.replace(hour=2)), \
                 patch.object(runner, "collect_card", side_effect=AssertionError("No live requests expected")), \
@@ -245,7 +277,7 @@ class RunnerIsolationTests(unittest.TestCase):
                 patch.object(opportunity_alerts, "_send", side_effect=forbidden), \
                 patch.object(opportunity_alerts, "_append_log", side_effect=forbidden), \
                 patch.object(x_post_delivery, "post_to_x", side_effect=forbidden):
-            prediction, snapshot = runner.build_live("20261012", "06", 1, "10:15")
+            prediction, snapshot = runner.build_live("20261012", "06", 1, "10:15", prefetch=False)
         self.assertEqual(len(prediction["models"]["fusion"]["picks"]), 10)
         for key in ("native_pt2_balanced", "native_pt2_probability", "native_pt2_value", "native_pt2_longshot",
                     "native_comparison_prototype1", "native_comparison_prototype3", "native_featured_plan", "native_long_selected"):

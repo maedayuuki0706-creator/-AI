@@ -29,7 +29,7 @@ def _strategy(model, families, **extra):
                      selection_policy=model.get("selection_policy"), **extra)
 
 
-def build_live(day, jcd, rno, deadline):
+def build_live(day, jcd, rno, deadline, *, prefetch=True):
     # Import prediction helpers only inside an isolated capture subprocess.
     import direct_discord_notify as official_source
     import detailed_discord_notify as cards
@@ -48,11 +48,27 @@ def build_live(day, jcd, rno, deadline):
     from ticket_compression import compression_snapshot
 
     captured = now_jst()
+    # Fast exhibition gate: do not spend the capture budget on a race whose
+    # official preview is still empty. All prefetches are GETs in this child;
+    # the production modules/files and their delivery behavior are unchanged.
+    if prefetch:
+        preview_raw = official_source.fetch(official_source.official_url('beforeinfo', day, jcd, rno))
+        if official_source.parse_beforeinfo(preview_raw).get('exhibition_count') != 6:
+            raise ValueError("Six official exhibition records are not yet available")
+        urls = [official_source.official_url(kind, day, jcd, n) for kind, n in
+                (('racelist', rno), ('odds3t', rno), ('racelist', 1))]
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            prefetched = [pool.submit(official_source.fetch, url) for url in dict.fromkeys(urls)]
+            biyori_fetch = pool.submit(hiyori_source.fetch_race, day, jcd, rno)
+            for future in prefetched:
+                future.result()
+            source = biyori_fetch.result()
+    else:
+        source = hiyori_source.fetch_race(day, jcd, rno)
+    source["fetched_at"] = now_jst().isoformat()
     official = official_source.analyze_official(day, jcd, rno)
     if not official or official.get("preview", {}).get("exhibition_count") != 6:
         raise ValueError("Live official/exhibition data are not ready")
-    source = hiyori_source.fetch_race(day, jcd, rno)
-    source["fetched_at"] = now_jst().isoformat()
     hiyori = hiyori_model.analyze(official, source, day, jcd, rno)
     database = pt2_sheet_db.enhance_analysis(official, jcd)
     odds = {r["combination"]: r.get("odds") for r in official["trifecta"]}
@@ -118,6 +134,8 @@ def build_live(day, jcd, rno, deadline):
                      "exhibition_course": b.get("predicted_course")} for b in official["inputs"]]
     context = classify({**request, "venue": official["venue"], "rows": context_rows, "settled": False}, now_jst())
     provenance = {"source_url": source.get("source_url"), "hiyori_input_hash": core.digest(source),
+                  "official_urls": {kind: official_source.official_url(kind, day, jcd, rno)
+                                    for kind in ("racelist", "beforeinfo", "odds3t")},
                   "legacy_fusion_available": False,
                   "legacy_fusion_reason": "Original kyoteibiyori_adapter.race_model is explicitly not ready; real Hiyori model used instead.",
                   "learning": "Existing bridge policy retained; all_ai_learning is a report, not an independent engine.",
@@ -133,7 +151,9 @@ def capture_one(out, day, jcd, rno, deadline):
     key = core.identity(day, jcd, rno)
     prediction_path = root / "predictions" / day / f"{key}.json"
     if prediction_path.exists():
-        return {"key": key, "status": "already_frozen"}
+        existing_version = load(prediction_path).get("version")
+        return {"key":key, "status":"already_frozen" if existing_version == core.VERSION else "already_frozen_other_engine",
+                "existing_engine_version":existing_version}
     record, snapshot = build_live(day, jcd, rno, deadline)
     if now_jst() > core.cutoff(day, deadline) - timedelta(seconds=core.MIN_LEAD_SECONDS):
         raise ValueError("Capture finished too late; nothing is frozen")
@@ -191,9 +211,20 @@ def collect_results(root, end):
     root = Path(root)
     pending = []
     for path in sorted((root / "predictions").glob("*/*.json")):
-        if (root / "evaluations" / path.parent.name / path.name).exists():
-            continue
         record = load(path)
+        if record.get("version") != core.VERSION:
+            continue
+        evaluation_path = root / "evaluations" / path.parent.name / path.name
+        existing = load(evaluation_path) if evaluation_path.exists() else None
+        # Preserve the original observation. Later-published ST/finish/method
+        # details are a separate append-only verification, never a new forecast.
+        if existing and (existing.get("excluded_reason") or
+                         (existing.get("official_result") or {}).get("race_details") or
+                         (root / "official_verifications" / path.parent.name / path.name).exists()):
+            continue
+        retry_path = root / "details_retry" / path.parent.name / path.name
+        if existing and retry_path.exists() and now_jst() < core.aware(load(retry_path)["next_attempt_at"]):
+            continue
         deadline = core.aware(record["deadline_at"])
         checkpoint_path = root / "checkpoints" / record["day"] / path.name
         if now_jst() < deadline + timedelta(minutes=3) or not checkpoint_path.exists():
@@ -205,18 +236,47 @@ def collect_results(root, end):
             core.write_once(root / "evaluations" / record["day"] / path.name,
                             {"key": record["key"], "excluded_reason": "late_remote_checkpoint"})
             continue
-        pending.append((record, checkpoint))
+        pending.append((record, checkpoint, path.name, existing))
+    # New settlement has priority over optional late ST/method enrichment.
+    pending.sort(key=lambda pair: (pair[3] is not None, pair[0]["deadline_at"]))
 
-    def fetch_result(record, checkpoint):
+    def fetch_result(record, checkpoint, filename, existing):
         url = base.official_url("raceresult", record["day"], record["jcd"], record["rno"])
-        result = parse_payout(base.fetch(url))
+        raw = base.fetch(url)
+        result = parse_payout(raw)
+        try:
+            from race_context import parse_result
+            result["race_details"] = parse_result(raw, record["day"], record["jcd"], record["rno"])
+        except ValueError as exc:
+            result["race_details"] = None
+            result["race_details_missing_reason"] = str(exc)
         result.update(key=record["key"], source_url=url, observed_at=now_jst().isoformat(),
+                      response_sha256=core.sha256(raw.encode()).hexdigest(),
                       prediction_committed_at=checkpoint["prediction_committed_at"],
                       prediction_commit_sha=checkpoint["commit_sha"])
+        if existing:
+            prior = existing["official_result"]
+            if (prior.get("status"), prior.get("payouts"), prior.get("refund_lanes")) != (
+                    result.get("status"), result.get("payouts"), result.get("refund_lanes")):
+                raise ValueError("Later official details do not match the original settled payout; held for review")
+            if not result.get("race_details"):
+                observed = now_jst()
+                core.write_report(root / "details_retry" / record["day"] / filename,
+                    {"key":record["key"], "last_attempt_at":observed.isoformat(),
+                     "next_attempt_at":(observed+timedelta(minutes=20)).isoformat(),
+                     "status":"official_finish_st_method_not_available",
+                     "source_url":url, "missing_reason":result.get("race_details_missing_reason")})
+                return record["key"], False
         outcome = core.evaluate(record, result, now_jst())
         if outcome:
-            core.write_once(root / "results" / record["day"] / f"{record['key']}.json", result)
-            core.write_once(root / "evaluations" / record["day"] / f"{record['key']}.json", outcome)
+            if existing:
+                core.write_once(root / "official_verifications" / record["day"] / filename,
+                    {"key":record["key"], "prediction_digest":record["digest"],
+                     "original_evaluation_digest":core.digest(existing), "evaluation":outcome,
+                     "note":"Append-only later official details; frozen forecast and first result observation retained"})
+            else:
+                core.write_once(root / "results" / record["day"] / filename, result)
+                core.write_once(root / "evaluations" / record["day"] / filename, outcome)
         return record["key"], bool(outcome)
 
     settled, errors = 0, []
@@ -283,7 +343,7 @@ def write_summary(root):
     return summary
 
 
-def run(root, budget_seconds=85):
+def run(root, budget_seconds=125):
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     start, now = time.monotonic(), now_jst()
@@ -300,7 +360,12 @@ def run(root, budget_seconds=85):
             for jcd, deadlines in schedule["venues"].items():
                 for rno, deadline in enumerate(deadlines, 1):
                     key = core.identity(day, jcd, rno)
-                    if (root / "predictions" / day / f"{key}.json").exists():
+                    previous_path = root / "predictions" / day / f"{key}.json"
+                    if previous_path.exists():
+                        previous_version = load(previous_path).get("version")
+                        if previous_version != core.VERSION:
+                            status.setdefault("other_engine_frozen_races", []).append(
+                                {"key":key,"engine":previous_version,"status":"reference_only_preserved"})
                         continue
                     lead = (core.cutoff(day, deadline) - now_jst()).total_seconds()
                     race = {"key": key, "day": day, "jcd": jcd, "rno": rno, "deadline": deadline}
@@ -315,7 +380,7 @@ def run(root, budget_seconds=85):
                 if time.monotonic() >= end - 25:
                     status["captures"] += [{"key": r["key"], "status": "deferred_by_budget"} for r in due[offset:]]
                     break
-                timeout = min(55, end - time.monotonic() - 15)
+                timeout = min(90, end - time.monotonic() - 20)
                 with ThreadPoolExecutor(max_workers=3) as pool:
                     futures = [pool.submit(_capture_child, root, r, timeout) for r in due[offset:offset + 3]]
                     for future in as_completed(futures):
@@ -340,7 +405,7 @@ def run(root, budget_seconds=85):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", required=True)
-    parser.add_argument("--budget-seconds", type=int, default=85)
+    parser.add_argument("--budget-seconds", type=int, default=125)
     parser.add_argument("--capture-one", nargs=4, metavar=("DAY", "JCD", "RNO", "DEADLINE"))
     parser.add_argument("--checkpoint-commit")
     args = parser.parse_args()

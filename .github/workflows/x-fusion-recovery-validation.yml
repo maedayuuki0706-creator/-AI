@@ -1,0 +1,43 @@
+name: X Recovery - Read Only Audit and No Send Tests
+
+on:
+  push:
+    branches: [work/x-fusion-recovery-20261013]
+    paths:
+      - 'x_delivery_v2/**'
+      - 'audit_fusion_recovery.py'
+      - 'tests/test_x_delivery_v2*.py'
+      - '.github/workflows/x-fusion-recovery-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: x-recovery-no-send-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test claims, uncertain quarantine, costs and existing prediction policy without posting
+        run: |
+          python -m unittest discover -s tests -p 'test_x_delivery_v2*.py' -v
+          python -m unittest discover -s tests -p 'test_x_delivery.py' -v
+          python -m unittest discover -s tests -p 'test_x_featured_selector.py' -v
+      - name: Read production receipts and simulate the prepared fix with every POST forbidden
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python audit_fusion_recovery.py --out "$RUNNER_TEMP/x-read-only-audit"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: x-read-only-recovery-${{ github.run_id }}
+          path: ${{ runner.temp }}/x-read-only-audit/
+          retention-days: 30
