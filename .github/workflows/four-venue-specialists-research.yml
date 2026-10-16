@@ -1,0 +1,77 @@
+name: Four Venue Specialists - Research Log Only
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/four-venue-specialists-research.yml']
+  schedule:
+    # JST 08:00-23:50, every ten minutes; no production hooks.
+    - cron: '*/10 23,0-14 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: research-four-venue-specialists-independent
+  cancel-in-progress: false
+
+jobs:
+  research-log-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/four-venue-specialists-20261017
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*.py
+            /research/
+            /data/sheet_db/
+            /data/venue_tide_profiles.json
+            /data/venue_tactical_priors.json
+            /data/racer_profiles.json
+            /data/learning_state.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Gate research unit tests before processing
+        run: |
+          python -m unittest discover -s research/venue_specialists_v1/tests -v
+          python -m unittest discover -s research/scenario_v2/tests -v
+      - name: Open a separate research-only state branch
+        run: |
+          git fetch --depth=1 origin research-venue-specialists-state:refs/remotes/origin/research-venue-specialists-state
+          git -c core.sparseCheckout=false worktree add --detach "$RUNNER_TEMP/venue-specialists-state" refs/remotes/origin/research-venue-specialists-state
+          git -C "$RUNNER_TEMP/venue-specialists-state" config user.name 'github-actions[bot]'
+          git -C "$RUNNER_TEMP/venue-specialists-state" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          echo "VENUE_SPECIALIST_CODE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Collect only official pre-race research snapshots and coverage
+        run: |
+          python -m research.venue_specialists_v1.run --out "$RUNNER_TEMP/venue-specialists-state/data/venue_specialists_v1"
+      - name: Persist research data, never production state
+        id: persist
+        if: always()
+        run: |
+          ROOT="$RUNNER_TEMP/venue-specialists-state"
+          if [ ! -d "$ROOT/data/venue_specialists_v1" ]; then exit 0; fi
+          git -C "$ROOT" add data/venue_specialists_v1/
+          if git -C "$ROOT" diff --cached --quiet; then exit 0; fi
+          git -C "$ROOT" commit -m 'research: freeze venue-specialist pre-race logs and coverage'
+          git -C "$ROOT" push origin HEAD:refs/heads/research-venue-specialists-state
+          echo "persisted_sha=$(git -C "$ROOT" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Verify pushed Git snapshots and add durable receipts
+        if: always() && steps.persist.outputs.persisted_sha != ''
+        env:
+          VENUE_STATE_SHA: "${{ steps.persist.outputs.persisted_sha }}"
+        run: |
+          ROOT="$RUNNER_TEMP/venue-specialists-state"
+          python -m research.venue_specialists_v1.run --out "$ROOT/data/venue_specialists_v1" --verify-commit "$VENUE_STATE_SHA"
+          git -C "$ROOT" add data/venue_specialists_v1/receipts/ || true
+          if ! git -C "$ROOT" diff --cached --quiet; then
+            git -C "$ROOT" commit -m 'research: confirm immutable pre-deadline Git receipts'
+            git -C "$ROOT" push origin HEAD:refs/heads/research-venue-specialists-state
+          fi
+          echo 'Research LOG remote checkpoint completed; no Discord/X calls.'
