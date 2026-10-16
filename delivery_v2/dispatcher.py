@@ -264,6 +264,10 @@ def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yu
         active_since.setdefault(stream, activation_at.isoformat())
     active_missed = [row for row in rows if row['stream'] in active and row['status']=='missed'
                     and datetime.fromisoformat(row['deadline']) >= datetime.fromisoformat(active_since[row['stream']])]
+    # A previously recorded miss remains a live incident, but is not a new
+    # dispatcher failure on every subsequent scheduled wake-up.
+    prior_missed = {row['key'] for row in (previous or {}).get('active_missed', ())}
+    new_active_missed = [row for row in active_missed if row['key'] not in prior_missed]
     for row in active_missed:
         notify_failure(row['stream'], row, row, store)
     for row in rows:
@@ -285,6 +289,7 @@ def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yu
     report['wake_reason'] = os.getenv('DISCORD_DELIVERY_V2_WAKE_REASON', '')
     report['active_since'] = active_since
     report['active_missed'] = active_missed
+    report['new_active_missed'] = new_active_missed
     receipts.atomic_write(SUMMARY, report)
     # Cursor is diagnostic. Eligibility always scans every current unexpired race.
     try:
@@ -292,12 +297,24 @@ def run_once(*, store=None, clock=None, schedules=None, engine=None, active=('yu
     except Conflict:
         raise RuntimeError('Another dispatcher updated this checkpoint') from None
     print('Dispatcher '+json.dumps({k:report[k] for k in ['day','status','active_streams','counts','previous_successful_check']}, ensure_ascii=False), flush=True)
+    if active_missed:
+        print(f'::warning::Discord V2: {len(active_missed)} unresolved missed deliveries; {len(new_active_missed)} new this run', flush=True)
     summary = os.getenv('GITHUB_STEP_SUMMARY')
     if summary:
         with open(summary, 'a', encoding='utf-8') as handle:
             handle.write('### Discord Delivery V2\n\n'+json.dumps(counts, ensure_ascii=False)+'\n\n')
             handle.write('Live streams: '+', '.join(active)+'; other streams are audited through existing receipts.\n')
+            handle.write(f'Unresolved missed: {len(active_missed)}; newly missed: {len(new_active_missed)}. Audit status: {report["status"]}.\n')
     return report
+
+
+def dispatch_exit_code(report):
+    """Fail this run for new incidents or technical errors, not stale incidents.
+
+    The durable audit retains status=degraded until every incident is resolved;
+    a green workflow run does not mean the delivery health is green.
+    """
+    return int(bool(report['new_active_missed'] or report['schedule_errors'] or report['delivery_errors']))
 
 
 def main():
@@ -314,7 +331,7 @@ def main():
     try:
         report = run_once(active=active, budget_seconds=args.budget_seconds,
                           recheck_seconds=args.recheck_seconds)
-        return 0 if report['status'] == 'checked' else 1
+        return dispatch_exit_code(report)
     except Exception as exc:
         print(f'::error::Production dispatcher failed ({type(exc).__name__})', flush=True)
         return 1
