@@ -75,3 +75,17 @@ jobs:
             git -C "$ROOT" push origin HEAD:refs/heads/research-venue-specialists-state
           fi
           echo 'Research LOG remote checkpoint completed; no Discord/X calls.'
+      - name: Verify official results after the race and save independent reviews
+        if: success() && steps.persist.outputs.persisted_sha != ''
+        run: |
+          ROOT="$RUNNER_TEMP/venue-specialists-state"
+          python -m research.venue_specialists_v1.review --out "$ROOT/data/venue_specialists_v1"
+      - name: Persist only research reviews and derived scoreboards
+        if: success() && steps.persist.outputs.persisted_sha != ''
+        run: |
+          ROOT="$RUNNER_TEMP/venue-specialists-state"
+          git -C "$ROOT" add data/venue_specialists_v1/reviews/ data/venue_specialists_v1/summary/ 2>/dev/null || true
+          if ! git -C "$ROOT" diff --cached --quiet; then
+            git -C "$ROOT" commit -m 'research: record official result reviews by specialist'
+            git -C "$ROOT" push origin HEAD:refs/heads/research-venue-specialists-state
+          fi
