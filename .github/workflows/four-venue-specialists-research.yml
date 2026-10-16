@@ -84,7 +84,7 @@ jobs:
         if: success() && steps.persist.outputs.persisted_sha != ''
         run: |
           ROOT="$RUNNER_TEMP/venue-specialists-state"
-          git -C "$ROOT" add data/venue_specialists_v1/reviews/ data/venue_specialists_v1/summary/ 2>/dev/null || true
+          git -C "$ROOT" add -A data/venue_specialists_v1/
           if ! git -C "$ROOT" diff --cached --quiet; then
             git -C "$ROOT" commit -m 'research: record official result reviews by specialist'
             git -C "$ROOT" push origin HEAD:refs/heads/research-venue-specialists-state
