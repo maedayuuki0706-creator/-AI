@@ -90,7 +90,7 @@ def evaluate(forecast, receipt, result):
     details=result.get("details")
     if details and forecast.get("common_v2") and not exclude:
         from research.scenario_v2.engine import review as common_review
-        actual={"race_id":forecast["race_id"],"status":"settled","trifecta":winning[0],
+        actual={"race_id":forecast["race_id"],"status":"settled","observed_at":result["observed_at"],"trifecta":winning[0],
                 "payout_per_100":payouts[winning[0]],"winning_method":details["method"],
                 "boats":[{"lane":b["lane"],"racer_id":b["racer_id"],"finish":b["finish"],
                           "actual_course":b.get("course"),"actual_st":b.get("st")} for b in details["finish"]]}

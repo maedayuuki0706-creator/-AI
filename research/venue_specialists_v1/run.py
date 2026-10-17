@@ -44,7 +44,7 @@ def _deadline(day, hhmm):
 
 
 def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
-                 venue_stats=None, motors=None, clock=None):
+                 venue_stats=None, motors=None, players=None, db_meta=None, clock=None):
     clock = clock or now_jst
     if official is None:
         from .official import Official
@@ -75,6 +75,10 @@ def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
     observed = clock()
     if deadline - observed < timedelta(minutes=3):
         raise ValueError("Official input too late")
+    db_meta=db_meta or {}
+    snapshot_at=db_meta.get("snapshot_at")
+    if snapshot_at and datetime.fromisoformat(snapshot_at)>observed:
+        raise ValueError("Future DB snapshot")
     rows = []
     for row in boats:
         lane = int(row["lane"])
@@ -89,6 +93,12 @@ def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
             "exhibition_time": ex.get("exhibition_time"), "exhibition_st": ex.get("exhibition_st_timing"),
             "tilt": ex.get("tilt"), "parts_exchange": ex.get("parts_exchange"),
         })
+    for boat in rows:
+        player=(players or {}).get(boat["racer_id"],{})
+        boat["player_course_observation"]={k:player.get(k) for k in ["course_win","avg_st","escape","sashi","makuri","makurisashi"]}
+        motor=(motors or {}).get(f"{jcd}:{boat['motor_number']}",{})
+        boat["motor_history_observation"]={k:motor.get(k) for k in ["start","as_of","starts","top2","top3","launch","stretch","turn"]}
+        boat["motor_history_observation"]["current_official_period_verified"]=False
     tide = None
     if VENUES[jcd]["tide_enabled"]:
         try:
@@ -106,7 +116,8 @@ def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
                    "beforeinfo_sha256": sha256(html.encode("utf-8")).hexdigest(),
                    "venue_priors_snapshot_digest": digest(venue_stats or {}),
                    "motor_snapshot_digest": digest(motors or {}),
-                   "research_code_sha": os.getenv("VENUE_SPECIALIST_CODE_SHA")},
+                   "research_code_sha": os.getenv("VENUE_SPECIALIST_CODE_SHA"),
+                   "database_snapshot":db_meta, "player_fields_descriptive_only":True},
         "environment": {"wind_speed": preview.get("wind_speed"),
                         "wave_cm": preview.get("wave_cm"),
                         "air_temp_c": preview.get("air_temp_c"),
@@ -115,6 +126,7 @@ def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
                         "wind_direction": preview.get("wind_direction"),
                         "tide": tide},
     }
+    if snapshot_at:snapshot["meta"]["db_snapshot_at"]=snapshot_at
     if hasattr(official, "envelope"):
         card_url = official.official_url("racelist", day, jcd, rno)
         snapshot["official_originals"] = {"racelist": official.envelope(card_url),
@@ -165,6 +177,8 @@ def run(root, *, clock=None, official=None, max_workers=4):
     day = start.strftime("%Y%m%d")
     venue_db = _read_json("data/sheet_db/venues.json")
     motor_db = _read_json("data/sheet_db/motors.json")
+    player_db=_read_json("data/sheet_db/players.json")
+    db_meta=_read_json("data/sheet_db/meta.json")
     schedules, errors, due = {}, [], []
     for code, profile in VENUES.items():
         if day < profile["first_day"]: continue
@@ -188,7 +202,7 @@ def run(root, *, clock=None, official=None, max_workers=4):
     def attempt(args):
         try:
             return collect_race(*args, root, clock=clock, official=official,
-                                venue_stats=venue_db, motors=motor_db)
+                                venue_stats=venue_db, motors=motor_db,players=player_db,db_meta=db_meta)
         except Exception as exc:
             item={"race_id": race_id(args[0], args[1], args[2]), "status": "missing",
                   "observed_at":clock().isoformat(), "deadline":args[3],

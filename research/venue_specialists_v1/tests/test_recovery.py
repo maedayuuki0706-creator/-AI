@@ -69,3 +69,29 @@ class RecoveryTests(unittest.TestCase):
         with self.assertRaises(ValueError):review.evaluate(forecast,receipt,{'race_id':'20261017_03_01','status':'settled','payouts':{'1-2-3':1000}})
 
 if __name__=='__main__':unittest.main()
+
+class ComparisonTests(unittest.TestCase):
+    def test_comparison_uses_only_same_race_proven_baseline(self):
+        from research.scenario_v2.tests.test_adapter_batch import source_fixture
+        from research.venue_specialists_v1.compare import compare_record
+        from research.venue_specialists_v1.tests.test_review import fixture as pair
+        base,cp=source_fixture();f,receipt=pair()
+        # Keep the real fixture timestamps and race identity internally consistent.
+        f['race_id']=base['key'];f['digest']=engine.digest({k:v for k,v in f.items() if k!='digest'})
+        receipt.update(race_id=f['race_id'],digest=f['digest'])
+        settled=review.evaluate(f,receipt,{'status':'settled','payouts':{base['models']['fusion']['picks'][0]:1000}})
+        row=compare_record(f,settled,base,cp)
+        self.assertTrue(row['new_yuuki_hit']);self.assertEqual(row['stake_yen_each'],1000)
+        cp['prediction_committed_at']=base['deadline_at']
+        with self.assertRaises(ValueError):compare_record(f,settled,base,cp)
+
+    def test_actual_details_flow_to_common_v2_review(self):
+        from research.venue_specialists_v1.tests.test_review import fixture as pair
+        f,receipt=pair()
+        result={'status':'settled','observed_at':'2026-10-17T11:40:00+09:00','payouts':{'1-2-3':1000},'details':{
+            'method':'逃げ','finish':[{'lane':i,'racer_id':str(5000+i),'finish':i,
+                                      'course':i,'st':.15} for i in range(1,7)]}}
+        row=review.evaluate(f,receipt,result)
+        self.assertEqual(len(row['common_v2_diagnostics']['lanes']),6)
+        self.assertTrue(row['main_head_correct'])
+        self.assertFalse(row['scenario_mechanism_verified'])
