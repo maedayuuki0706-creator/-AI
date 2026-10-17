@@ -171,6 +171,13 @@ def capture_yuuki(snapshot, root, *, clock, baseline=None):
             payload["meta"]["captured_at"] = clock().isoformat()
         except (ValueError, KeyError, TypeError) as exc:
             reason = str(exc)[:200]
+    partial_path = root / "partial_scenarios" / key[:8] / (key + ".json")
+    if "baseline_picks" not in payload and partial_path.exists():
+        previous = read(partial_path)
+        scenario.verify(previous)
+        if previous["meta"]["race_id"] != key:
+            raise ValueError("Partial scenario identity mismatch")
+        return {"race_id": key, "status": "partial_scenario_already_saved", "reason": reason}
     # The source has been assembled at this instant; the original official
     # observation timestamp remains in the evidence and original envelopes.
     forecast = scenario.generate(payload, mode="live", now=clock().isoformat())

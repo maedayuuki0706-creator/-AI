@@ -84,6 +84,13 @@ class YuukiCaptureTests(unittest.TestCase):
             out = capture_yuuki(fixture(), tmp, clock=lambda: NOW, baseline=baseline(fixture()))
             self.assertEqual(out['status'], 'locally_frozen_uncheckpointed')
 
+    def test_partial_retry_does_not_generate_an_unsaved_duplicate_scenario(self):
+        with TemporaryDirectory() as tmp:
+            capture_yuuki(fixture(), tmp, clock=lambda: NOW)
+            with patch.object(scenario, 'generate', side_effect=AssertionError('Reuse the already saved partial original')):
+                out = capture_yuuki(fixture(), tmp, clock=lambda: NOW + timedelta(seconds=30))
+            self.assertEqual(out['status'], 'partial_scenario_already_saved')
+
     def test_late_generation_never_backfills_even_with_old_input(self):
         with TemporaryDirectory() as tmp:
             out = capture_yuuki(fixture(), tmp, clock=lambda: NOW + timedelta(minutes=30), baseline=baseline(fixture()))
