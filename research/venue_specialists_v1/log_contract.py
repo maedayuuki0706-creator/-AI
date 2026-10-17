@@ -98,10 +98,12 @@ class FrozenBaseline:
     Exact originals are read at a fetched remote SHA before the live deadline.
     """
     branch = "research-fusion-shadow-state"
+    branches = ("research-fusion-recovery-state", branch)
 
     def __init__(self, git_root, clock):
         self.git_root, self.clock = git_root, clock
         self.loaded, self.remote_sha, self.error = False, None, None
+        self.remote_shas = []
         self.lock = threading.Lock()
 
     def _git(self, *args):
@@ -113,24 +115,31 @@ class FrozenBaseline:
             if not self.loaded:
                 self.loaded = True
                 try:
-                    self._git("fetch", "--quiet", "--depth=1", "origin", "refs/heads/" + self.branch)
-                    self.remote_sha = self._git("rev-parse", "FETCH_HEAD").strip()
+                    # One bounded fetch request for both read-only archives;
+                    # no extra capture processes or scheduled jobs.
+                    refs = ["refs/heads/" + b + ":refs/remotes/origin/" + b for b in self.branches]
+                    self._git("fetch", "--quiet", "--depth=1", "origin", *refs)
+                    self.remote_shas = [(b, self._git("rev-parse", "refs/remotes/origin/" + b).strip())
+                                        for b in self.branches]
+                    self.remote_sha = self.remote_shas[0][1]
                 except (subprocess.SubprocessError, OSError) as exc:
                     self.error = type(exc).__name__
         if self.error:
             raise ValueError("baseline_remote_unavailable:" + self.error)
         prefix = "data/fusion_shadow/"
-        try:
-            record = json.loads(self._git("show", f"{self.remote_sha}:{prefix}predictions/{key[:8]}/{key}.json"))
-            cp = json.loads(self._git("show", f"{self.remote_sha}:{prefix}checkpoints/{key[:8]}/{key}.json"))
-        except subprocess.CalledProcessError as exc:
-            raise ValueError("baseline_original_or_checkpoint_missing") from exc
-        payload = from_fusion(record, cp)
-        if self.clock() >= scenario.aware(record["deadline_at"]) - timedelta(minutes=3):
-            raise ValueError("baseline_received_after_capture_cutoff")
-        return payload, {"branch": self.branch, "remote_sha": self.remote_sha,
-                         "baseline_digest": record["digest"],
-                         "remote_observed_at": self.clock().isoformat()}
+        for branch, sha in self.remote_shas:
+            try:
+                record = json.loads(self._git("show", f"{sha}:{prefix}predictions/{key[:8]}/{key}.json"))
+                cp = json.loads(self._git("show", f"{sha}:{prefix}checkpoints/{key[:8]}/{key}.json"))
+            except subprocess.CalledProcessError:
+                continue
+            payload = from_fusion(record, cp)
+            if self.clock() >= scenario.aware(record["deadline_at"]) - timedelta(minutes=3):
+                raise ValueError("baseline_received_after_capture_cutoff")
+            return payload, {"branch": branch, "remote_sha": sha,
+                             "baseline_digest": record["digest"],
+                             "remote_observed_at": self.clock().isoformat()}
+        raise ValueError("baseline_original_or_checkpoint_missing")
 
 
 def capture_yuuki(snapshot, root, *, clock, baseline=None):

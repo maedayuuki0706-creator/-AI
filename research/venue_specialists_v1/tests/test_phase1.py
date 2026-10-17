@@ -144,6 +144,28 @@ class YuukiCaptureTests(unittest.TestCase):
         self.assertEqual(sum(x[0] == 'fetch' for x in calls), 1)
         self.assertFalse(any(x[0] in ('push', 'checkout', 'commit') for x in calls))
 
+    def test_empty_recovery_archive_falls_back_to_existing_frozen_original(self):
+        record, cp = source_fixture()
+        clock = lambda: datetime(2026, 10, 16, 18, 52, tzinfo=JST)
+        loader = FrozenBaseline('.', clock)
+        calls = []
+        def fake(*args):
+            calls.append(args)
+            if args[0] == 'rev-parse':
+                return ('a' if args[1].endswith('recovery-state') else 'b') * 40
+            if args[0] == 'show':
+                if args[1].startswith('a' * 40):
+                    raise subprocess.CalledProcessError(128, ['git', 'show'])
+                return json.dumps(cp if '/checkpoints/' in args[1] else record)
+            return ''
+        with patch.object(loader, '_git', side_effect=fake):
+            payload, evidence = loader(record['key'])
+        self.assertEqual(evidence['branch'], 'research-fusion-shadow-state')
+        self.assertEqual(evidence['remote_sha'], 'b' * 40)
+        self.assertEqual(len(payload['baseline_picks']), 10)
+        self.assertEqual(sum(x[0] == 'fetch' for x in calls), 1)
+        self.assertEqual(len(next(x for x in calls if x[0] == 'fetch')), 6)
+
 
 class MetricsTests(unittest.TestCase):
     def test_results_are_separate_and_order_alone_never_proves_tactics(self):
