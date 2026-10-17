@@ -1,0 +1,236 @@
+{
+  "as_of": "2026-10-17T04:52:58.537Z",
+  "timezone": "Asia/Tokyo",
+  "status": "current_active_venues_resumed_future_launches_unverified",
+  "research_only": true,
+  "code_branch": "research/four-venue-specialists-20261017",
+  "state_branch": "research-venue-specialists-state",
+  "main_changes_only": [
+    ".github/workflows/four-venue-specialists-research.yml"
+  ],
+  "main_workflow_commits": [
+    "a2bb84fcd283969e1362afb1bf09a12a87976a27",
+    "98ff0fa2a11ff28bc977836456f47e8527bdf99e"
+  ],
+  "observed_runs": [
+    {
+      "id": 38988492745,
+      "event": "schedule",
+      "status": "success_but_zero_due_at_0954_expected_before_capture_window"
+    },
+    {
+      "id": 39002998538,
+      "event": "push",
+      "status": "failed_during_repair",
+      "reason": "8_second_reads_timed_out_then_rescue_append_conflicted_with_old_writer"
+    },
+    {
+      "id": 39003506369,
+      "event": "workflow_dispatch",
+      "status": "success",
+      "observed_minute_cycles": true,
+      "auto_original": "20261017_03_07"
+    },
+    {
+      "id": 39004028183,
+      "event": "workflow_dispatch",
+      "status": "running",
+      "auto_original": "20261017_16_07",
+      "official_payout_review": "20261017_16_06"
+    }
+  ],
+  "schedule_root_cause": {
+    "observed": "workflow active, correct research ref, no new scheduled runs between 09:54 and repair at 13:33 JST",
+    "github_internal_cause": "not_proven",
+    "first_zero_due": "normal: first deadlines 10:51 and 11:14 were more than 28 minutes away",
+    "repair": "bounded per-minute worker, independent self-dispatch retries, offset backup cron, idle continuation overnight"
+  },
+  "proofs": [
+    {
+      "race_id": "20261017_03_07",
+      "origin": "automatic",
+      "created_at": "2026-10-17T13:42:43.176098+09:00",
+      "deadline_at": "2026-10-17T13:56:00+09:00",
+      "receipt": {
+        "checked_at": "2026-10-17T13:42:45.671606+09:00",
+        "commit_sha": "9b2da5b016ce80ceecb06ad01588880e3f32cff1",
+        "complete_originals_verified": true,
+        "digest": "7e6a86a77762aad4bc33bfc51274bdd83a45de6b97ff58494c7a968e868a0305",
+        "forecast_path": "data/venue_specialists_v1/forecasts/20261017/20261017_03_07.json",
+        "input_path": "data/venue_specialists_v1/inputs/20261017/20261017_03_07.json",
+        "race_id": "20261017_03_07",
+        "snapshot_digest": "429fa93d6eccd0562ca87ddc3890ecb75dc009b2c68f459ffe6cc03cc4df770e",
+        "status": "confirmed_before_deadline"
+      }
+    },
+    {
+      "race_id": "20261017_16_06",
+      "origin": "local_live_capture_rescued_without_regeneration",
+      "created_at": "2026-10-17T13:32:19.122434+09:00",
+      "deadline_at": "2026-10-17T13:39:00+09:00",
+      "receipt": {
+        "race_id": "20261017_16_06",
+        "digest": "f06dc8992c61172e7adcf2864db27a26088738c9009b57126b17c443fa1fc366",
+        "commit_sha": "0810b217da684a1e10df5994e9d253f98757e18a",
+        "checked_at": "2026-10-17T04:38:08.179Z",
+        "snapshot_digest": "71d5cbe21d6b7f16c2ed9a6030514a41ec74c7e0656b34449c857156b08bbdac",
+        "input_path": "data/venue_specialists_v1/inputs/20261017/20261017_16_06.json",
+        "forecast_path": "data/venue_specialists_v1/forecasts/20261017/20261017_16_06.json",
+        "complete_originals_verified": true,
+        "status": "confirmed_before_deadline",
+        "confirmation_method": "connector_remote_branch_and_exact_Git_objects",
+        "origin": "genuine_local_capture_preserved_without_regeneration",
+        "research_code_commit": "db28e307e80eff46a6840829351d76c20c04160b"
+      }
+    },
+    {
+      "race_id": "20261017_16_07",
+      "origin": "automatic",
+      "created_at": "2026-10-17T13:52:08.885652+09:00",
+      "deadline_at": "2026-10-17T14:10:00+09:00",
+      "receipt": {
+        "checked_at": "2026-10-17T13:52:10.697637+09:00",
+        "commit_sha": "a08488211e1ee66ad7f2429550a843b52d1619f2",
+        "complete_originals_verified": true,
+        "digest": "c8ac3269cd967ee2a1660f21c77995a671b302614eea5d279213cc456958d6ca",
+        "forecast_path": "data/venue_specialists_v1/forecasts/20261017/20261017_16_07.json",
+        "input_path": "data/venue_specialists_v1/inputs/20261017/20261017_16_07.json",
+        "race_id": "20261017_16_07",
+        "snapshot_digest": "d776899d09edc4471e08be2ef0ef9e5f3c72b11a1bedea636e69d05618117eb1",
+        "status": "confirmed_before_deadline"
+      }
+    }
+  ],
+  "verification": {
+    "exact_Git_inputs_and_forecasts": true,
+    "raw_HTML_SHA256": true,
+    "forecast_digest": true,
+    "common_v2_digest": true,
+    "ten_unique_tickets_each": true,
+    "six_boats_each": true,
+    "creation_Git_commit_receipt_before_deadline": true,
+    "kojima6_forecast_unchanged_after_result": true,
+    "workflow_push_match_audit": {
+      "workflows_checked": 66,
+      "matches": [
+        ".github/workflows/four-venue-specialists-research.yml"
+      ]
+    },
+    "tests": {
+      "specialists": 27,
+      "common_v2": 40,
+      "capture_v1": 23,
+      "total": 90
+    }
+  },
+  "scoreboard": {
+    "version": "venue-specialists-official-postmortem-v1.1",
+    "through_day": "20261017",
+    "research_only": true,
+    "prospective_only": true,
+    "venues": {
+      "16": {
+        "venue": "児島",
+        "graded": 1,
+        "hits": 0,
+        "stake_yen": 1000,
+        "return_yen": 0,
+        "main_head_hits": 0,
+        "selection_errors": {
+          "second_not_selected_given_head": 1
+        },
+        "scenario_patterns": {
+          "actual_tactics_unverified": 1
+        },
+        "full_finish_verified_count": 0,
+        "hit_rate_pct": 0,
+        "roi_pct": 0,
+        "profit_yen": -1000,
+        "main_head_accuracy_pct": 0,
+        "scheduled_races": 12,
+        "local_forecasts": 2,
+        "saved_success": 2,
+        "missing_count": 5,
+        "upcoming_unconfirmed": 5,
+        "missing_race_ids": [
+          "20261017_16_01",
+          "20261017_16_02",
+          "20261017_16_03",
+          "20261017_16_04",
+          "20261017_16_05"
+        ],
+        "operational_status": "degraded_missing",
+        "schedule_error": null
+      },
+      "23": {
+        "venue": "唐津",
+        "graded": 0,
+        "hits": 0,
+        "hit_rate_pct": null,
+        "roi_pct": null,
+        "profit_yen": 0,
+        "main_head_accuracy_pct": null,
+        "scheduled_races": 0,
+        "local_forecasts": 0,
+        "saved_success": 0,
+        "missing_count": 0,
+        "upcoming_unconfirmed": 0,
+        "missing_race_ids": [],
+        "operational_status": "not_started",
+        "schedule_error": null
+      },
+      "03": {
+        "venue": "江戸川",
+        "graded": 0,
+        "hits": 0,
+        "hit_rate_pct": null,
+        "roi_pct": null,
+        "profit_yen": 0,
+        "main_head_accuracy_pct": null,
+        "scheduled_races": 12,
+        "local_forecasts": 1,
+        "saved_success": 1,
+        "missing_count": 6,
+        "upcoming_unconfirmed": 5,
+        "missing_race_ids": [
+          "20261017_03_01",
+          "20261017_03_02",
+          "20261017_03_03",
+          "20261017_03_04",
+          "20261017_03_05",
+          "20261017_03_06"
+        ],
+        "operational_status": "degraded_missing",
+        "schedule_error": null
+      },
+      "06": {
+        "venue": "浜名湖",
+        "graded": 0,
+        "hits": 0,
+        "hit_rate_pct": null,
+        "roi_pct": null,
+        "profit_yen": 0,
+        "main_head_accuracy_pct": null,
+        "scheduled_races": 0,
+        "local_forecasts": 0,
+        "saved_success": 0,
+        "missing_count": 0,
+        "upcoming_unconfirmed": 0,
+        "missing_race_ids": [],
+        "operational_status": "not_started",
+        "schedule_error": null
+      }
+    },
+    "actual_scenario_causes_verified": 0,
+    "digest": "96e77fa3d26b8902f15368ad069287a3e8360ff6b80ff0a8c68624d0ee51468b"
+  },
+  "limitations": [
+    "Early missing races remain missing: Kojima1-5 and Edogawa1-6; never regenerated retrospectively",
+    "Karatsu starts 20261018; Hamanako starts 20261021; actual launches unverified",
+    "No unvalidated specialist coefficients applied; structural 10-ticket policy is unvalidated and not calibrated probabilities",
+    "Official Kojima6 payout verified; six-finish/ST/method unavailable at observation; causal tactical diagnoses unverified",
+    "Baseline New Yuuki comparator implemented with Git proof; automatic baseline synchronization not connected and no matched comparison yet",
+    "Wind direction mapping, independent tide/current measurements, official current motor-period confirmation and video labels remain missing",
+    "Night-to-next-day continuity added but not yet observed; GitHub outage-free operation is not guaranteed"
+  ]
+}
