@@ -60,7 +60,8 @@
       "at": "2026-10-17T14:10:08.209234+09:00",
       "attempt": 1,
       "id": "dea749f0a9a44a3ebfd886320c82045a",
-      "status": "reserved"
+      "retry_at": "2026-10-17T14:11:11.468086+09:00",
+      "status": "blocked"
     },
     "20261017:08:4": {
       "at": "2026-10-17T11:29:42.785512+09:00",
@@ -710,10 +711,12 @@
       "attempt": 1,
       "claimed_at": "2026-10-17T14:10:08.209234+09:00",
       "content_sha256": "c5aec9fded781c0e148c0d116be8c5c09824d031585fad273b94c6e5e5379319",
+      "error_type": "DefiniteRejection",
       "key": "prediction:20261017:04:9",
       "owner": "dea749f0a9a44a3ebfd886320c82045a",
       "parent_post_id": null,
       "phase": "prediction",
+      "request_started_at": "2026-10-17T14:10:09.849613+09:00",
       "row": {
         "day": "20261017",
         "deadline": "14:26",
@@ -763,7 +766,14 @@
         "source": "AI重なり本線",
         "venue": "平和島"
       },
-      "status": "sending"
+      "status": "failed",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "X HTTP 402",
+        "retryable": false,
+        "transport_http_status": 502
+      },
+      "updated_at": "2026-10-17T14:10:11.468086+09:00"
     },
     "prediction:20261017:08:4": {
       "attempt": 1,
