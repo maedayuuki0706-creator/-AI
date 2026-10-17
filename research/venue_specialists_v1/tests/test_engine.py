@@ -87,10 +87,11 @@ class EngineTests(unittest.TestCase):
                                     mode="replay", now="2026-10-27T12:00:00+09:00")
         self.assertEqual(not_enough["lane_audits"][1]["components"]["wind_conditions"]["adjustment"],0)
 
-    def test_missing_course_prior_no_invented_card(self):
+    def test_missing_course_prior_no_invented_coefficients(self):
         x = engine.analyze(fixture(), mode="replay", now="2026-10-27T12:00:00+09:00")
-        self.assertEqual(x["virtual_card"], [])
-        self.assertEqual(x["card_status"], "missing_course_prior")
+        self.assertEqual(len(x["virtual_card"]),10)
+        self.assertTrue(all(r["score"]==0 for r in x["lane_audits"]))
+        self.assertTrue(all(p["v2_scenario_supported"] for p in x["virtual_card"]))
 
     def test_frozen_datetime_guard(self):
         with self.assertRaises(ValueError):

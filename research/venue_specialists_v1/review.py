@@ -36,6 +36,7 @@ def evaluate(forecast, receipt, result):
     deadline = datetime.fromisoformat(forecast["deadline_at"])
     if saved >= deadline:
         raise ValueError("Receipt signed after race deadline")
+    if result.get("race_id",forecast["race_id"])!=forecast["race_id"]:raise ValueError("Result identity mismatch")
     status = result.get("status")
     payouts = result.get("payouts") or {}
     exclude = bool(result.get("refund_lanes")) or status != "settled"
@@ -84,6 +85,17 @@ def evaluate(forecast, receipt, result):
         "limitations": ["Official finishing order does not establish each boat's tactics or failure causes",
                         "Actual 1M track/video not reviewed"],
     }
+    out["main_head_correct"] = (first[0]==picks[0].split("-")[0]) if first and picks and not exclude else None
+    out["selected_head_covered"] = (first[0] in heads) if first and not exclude else None
+    details=result.get("details")
+    if details and forecast.get("common_v2") and not exclude:
+        from research.scenario_v2.engine import review as common_review
+        actual={"race_id":forecast["race_id"],"status":"settled","trifecta":winning[0],
+                "payout_per_100":payouts[winning[0]],"winning_method":details["method"],
+                "boats":[{"lane":b["lane"],"racer_id":b["racer_id"],"finish":b["finish"],
+                          "actual_course":b.get("course"),"actual_st":b.get("st")} for b in details["finish"]]}
+        out["common_v2_diagnostics"]=common_review(forecast["common_v2"],actual)
+    out["new_yuuki_comparison"]={"status":"baseline_not_supplied","hit":None,"return_yen":None}
     out["digest"] = digest(out)
     return out
 
@@ -97,8 +109,13 @@ def summarize(root, day):
         code = result["jcd"]
         row = counts.setdefault(code, {"venue": VENUES[code]["venue"], "graded": 0,
                                        "hits": 0, "stake_yen": 0, "return_yen": 0,
-                                       "selection_errors": {}})
+                                       "main_head_hits":0, "selection_errors": {}, "scenario_patterns":{}})
+        if result["race_id"][:8]>day:continue
         row["graded"] += 1
+        row["main_head_hits"] += int(bool(result.get("main_head_correct")))
+        diagnostic=result.get("common_v2_diagnostics") or {}
+        pattern=str(diagnostic.get("method_assessment") or diagnostic.get("status") or "actual_tactics_unverified")
+        row["scenario_patterns"][pattern]=row["scenario_patterns"].get(pattern,0)+1
         row["hits"] += int(bool(result["hit"]))
         row["stake_yen"] += result["stake_yen"]
         row["return_yen"] += result["return_yen"]
@@ -108,7 +125,14 @@ def summarize(root, day):
         row["hit_rate_pct"] = round(100*row["hits"]/row["graded"], 2) if row["graded"] else None
         row["roi_pct"] = round(100*row["return_yen"]/row["stake_yen"], 2) if row["stake_yen"] else None
         row["profit_yen"] = row["return_yen"] - row["stake_yen"]
-    report = {"version": "venue-specialists-official-postmortem-v1", "through_day": day,
+        row["main_head_accuracy_pct"]=round(100*row["main_head_hits"]/row["graded"],2) if row["graded"] else None
+    from .audit import coverage_counts
+    availability=coverage_counts(root,day)
+    for code,stats in availability.items():
+        row=counts.setdefault(code,{"venue":VENUES[code]["venue"],"graded":0,"hits":0,"hit_rate_pct":None,
+                                   "roi_pct":None,"profit_yen":0,"main_head_accuracy_pct":None})
+        row.update(stats)
+    report = {"version": "venue-specialists-official-postmortem-v1.1", "through_day": day,
               "research_only": True, "prospective_only": True,
               "venues": counts, "actual_scenario_causes_verified": 0}
     report["digest"] = digest(report)
@@ -118,8 +142,9 @@ def summarize(root, day):
 def run(root, *, now=None, official=None, max_fetch=24):
     now = now or datetime.now(JST)
     if official is None:
-        import direct_discord_notify as official
-    from daily_report import parse_payout
+        from .official import Official
+        official=Official()
+    from research.capture_v1.parsers import parse_payout, parse_result
     root = Path(root)
     checked, saved, errors = 0, 0, []
     pending = sorted((root / "forecasts").glob("20*/*.json"))
@@ -143,12 +168,22 @@ def run(root, *, now=None, official=None, max_fetch=24):
         checked += 1
         try:
             url = official.official_url("raceresult",key[:8], forecast["jcd"], int(key[-2:]))
-            result = parse_payout(official.fetch(url))
+            html=official.fetch(url)
+            result = parse_payout(html)
+            result["race_id"]=key
+            result["raw_html"]=html
+            result["sha256"]=__import__("hashlib").sha256(html.encode()).hexdigest()
+            if result.get("status")=="settled" and len(result.get("payouts") or {})==1 and not result.get("refund_lanes"):
+                details=parse_result(html,key[:8],forecast["jcd"],int(key[-2:]))
+                result["details"]=details
+                if details["method"]=="恵まれ" or any(b["status"]!="finished" for b in details["finish"]):
+                    result["status"]="accident"
             result["observed_at"] = now.isoformat()
             result["source_url"] = url
             if result.get("status") == "pending":
                 continue
             review = evaluate(forecast, receipt, result)
+            save_immutable(root/"results"/key[:8]/(key+".json"),result)
             save_immutable(out_path, review)
             saved += 1
         except Exception as exc:

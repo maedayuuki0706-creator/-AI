@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from research.scenario_v2 import engine as scenario
 
 JST = ZoneInfo("Asia/Tokyo")
-VERSION = "venue-specialists-shadow-v1"
+VERSION = "venue-specialists-shadow-v1.1-log-recovery"
 POLICY = {"points": 10, "unit_yen": 100, "heuristic_not_calibrated": True,
           "minimum_conditional_races": 200, "validated_effect_cap": 0.20,
           "standalone_research": True}
@@ -101,24 +101,10 @@ def _validated_residual(kind, course, env, captured, conditioned):
 
 
 def _motor_score(boat, code, captured, motor_db):
-    value = _number(boat.get("motor_top2_rate"))
-    signals = [{"field": "motor_top2_rate", "value": value,
-                "status": "observed" if value is not None else "missing"}]
-    score = _clamp((value - 35) / 35 * .13) if value is not None else 0
-    motor_no = boat.get("motor_number")
-    data = motor_db.get(f"{code}:{motor_no}") if motor_no is not None else None
-    if isinstance(data, dict) and _timestamp_before(data.get("as_of"), captured):
-        grade = str(data.get("grade") or "").upper()
-        if grade in {"S", "A", "B", "C", "D"}:
-            score += {"S": .09, "A": .045, "B": 0, "C": -.045, "D": -.09}[grade]
-            signals.append({"field": "current_motor_grade", "value": grade,
-                            "status": "research_grade", "as_of": data["as_of"]})
-        for attribute in ("launch", "stretch", "turn"):
-            signals.append({"field": "motor_" + attribute,
-                            "value": data.get(attribute), "status": "descriptive_only"})
-    else:
-        signals.append({"field": "motor_grade", "status": "missing_or_future"})
-    return round(_clamp(score, .25), 5), signals
+    # No coefficient has been externally validated. Preserve observations only.
+    return 0.0, [{"field": "motor_top2_rate", "value": boat.get("motor_top2_rate"),
+                  "status": "descriptive_only_unvalidated"},
+                 {"field": "current_motor_period", "status": "not_verified"}]
 
 
 def analyze(snapshot, *, venues_db=None, motor_db=None, conditioned=None,
@@ -171,21 +157,21 @@ def analyze(snapshot, *, venues_db=None, motor_db=None, conditioned=None,
         if percentages is not None:
             # The course rate is the *venue prior*, not a probability estimate.
             # Deliberately do not also add national course rates.
-            s += math.log(percentages[course-1] / 100)
-            additions["venue_course_prior_log"] = round(s, 5)
+            s += 0.0  # DB course rates have no dated/count evidence; descriptive only
+            additions["venue_course_prior_log"] = 0.0
+            additions["observed_course_win_pct"] = percentages[course-1]
+            additions["course_prior_status"] = "unvalidated_not_applied"
         else:
             additions["venue_course_prior_log"] = None
         motor, motor_log = _motor_score(b, code, captured, motor_db)
         s += motor
         additions["motor_residual"] = motor
         st = _number(b.get("avg_st"))
-        st_part = (_clamp((st_mean - st) / .05 * .10)
-                   if st_mean is not None and st is not None else 0)
+        st_part = 0.0  # no validated ST-to-ranking coefficient
         s += st_part
         additions["historical_st_formation"] = round(st_part, 5)
         exhibition = _number(b.get("exhibition_time"))
-        exhibition_part = (_clamp((exhibition_mean - exhibition) / .10 * .12)
-                           if exhibition_mean is not None and exhibition is not None else 0)
+        exhibition_part = 0.0  # no validated exhibition-to-ranking coefficient
         s += exhibition_part
         additions["exhibition_time_relative"] = round(exhibition_part, 5)
         for key, category in (("wind", "wind_conditions"),
@@ -208,47 +194,56 @@ def analyze(snapshot, *, venues_db=None, motor_db=None, conditioned=None,
                        "components": additions, "motor_evidence": motor_log,
                        "win_paths": item["win_paths"],
                        "loss_paths": item["loss_paths"],
-                       "hypotheses": [{"tactic": h.get("tactic"), "attack_origin": h.get("origin_lane"),
+                       "hypotheses": [{"tactic": h.get("tactic"), "attack_origin": h.get("attack_origin_lane"),
                                       "formation_count": len(h.get("formations") or [])}
                                      for h in item["hypotheses"]]})
+    # Structural selection policy, not a learned coefficient or likelihood.
+    # Interleave candidates from every head; do not treat branch repetition as frequency.
     coverage = set(base["formation_candidates"])
-    card = []
-    if percentages is not None:
-        # Distinct roles for head, second and third; never directly use a
-        # course top-two percentage as the first-place probability.
-        rankings = []
-        for first, second, third in permutations(range(1, 7), 3):
-            combo = f"{first}-{second}-{third}"
-            score = scores[first] + .35 * scores[second] + .15 * scores[third]
-            if combo in coverage:
-                score += .10  # common v2 scenario coverage, not an actual probability
-            rankings.append((round(score, 8), combo, combo in coverage))
-        rankings.sort(key=lambda item: (-item[0], item[1]))
-        card = [{"combination": combo, "research_rank_score": value,
-                 "v2_scenario_supported": supported}
-                for value, combo, supported in rankings[:POLICY["points"]]]
+    pools = {}
+    support = {}
+    for item in boats:
+        queue = []
+        hypotheses = sorted(item["hypotheses"], key=lambda h: (-int(h["supported_observations"] > 0), h["id"]))
+        for h in hypotheses:
+            for f in h["formations"]:
+                combo = f["combination"]
+                support.setdefault(combo, []).append(h["id"])
+                if combo not in queue: queue.append(combo)
+        pools[item["lane"]] = queue
+    order = sorted(pools, key=lambda lane: (-scores[lane], next(b["predicted_course"] for b in boats if b["lane"] == lane)))
+    chosen = []
+    while len(chosen) < POLICY["points"] and any(pools.values()):
+        for lane in order:
+            while pools[lane] and pools[lane][0] in chosen: pools[lane].pop(0)
+            if pools[lane] and len(chosen) < POLICY["points"]: chosen.append(pools[lane].pop(0))
+    card = [{"combination": combo, "v2_scenario_supported": combo in coverage,
+             "supporting_hypothesis_ids": support[combo], "selection_policy": "v2_head_interleave_no_unvalidated_coefficients"}
+            for combo in chosen]
     record = {"model": profile["name"], "venue": profile["venue"], "jcd": code,
               "version": VERSION, "start_day": profile["first_day"],
               "race_id": base["meta"]["race_id"], "research_only": True,
               "status": "prospective_uncheckpointed" if mode == "live" else "retrospective_replay",
               "created_at": now, "captured_at": base["meta"]["captured_at"],
               "deadline_at": base["meta"]["deadline_at"], "snapshot_digest": digest(snapshot),
-              "common_v2_digest": base["digest"],
+              "common_v2_digest": base["digest"], "common_v2": base,
+              "selection_policy": "v2_head_interleave_no_unvalidated_coefficients",
               "input_sources": snapshot.get("source", {}),
               "environment": env_display, "water_type": profile["water_type"],
               "tide_eligible": profile["tide_enabled"],
-              "seven_features": {"course": "research_venue_prior" if percentages else "missing",
+              "seven_features": {"course": "descriptive_unvalidated" if percentages else "missing",
                   "motor": "observed_or_missing", "wind": "validated_only",
                   "tide": "validated_only" if profile["tide_enabled"] else "not_applicable",
                   "entry": "observed_exhibition_course", "st": "historical_avg_only",
                   "water": "validated_only"},
               "lane_audits": sorted(audits, key=lambda a: a["lane"]),
               "formation_candidates": base["formation_candidates"],
-              "virtual_card": card, "card_status": "research_10_points" if card else "missing_course_prior",
+              "virtual_card": card, "card_status": "research_10_points" if len(card) == 10 else "incomplete_scenario_card",
               "unit_yen": 100, "stake_yen": len(card) * 100,
               "probabilities_calibrated": False,
               "limitations": ["Research scores are not win rates, fair odds, EV or proof of a weather/tide effect.",
-                  "Course prior source is provisional and must receive count/date validation.",
+                  "All unvalidated motor, ST, exhibition and course-rate coefficients are disabled.",
+                  "10 tickets interleave v2 structural candidates across heads; this policy has no demonstrated predictive advantage.",
                   "Exhibition ST does not predict actual ST; it was not used as a score.",
                   "Unvalidated weather, tide, wave and missing data add zero.",
                   "Actual tactics and six-boat positional reactions require video review.",

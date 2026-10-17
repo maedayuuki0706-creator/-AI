@@ -20,7 +20,7 @@ from research.scenario_v2.collector import save_immutable
 from .engine import VENUES, analyze, digest
 
 JST = ZoneInfo("Asia/Tokyo")
-EARLIEST_LEAD = 6 * 60
+EARLIEST_LEAD = 4 * 60
 LATEST_LEAD = 28 * 60
 
 
@@ -46,7 +46,9 @@ def _deadline(day, hhmm):
 def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
                  venue_stats=None, motors=None, clock=None):
     clock = clock or now_jst
-    official = official or __import__("direct_discord_notify")
+    if official is None:
+        from .official import Official
+        official = Official()
     deadline = _deadline(day, hhmm)
     key = race_id(day, jcd, rno)
     paths = Path(root)
@@ -91,8 +93,9 @@ def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
     if VENUES[jcd]["tide_enabled"]:
         try:
             if tide_source is None:
-                import tide_context as tide_source
-            tide = tide_source.get_tide_context(day, jcd, hhmm)
+                tide = {"available": False, "status": "independent_tide_source_not_connected", "current_measured": False}
+            else:
+                tide = tide_source.get_tide_context(day, jcd, hhmm)
         except Exception:
             tide = {"available": False, "status": "tide_fetch_error"}
     snapshot = {
@@ -112,6 +115,17 @@ def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
                         "wind_direction": preview.get("wind_direction"),
                         "tide": tide},
     }
+    if hasattr(official, "envelope"):
+        card_url = official.official_url("racelist", day, jcd, rno)
+        snapshot["official_originals"] = {"racelist": official.envelope(card_url),
+                                          "beforeinfo": official.envelope(url)}
+        if official.deadlines(day,jcd)[int(rno)-1] != hhmm:
+            raise ValueError("Official deadline changed")
+        import re
+        ids=set(re.findall(r'/racerphoto/(\d{4})',html))
+        if ids and ids != {str(b["racer_id"]) for b in boats}:
+            raise ValueError("Exhibition roster differs from official entrants")
+        snapshot["environment"]["wind_direction_icon"] = preview.get("wind_direction_icon")
     forecast = analyze(snapshot, venues_db=venue_stats, motor_db=motors,
                        mode="live", now=clock().isoformat())
     # Input and forecast write-once. A partial write must be reported, not
@@ -145,20 +159,45 @@ def schedule(day, *, official, clock):
 def run(root, *, clock=None, official=None, max_workers=4):
     clock = clock or now_jst
     if official is None:
-        import direct_discord_notify as official
+        from .official import Official
+        official = Official()
     start = clock()
     day = start.strftime("%Y%m%d")
     venue_db = _read_json("data/sheet_db/venues.json")
     motor_db = _read_json("data/sheet_db/motors.json")
-    due, errors = schedule(day, official=official, clock=clock)
+    schedules, errors, due = {}, [], []
+    for code, profile in VENUES.items():
+        if day < profile["first_day"]: continue
+        try:
+            deadlines = official.deadlines(day,code)
+            if not isinstance(deadlines,list) or len(deadlines) not in (0,12):
+                raise ValueError("Expected 12 official deadlines or verified non-held venue")
+            schedules[code] = deadlines
+            for rno, hhmm in enumerate(deadlines,1):
+                lead=(_deadline(day,hhmm)-clock()).total_seconds()
+                if EARLIEST_LEAD <= lead <= LATEST_LEAD: due.append((day,code,rno,hhmm))
+        except Exception as exc:
+            errors.append({"venue":code,"type":type(exc).__name__,"reason":str(exc)[:200]})
+    inventory={"day":day,"observed_at":clock().isoformat(),"schedules":schedules,"errors":errors}
+    if hasattr(official,"envelope"):
+        inventory["originals"]={code:official.envelope(official.official_url("racelist",day,code,1)) for code in schedules}
+    stamp=start.strftime("%H%M%S_%f")+"_"+str(os.getenv("GITHUB_RUN_ID") or "manual")
+    save_immutable(Path(root)/"schedules"/day/(stamp+".json"),inventory)
+    due.sort(key=lambda r:(r[3],r[1],r[2]))
     output = []
     def attempt(args):
         try:
             return collect_race(*args, root, clock=clock, official=official,
                                 venue_stats=venue_db, motors=motor_db)
         except Exception as exc:
-            return {"race_id": race_id(args[0], args[1], args[2]), "status": "missing",
-                    "error_type": type(exc).__name__, "reason": str(exc)[:200]}
+            item={"race_id": race_id(args[0], args[1], args[2]), "status": "missing",
+                  "observed_at":clock().isoformat(), "deadline":args[3],
+                  "error_type": type(exc).__name__, "reason": str(exc)[:200]}
+            if hasattr(official,"envelope"):
+                item["partial_originals"]={kind:official.envelope(official.official_url(kind,*args[:3]))
+                  for kind in ["racelist","beforeinfo"] if official.official_url(kind,*args[:3]) in official.raw}
+            save_immutable(Path(root)/"attempts"/day/(item["race_id"]+"_"+stamp+".json"),item)
+            return {k:v for k,v in item.items() if k!="partial_originals"}
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = [pool.submit(attempt, args) for args in due]
         for future in as_completed(futures):
@@ -169,10 +208,8 @@ def run(root, *, clock=None, official=None, max_workers=4):
     for code, profile in VENUES.items():
         if day < profile["first_day"]:
             continue
-        try:
-            deadlines = official.deadlines(day, code)
-        except Exception:
-            continue  # A schedule retrieval error was already recorded above.
+        if code not in schedules: continue
+        deadlines=schedules[code]
         for rno, hhmm in enumerate(deadlines[:12], start=1):
             cutoff = _deadline(day, hhmm)
             if (cutoff-clock()).total_seconds() >= 180:
@@ -187,7 +224,10 @@ def run(root, *, clock=None, official=None, max_workers=4):
                 if not receipt.is_file():
                     missed.append({"race_id": key, "deadline": hhmm,
                                    "status": "remote_checkpoint_pending_or_missing"})
-    report = {"version": "venue-specialist-collector-v1", "research_only": True,
+    report = {"version": "venue-specialist-collector-v1.1", "scheduled_races":sum(map(len,schedules.values())),
+              "scheduled_by_venue":{c:len(d) for c,d in schedules.items()},
+              "health":"degraded" if errors or missed or any(x["status"]=="missing" for x in output) else "ok",
+              "version_label": "venue-specialist-collector-v1.1", "research_only": True,
               "day": day, "started_at": start.isoformat(), "finished_at": clock().isoformat(),
               "active_venues": {k: v["name"] for k,v in VENUES.items()
                                 if day >= v["first_day"]},
@@ -197,7 +237,7 @@ def run(root, *, clock=None, official=None, max_workers=4):
               "missing_count": sum(x["status"] == "missing" for x in output),
               "elapsed_races_without_confirmed_forecast": missed}
     coverage = Path(root) / "coverage" / day / (
-        start.strftime("%H%M%S") + "_" + str(os.getenv("GITHUB_RUN_ID") or "manual") + ".json")
+        stamp + ".json")
     save_immutable(coverage, report)
     return report
 
@@ -226,10 +266,17 @@ def verify_commit(root, commit_sha, *, git_show, confirmed_at=None):
                 raise ValueError("Existing receipt identity/digest mismatch")
             confirmed.append(previous)
             continue
+        input_path=root/"inputs"/record["race_id"][:8]/(record["race_id"]+".json")
+        snapshot=_read_json(input_path)
+        if digest(snapshot)!=record["snapshot_digest"]:raise ValueError("Input digest mismatch")
+        input_remote_path="data/venue_specialists_v1/"+str(input_path.relative_to(root)).replace(os.sep,"/")
+        if json.loads(git_show(commit_sha,input_remote_path))!=snapshot:raise ValueError("Remote input mismatch")
         deadline = datetime.fromisoformat(record["deadline_at"])
         valid = saved_at < deadline
         receipt = {"race_id": record["race_id"], "digest": record["digest"],
                    "commit_sha": commit_sha, "checked_at": saved_at.isoformat(),
+                   "snapshot_digest":record["snapshot_digest"], "input_path":input_remote_path,
+                   "forecast_path":remote_path, "complete_originals_verified":bool(snapshot.get("official_originals")),
                    "status": "confirmed_before_deadline" if valid else "late_remote_save_excluded"}
         save_immutable(receipt_path, receipt)
         confirmed.append(receipt)
