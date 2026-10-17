@@ -24,8 +24,8 @@ class Official:
     def fetch(self, url):
         with self.lock:
             if url in self.raw: return self.raw[url]
-        req=urllib.request.Request(url,headers={'User-Agent':'BoatAI-Venue-Research/1.1','Accept-Language':'ja'})
-        with urllib.request.urlopen(req,timeout=8) as response:
+        req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0 (compatible; BoatAI-Independent-Research/1.1)','Accept-Language':'ja'})
+        with urllib.request.urlopen(req,timeout=25) as response:
             if response.geturl()!=url: raise ValueError('Unexpected official redirect')
             content=response.read(2000001)
         if len(content)>2000000: raise ValueError('Official response too large')
