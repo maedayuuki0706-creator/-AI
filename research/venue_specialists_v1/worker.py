@@ -19,49 +19,60 @@ def git(root, *args):
                                    stderr=subprocess.STDOUT, timeout=40)
 
 
-def _validate_paths(changes):
+def _validate_paths(changes, *, prefix=PREFIX, mutable=None):
+    mutable = DERIVED_MUTABLE if mutable is None else mutable
     for line in changes.splitlines():
         status, path = line.split('\t', 1)
-        if not path.startswith(PREFIX + '/'):
+        if not path.startswith(prefix + '/'):
             raise ValueError('Non-research staged path')
-        if status != 'A' and path not in DERIVED_MUTABLE:
+        if status != 'A' and path not in mutable:
             raise ValueError('Immutable research file modification/deletion refused: ' + path)
 
 
-def _merge_remote(state, remote_sha):
+def _merge_remote(state, remote_sha, *, mutable=None):
+    mutable = DERIVED_MUTABLE if mutable is None else mutable
     try:
         git(state, 'merge', '--no-edit', remote_sha)
     except subprocess.CalledProcessError:
         conflicts = git(state, 'diff', '--name-only', '--diff-filter=U').splitlines()
-        if conflicts != [PREFIX + '/summary/latest.json']:
+        if not conflicts or not set(conflicts) <= mutable:
             git(state, 'merge', '--abort')
             raise ValueError('Conflicting immutable research originals; refusing overwrite')
-        git(state, 'checkout', '--theirs', '--', PREFIX + '/summary/latest.json')
-        git(state, 'add', '--', PREFIX + '/summary/latest.json')
+        git(state, 'checkout', '--theirs', '--', *conflicts)
+        git(state, 'add', '--', *conflicts)
         git(state, 'commit', '--no-edit')
 
 
-def persist(state, message, *, attempts=3, pause=time.sleep):
+def persist(state, message, *, attempts=3, pause=time.sleep, fusion_pilot_day=None):
     """Retry unpushed commits even with an empty index, without force or overwrites.
 
     A crash after commit/before push no longer disables the next retry. A remote
     append after our push is accepted if it contains the pushed commit. Every
     returned SHA has been fetched from the remote, not merely read from local HEAD.
     """
-    git(state, 'add', '--', PREFIX)
+    branch, prefix, mutable = BRANCH, PREFIX, DERIVED_MUTABLE
+    if fusion_pilot_day is not None:
+        # The existing research persister is reused, with a fixed independent
+        # branch allowlist. No arbitrary branch/path or production write option.
+        from datetime import datetime
+        datetime.strptime(fusion_pilot_day, '%Y%m%d')
+        branch, prefix = 'research-fusion-recovery-state', 'data/fusion_shadow'
+        mutable = {prefix + '/' + x for x in ('heartbeat.json', 'summary.json', 'SUMMARY.md',
+                                              'cards/' + fusion_pilot_day + '.json')}
+    git(state, 'add', '--', prefix)
     staged = git(state, 'diff', '--cached', '--name-status', '--no-renames')
-    _validate_paths(staged)
+    _validate_paths(staged, prefix=prefix, mutable=mutable)
     if staged.strip():
         git(state, 'commit', '-m', message)
     for attempt in range(attempts):
         try:
             # Also push when no NEW files were staged: HEAD can contain a
             # commit whose previous push failed or timed out.
-            git(state, 'push', 'origin', 'HEAD:refs/heads/' + BRANCH)
+            git(state, 'push', 'origin', 'HEAD:refs/heads/' + branch)
         except (subprocess.SubprocessError, OSError):
             pass
         try:
-            git(state, 'fetch', '--quiet', '--depth=50', 'origin', 'refs/heads/' + BRANCH)
+            git(state, 'fetch', '--quiet', '--depth=50', 'origin', 'refs/heads/' + branch)
             remote_sha = git(state, 'rev-parse', 'FETCH_HEAD').strip()
             local_sha = git(state, 'rev-parse', 'HEAD').strip()
             included = remote_sha == local_sha
@@ -73,7 +84,7 @@ def persist(state, message, *, attempts=3, pause=time.sleep):
                     pass
             if included:
                 return remote_sha
-            _merge_remote(state, remote_sha)
+            _merge_remote(state, remote_sha, mutable=mutable)
         except ValueError:
             raise
         except (subprocess.SubprocessError, OSError):

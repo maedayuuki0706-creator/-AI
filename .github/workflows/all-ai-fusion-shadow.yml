@@ -1,27 +1,23 @@
-name: All AI Fusion - Log Only Shadow Test
+name: All AI Fusion - Recovery Research Pilot (manual only)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'fusion_shadow.py'
-      - 'fusion_shadow_runner.py'
-      - 'tests/test_fusion_shadow.py'
-      - '.github/workflows/all-ai-fusion-shadow.yml'
-  schedule:
-    # UTC 23:03-14:58 = JST 08:03-23:58. GitHub schedules can be delayed.
-    - cron: '3-58/5 23,0-14 * * *'
+    inputs:
+      day:
+        description: 'JST race day YYYYMMDD; only Karatsu 1-3R, one capture per run'
+        required: true
+        default: '20261018'
 
 permissions:
   contents: write
 
 concurrency:
-  group: all-ai-fusion-shadow-independent
+  group: fusion-recovery-research-pilot-only
   cancel-in-progress: false
 
 jobs:
   check_and_log:
+    if: github.ref == 'refs/heads/research/fusion-log-recovery-20261018'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -34,6 +30,8 @@ jobs:
             /*.py
             /notification_policy.json
             /tests/test_fusion_shadow.py
+            /tests/test_fusion_log_recovery.py
+            /research/
             /x_delivery_v2/
             /data/sheet_db/
             /data/racer_profiles.json
@@ -44,41 +42,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate timing, scoring, storage and no-delivery integration
-        run: python -m unittest discover -s tests -p 'test_fusion_shadow.py' -v
-      - name: Open separate log state
+      - name: Verify original policy, cutoff, retries and no delivery
         run: |
-          git fetch --depth=1 origin research-fusion-shadow-state:refs/remotes/origin/research-fusion-shadow-state
-          git -c core.sparseCheckout=false worktree add --detach "$RUNNER_TEMP/fusion-shadow-state" refs/remotes/origin/research-fusion-shadow-state
-          git -C "$RUNNER_TEMP/fusion-shadow-state" config user.name 'github-actions[bot]'
-          git -C "$RUNNER_TEMP/fusion-shadow-state" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-      - name: Collect live predictions and later official results; log only
-        run: python fusion_shadow_runner.py --out "$RUNNER_TEMP/fusion-shadow-state/data/fusion_shadow" --budget-seconds 85
-      - name: Persist log state only, including failed collector coverage
-        id: persist
-        if: always()
+          python -m unittest discover -s tests -p 'test_fusion_shadow.py' -q
+          python -m unittest discover -s tests -p 'test_fusion_log_recovery.py' -q
+          python -m unittest discover -s research/venue_specialists_v1/tests -q
+      - name: Open independent recovery log state
         run: |
-          ROOT="$RUNNER_TEMP/fusion-shadow-state"
-          if [ ! -d "$ROOT/data/fusion_shadow" ]; then
-            exit 0
-          fi
-          git -C "$ROOT" add data/fusion_shadow/
-          if ! git -C "$ROOT" diff --cached --quiet; then
-            git -C "$ROOT" commit -m 'research: record all-AI fusion shadow logs'
-            git -C "$ROOT" push origin HEAD:refs/heads/research-fusion-shadow-state
-            echo "commit_sha=$(git -C "$ROOT" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Confirm remote prediction save before deadline in a second receipt commit
-        if: always() && steps.persist.outputs.commit_sha != ''
+          git fetch --depth=1 origin research-fusion-recovery-state:refs/remotes/origin/research-fusion-recovery-state
+          git -c core.sparseCheckout=false worktree add --detach "$RUNNER_TEMP/fusion-recovery-state" refs/remotes/origin/research-fusion-recovery-state
+          git -C "$RUNNER_TEMP/fusion-recovery-state" config user.name 'github-actions[bot]'
+          git -C "$RUNNER_TEMP/fusion-recovery-state" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Freeze one eligible original, confirm remote receipt, then review
         env:
-          FUSION_STATE_COMMIT: ${{ steps.persist.outputs.commit_sha }}
-        run: |
-          ROOT="$RUNNER_TEMP/fusion-shadow-state"
-          python fusion_shadow_runner.py --out "$ROOT/data/fusion_shadow" --checkpoint-commit "$FUSION_STATE_COMMIT"
-          if [ -d "$ROOT/data/fusion_shadow/checkpoints" ]; then
-            git -C "$ROOT" add data/fusion_shadow/checkpoints/
-          fi
-          if ! git -C "$ROOT" diff --cached --quiet; then
-            git -C "$ROOT" commit -m 'research: confirm durable pre-deadline fusion snapshots'
-            git -C "$ROOT" push origin HEAD:refs/heads/research-fusion-shadow-state
-          fi
+          RESEARCH_PILOT_DAY: ${{ inputs.day || '20261018' }}
+        run: python -m research.fusion_log_recovery.pilot --state "$RUNNER_TEMP/fusion-recovery-state" --day "$RESEARCH_PILOT_DAY"
+      - name: Retain originals and failure stage if interrupted
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fusion-recovery-pilot-failure-${{ github.run_id }}
+          path: ${{ runner.temp }}/fusion-recovery-state/data/fusion_shadow/
+          retention-days: 7
+          if-no-files-found: ignore
