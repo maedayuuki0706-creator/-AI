@@ -69,7 +69,12 @@ def main():
     a=p.parse_args();finish=time.monotonic()+a.seconds;errors=[]
     while True:
         start=time.monotonic()
-        try:result=tick(a.state)
+        try:
+            local_now=run.now_jst()
+            if local_now.hour<8:
+                result={"at":local_now.isoformat(),"health":"idle_outside_hours",
+                        "note":"No official fetch or prediction overnight; retain independent continuation for next research day"}
+            else:result=tick(a.state)
         except Exception as exc:
             result={'at':run.now_jst().isoformat(),'health':'error','error_type':type(exc).__name__,'reason':str(exc)[:500]}
             errors.append(result)
