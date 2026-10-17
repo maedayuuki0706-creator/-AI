@@ -1,17 +1,28 @@
 {
   "audit": {
-    "eligible": 0,
+    "eligible": 1,
     "inside_cutoff": 100,
-    "prediction_files": 101,
+    "prediction_files": 102,
     "remaining_daily_slots": 30,
     "selection_gate": 1
   },
-  "checked_at": "2026-10-17T15:01:35.395247+09:00",
-  "counts": {},
+  "checked_at": "2026-10-17T15:05:57.077698+09:00",
+  "counts": {
+    "failed": 1
+  },
   "day": "20261017",
   "errors": [],
-  "events": [],
+  "events": [
+    {
+      "key": "prediction:20261017:02:10",
+      "status": "failed"
+    }
+  ],
   "held": [
+    {
+      "key": "prediction:20261017:02:10",
+      "status": "blocked"
+    },
     {
       "key": "prediction:20261017:02:3",
       "status": "blocked"
@@ -298,10 +309,10 @@
   "quarantined": [],
   "status": "degraded",
   "trigger_event": "workflow_dispatch",
-  "workflow_run_id": "39008345299",
+  "workflow_run_id": "39008608580",
   "x_monitor": {
     "duplicate_guard_verified": 0,
-    "held_transmissions": 70,
+    "held_transmissions": 71,
     "previous_day": {
       "alerts": [],
       "confirmed_post_total": 0,
