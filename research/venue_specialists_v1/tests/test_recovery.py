@@ -95,3 +95,23 @@ class ComparisonTests(unittest.TestCase):
         self.assertEqual(len(row['common_v2_diagnostics']['lanes']),6)
         self.assertTrue(row['main_head_correct'])
         self.assertFalse(row['scenario_mechanism_verified'])
+
+class PersistenceTests(unittest.TestCase):
+    def test_concurrent_append_preserves_both_originals_without_force(self):
+        import subprocess
+        from research.venue_specialists_v1.worker import persist,PREFIX,BRANCH
+        def g(cwd,*args):return subprocess.check_output(['git','-C',str(cwd),*args],stderr=subprocess.DEVNULL,text=True)
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp);bare=root/'origin.git';a=root/'a';b=root/'b'
+            subprocess.check_call(['git','init','--bare','--quiet',str(bare)])
+            subprocess.check_call(['git','clone','--quiet',str(bare),str(a)],stderr=subprocess.DEVNULL)
+            for p in [a]:
+                g(p,'config','user.name','test');g(p,'config','user.email','test@example.invalid')
+            (a/PREFIX).mkdir(parents=True);(a/PREFIX/'seed.json').write_text('{}')
+            g(a,'add','.');g(a,'commit','-qm','seed');g(a,'branch','-M',BRANCH);g(a,'push','-u','origin',BRANCH)
+            subprocess.check_call(['git','clone','--quiet','--branch',BRANCH,str(bare),str(b)])
+            g(b,'config','user.name','test');g(b,'config','user.email','test@example.invalid')
+            (a/PREFIX/'a.json').write_text('{"a":1}');persist(a,'A')
+            (b/PREFIX/'b.json').write_text('{"b":2}');sha=persist(b,'B')
+            self.assertEqual(json.loads(g(b,'show',sha+':'+PREFIX+'/a.json')),{'a':1})
+            self.assertEqual(json.loads(g(b,'show',sha+':'+PREFIX+'/b.json')),{'b':2})

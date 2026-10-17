@@ -24,7 +24,24 @@ def persist(state,message):
     paths=git(state,'diff','--cached','--name-only').splitlines()
     if any(not p.startswith(PREFIX+'/') for p in paths):raise ValueError('Non-research staged path')
     git(state,'commit','-m',message)
-    git(state,'push','origin','HEAD:refs/heads/'+BRANCH)
+    try:
+        git(state,'push','origin','HEAD:refs/heads/'+BRANCH)
+    except subprocess.CalledProcessError:
+        # Another authorized research writer may append originals. Never force
+        # the state branch or choose one version of a conflicting original.
+        git(state,'fetch','--depth=20','origin',BRANCH)
+        remote_sha=git(state,'rev-parse','FETCH_HEAD').strip()
+        try:
+            git(state,'merge','--no-edit',remote_sha)
+        except subprocess.CalledProcessError:
+            conflicts=git(state,'diff','--name-only','--diff-filter=U').splitlines()
+            if conflicts != [PREFIX+'/summary/latest.json']:
+                git(state,'merge','--abort')
+                raise ValueError('Conflicting immutable research originals; refusing overwrite')
+            git(state,'checkout','--theirs','--',PREFIX+'/summary/latest.json')
+            git(state,'add','--',PREFIX+'/summary/latest.json')
+            git(state,'commit','--no-edit')
+        git(state,'push','origin','HEAD:refs/heads/'+BRANCH)
     sha=git(state,'rev-parse','HEAD').strip()
     remote=git(state,'ls-remote','origin','refs/heads/'+BRANCH).split()[0]
     if remote!=sha:raise ValueError('Remote state branch head did not confirm push')

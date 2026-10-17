@@ -114,7 +114,11 @@ def summarize(root, day):
         row["graded"] += 1
         row["main_head_hits"] += int(bool(result.get("main_head_correct")))
         diagnostic=result.get("common_v2_diagnostics") or {}
-        pattern=str(diagnostic.get("method_assessment") or diagnostic.get("status") or "actual_tactics_unverified")
+        if not diagnostic:pattern="actual_tactics_unverified"
+        elif diagnostic.get("method_and_formation_covered") is True:pattern="winner_method_and_formation_covered"
+        elif diagnostic.get("method_and_formation_covered") is False:pattern="winner_method_or_followers_not_covered"
+        else:pattern="winner_method_not_available"
+        if diagnostic.get("entry_changed_lanes"):pattern+="_with_entry_change"
         row["scenario_patterns"][pattern]=row["scenario_patterns"].get(pattern,0)+1
         row["hits"] += int(bool(result["hit"]))
         row["stake_yen"] += result["stake_yen"]
@@ -187,8 +191,11 @@ def run(root, *, now=None, official=None, max_fetch=24):
             save_immutable(out_path, review)
             saved += 1
         except Exception as exc:
-            errors.append({"race_id": key, "error_type": type(exc).__name__,
-                           "message": str(exc)[:180]})
+            item={"race_id": key, "error_type": type(exc).__name__,
+                  "message": str(exc)[:180],"observed_at":now.isoformat()}
+            errors.append(item)
+            stamp=now.strftime("%H%M%S_%f")
+            save_immutable(root/"review_attempts"/key[:8]/(key+"_"+stamp+".json"),item)
     summary = summarize(root, now.strftime("%Y%m%d"))
     out = root / "summary" / "latest.json"
     out.parent.mkdir(parents=True, exist_ok=True)
