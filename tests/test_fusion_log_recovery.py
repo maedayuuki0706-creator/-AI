@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import time
 import unittest
+from contextlib import ExitStack
 from unittest.mock import patch
 
 import fusion_shadow as core
@@ -15,7 +16,12 @@ import fusion_shadow_runner as runner
 from research.fusion_log_recovery import pilot
 from research.venue_specialists_v1 import worker
 from research.venue_specialists_v1.tests import test_phase1 as phase1_tests
-from test_fusion_shadow import NOW, record, result
+from research.venue_specialists_v1.log_contract import (
+    FrozenBaseline, capture_yuuki, descriptor, verify_yuuki, validate_receipt,
+)
+from research.scenario_v2.adapters import from_fusion
+from research.venue_specialists_v1.phase1_metrics import comparison
+from test_fusion_shadow import NOW, fixture, record, result
 
 
 class CaptureRecoveryTests(unittest.TestCase):
@@ -189,6 +195,148 @@ class PilotPersistenceTests(unittest.TestCase):
             worker._validate_paths('M\tdata/fusion_shadow/predictions/20261012/x.json', prefix=pilot.PREFIX, mutable=set())
         with self.assertRaises(ValueError):
             worker._validate_paths('A\tdata/prediction_log.jsonl', prefix=pilot.PREFIX, mutable=set())
+
+
+class PreflightTests(unittest.TestCase):
+    def setup_state(self, tmp):
+        state = phase1_tests.PersistenceResumeTests()._setup(tmp)
+        for name in pilot.REQUIRED:
+            path = state / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('# synthetic committed readiness fixture\n')
+        db = state / 'data/sheet_db'; db.mkdir(parents=True)
+        for name in ('players', 'motors', 'venues', 'meta'):
+            value = {'snapshot_at': (NOW - timedelta(days=1)).isoformat()} if name == 'meta' else {'fixture': {}}
+            (db / (name + '.json')).write_text(json.dumps(value))
+        worker.git(state, 'add', '.')
+        worker.git(state, 'commit', '-m', 'synthetic pinned code and DB')
+        worker.git(state, 'push', 'origin', 'HEAD:refs/heads/' + pilot.BRANCH)
+        return state
+
+    def test_night_readiness_is_read_only_and_never_a_live_save(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = self.setup_state(tmp)
+            head = worker.git(state, 'rev-parse', 'HEAD')
+            with ExitStack() as stack:
+                stack.enter_context(patch.object(runner, 'now_jst', return_value=NOW.replace(hour=2)))
+                for name in ('run', 'build_live', 'checkpoint', 'collect_results'):
+                    stack.enter_context(patch.object(runner, name, side_effect=AssertionError('No prediction/result operation')))
+                stack.enter_context(patch.object(pilot, 'persist', side_effect=AssertionError('No commit/push')))
+                stack.enter_context(patch('urllib.request.urlopen', side_effect=AssertionError('No source requests')))
+                out = pilot.preflight(state, '20261012', code_root=state)
+            self.assertEqual(out['status'], 'preflight_ready_live_save_not_verified')
+            for field in ('new_predictions', 'new_receipts', 'official_source_requests', 'state_writes', 'pushes'):
+                self.assertEqual(out[field], 0)
+            self.assertEqual(worker.git(state, 'rev-parse', 'HEAD'), head)
+            self.assertEqual(worker.git(state, 'status', '--porcelain'), '')
+
+    def test_uncommitted_source_is_not_pinned_readiness(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = self.setup_state(tmp)
+            (state / 'fusion_shadow.py').write_text('# changed\n')
+            with patch.object(runner, 'now_jst', return_value=NOW), self.assertRaisesRegex(ValueError, 'pinned commit'):
+                pilot.preflight(state, '20261012', code_root=state)
+
+    def test_missing_dependency_is_not_ready(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = self.setup_state(tmp)
+            (state / 'hiyori_source.py').unlink()
+            with self.assertRaisesRegex(ValueError, 'Missing required'):
+                pilot.preflight(state, '20261012', code_root=state)
+
+    def test_future_db_snapshot_is_not_ready(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = self.setup_state(tmp)
+            (state / 'data/sheet_db/meta.json').write_text(json.dumps({'snapshot_at': (NOW + timedelta(days=1)).isoformat()}))
+            with patch.object(runner, 'now_jst', return_value=NOW), self.assertRaisesRegex(ValueError, 'Future'):
+                pilot.preflight(state, '20261012', code_root=state)
+
+    def test_remote_moved_or_wrong_checkout_is_not_ready(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = self.setup_state(tmp)
+            (state / 'other.txt').write_text('fixture')
+            worker.git(state, 'add', 'other.txt'); worker.git(state, 'commit', '-m', 'local only fixture')
+            with patch.object(runner, 'now_jst', return_value=NOW), self.assertRaisesRegex(ValueError, 'current recovery remote'):
+                pilot.preflight(state, '20261012', code_root=state)
+
+    def test_pending_originals_are_preserved_and_not_claimed_ready(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = self.setup_state(tmp)
+            path = state / pilot.PREFIX / 'predictions/20261012/pending.json'
+            core.write_once(path, {'synthetic': 'pending'})
+            before = path.read_bytes()
+            with patch.object(runner, 'now_jst', return_value=NOW), self.assertRaisesRegex(ValueError, 'Pending research state'):
+                pilot.preflight(state, '20261012', code_root=state)
+            self.assertEqual(path.read_bytes(), before)
+
+    def test_cli_defaults_to_preflight_and_live_requires_explicit_mode(self):
+        with patch('sys.argv', ['pilot', '--state', '.', '--day', '20261012']), \
+                patch.object(pilot, 'preflight') as check, patch.object(pilot, 'tick') as live:
+            pilot.main(); check.assert_called_once_with('.', '20261012'); live.assert_not_called()
+        with patch('sys.argv', ['pilot', '--state', '.', '--day', '20261012', '--mode', 'live']), \
+                patch.object(pilot, 'preflight') as check, patch.object(pilot, 'tick') as live:
+            pilot.main(); live.assert_called_once_with('.', '20261012'); check.assert_not_called()
+
+
+class FusionToYuukiIntegrationTests(unittest.TestCase):
+    def test_real_git_archives_missing_checkpoint_then_complete_yuuki_and_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fusion_state = phase1_tests.PersistenceResumeTests()._setup(tmp)
+            worker.git(fusion_state, 'push', 'origin', 'HEAD:refs/heads/' + pilot.BRANCH)
+            worker.git(fusion_state, 'push', 'origin', 'HEAD:refs/heads/research-fusion-shadow-state')
+            yuuki_state = Path(tmp) / 'yuuki-state'
+            worker.git(fusion_state, 'worktree', 'add', '--detach', str(yuuki_state),
+                       'refs/remotes/origin/' + worker.BRANCH)
+            fusion_root = fusion_state / pilot.PREFIX
+            request, analyses, strategies = fixture()
+            analyses['hiyori']['features'] = [{'lane': i, 'used': ['synthetic_fixture'], 'preview': {}}
+                                              for i in range(1, 7)]
+            generated = core.build_prediction(request, analyses, strategies, NOW)
+            key = generated['key']; name = key + '.json'
+            with patch.object(runner, 'now_jst', return_value=NOW), \
+                    patch.object(runner, 'build_live', return_value=(generated, {'synthetic': 'pre-race fixture'})):
+                runner.capture_one(fusion_root, '20261012', '06', 1, '10:15')
+            original_path = fusion_root / 'predictions/20261012' / name
+            original_bytes = original_path.read_bytes()
+            generated = runner.load(original_path)
+            original_sha = worker.persist(fusion_state, 'synthetic fusion original', fusion_pilot_day='20261012')
+            # Build only an independent official-input-shaped fixture. Strip
+            # baseline picks so an unpublished checkpoint cannot create a card.
+            projection = from_fusion(generated, {'key': key, 'prediction_digest': generated['digest'],
+                'prediction_committed_at': (NOW + timedelta(seconds=1)).isoformat(),
+                'eligible_checkpoint': True, 'commit_sha': 'a' * 40})
+            projection.pop('baseline_picks'); projection.pop('baseline_ranking')
+            projection['source'] = {'kind': 'synthetic fixture; not a real race observation'}
+            root = yuuki_state / worker.PREFIX
+            clock = lambda: NOW + timedelta(minutes=2)
+            out = capture_yuuki(projection, root, clock=clock, baseline=FrozenBaseline(yuuki_state, clock))
+            self.assertEqual(out['status'], 'partial_no_baseline_card')
+            partial = root / 'yuuki/partial_scenarios/20261012' / name
+            partial_before = partial.read_bytes()
+            self.assertFalse((root / 'yuuki/forecasts/20261012' / name).exists())
+            with patch.object(runner, 'now_jst', return_value=NOW + timedelta(minutes=1)):
+                runner.checkpoint(fusion_root, original_sha)
+            worker.persist(fusion_state, 'synthetic fusion receipt', fusion_pilot_day='20261012')
+            out = capture_yuuki(projection, root, clock=clock, baseline=FrozenBaseline(yuuki_state, clock))
+            self.assertEqual(out['status'], 'locally_frozen_uncheckpointed')
+            forecast_path = root / 'yuuki/forecasts/20261012' / name
+            forecast = runner.load(forecast_path); before = forecast_path.read_bytes()
+            self.assertTrue(descriptor(forecast)['complete_card'])
+            self.assertTrue(descriptor(forecast)['six_boat_scenarios'])
+            self.assertEqual(forecast['virtual_card']['policy'], 'retain-main6-flow4-v1')
+            self.assertEqual(forecast['source']['frozen_baseline']['branch'], pilot.BRANCH)
+            sha = worker.persist(yuuki_state, 'synthetic full Yuuki original')
+            show = lambda commit, path: worker.git(yuuki_state, 'show', f'{commit}:{path}')
+            receipt = verify_yuuki(root, sha, git_show=show, confirmed_at=clock() + timedelta(seconds=1))[0]
+            worker.persist(yuuki_state, 'synthetic Yuuki remote receipt')
+            validate_receipt(forecast, receipt)
+            evaluated = comparison(forecast, receipt, {'race_id': key, 'status': 'settled',
+                'observed_at': (NOW + timedelta(minutes=20)).isoformat(), 'refund_lanes': [],
+                'payouts': {forecast['virtual_card']['picks'][0]: 1200}, 'source_url': 'synthetic://official-result'})
+            self.assertFalse(evaluated['actual_tactics_verified'])
+            self.assertEqual(forecast_path.read_bytes(), before)
+            self.assertEqual(partial.read_bytes(), partial_before)
+            self.assertEqual(original_path.read_bytes(), original_bytes)
 
 
 if __name__ == '__main__':

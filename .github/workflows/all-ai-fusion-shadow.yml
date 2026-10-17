@@ -7,6 +7,12 @@ on:
         description: 'JST race day YYYYMMDD; only Karatsu 1-3R, one capture per run'
         required: true
         default: '20261018'
+      mode:
+        description: 'preflight never generates or saves a prediction; live is a bounded race test'
+        required: true
+        type: choice
+        options: [preflight, live]
+        default: preflight
 
 permissions:
   contents: write
@@ -31,6 +37,7 @@ jobs:
             /notification_policy.json
             /tests/test_fusion_shadow.py
             /tests/test_fusion_log_recovery.py
+            /tests/fixtures/
             /research/
             /x_delivery_v2/
             /data/sheet_db/
@@ -47,16 +54,19 @@ jobs:
           python -m unittest discover -s tests -p 'test_fusion_shadow.py' -q
           python -m unittest discover -s tests -p 'test_fusion_log_recovery.py' -q
           python -m unittest discover -s research/venue_specialists_v1/tests -q
+          python -m unittest discover -s research/scenario_v2/tests -q
+          python -m unittest discover -s research/capture_v1/tests -q
       - name: Open independent recovery log state
         run: |
           git fetch --depth=1 origin research-fusion-recovery-state:refs/remotes/origin/research-fusion-recovery-state
           git -c core.sparseCheckout=false worktree add --detach "$RUNNER_TEMP/fusion-recovery-state" refs/remotes/origin/research-fusion-recovery-state
           git -C "$RUNNER_TEMP/fusion-recovery-state" config user.name 'github-actions[bot]'
           git -C "$RUNNER_TEMP/fusion-recovery-state" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-      - name: Freeze one eligible original, confirm remote receipt, then review
+      - name: Check readiness or freeze one eligible original, then receipt and review
         env:
           RESEARCH_PILOT_DAY: ${{ inputs.day || '20261018' }}
-        run: python -m research.fusion_log_recovery.pilot --state "$RUNNER_TEMP/fusion-recovery-state" --day "$RESEARCH_PILOT_DAY"
+          RESEARCH_PILOT_MODE: ${{ inputs.mode || 'preflight' }}
+        run: python -m research.fusion_log_recovery.pilot --state "$RUNNER_TEMP/fusion-recovery-state" --day "$RESEARCH_PILOT_DAY" --mode "$RESEARCH_PILOT_MODE"
       - name: Retain originals and failure stage if interrupted
         if: failure()
         uses: actions/upload-artifact@v4
