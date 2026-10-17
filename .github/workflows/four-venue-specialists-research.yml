@@ -6,11 +6,13 @@ on:
     branches: [main]
     paths: ['.github/workflows/four-venue-specialists-research.yml']
   schedule:
-    # JST 08:00-23:50, every ten minutes; no production hooks.
-    - cron: '*/10 23,0-14 * * *'
+    # Backup starts, offset from the crowded top of the hour. The bounded worker
+    # polls every minute and chains the next independent research run.
+    - cron: '3,13,23,33,43,53 23,0-14 * * *'
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: research-four-venue-specialists-independent
@@ -19,7 +21,7 @@ concurrency:
 jobs:
   research-log-only:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,65 +29,47 @@ jobs:
           fetch-depth: 1
           sparse-checkout-cone-mode: false
           sparse-checkout: |
-            /*.py
             /research/
             /data/sheet_db/
-            /data/venue_tide_profiles.json
-            /data/venue_tactical_priors.json
-            /data/racer_profiles.json
-            /data/learning_state.json
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Gate research unit tests before processing
+      - name: Gate research tests
         run: |
           python -m unittest discover -s research/venue_specialists_v1/tests -v
           python -m unittest discover -s research/scenario_v2/tests -v
-      - name: Open a separate research-only state branch
+      - name: Open isolated research state
         run: |
           git fetch --depth=1 origin research-venue-specialists-state:refs/remotes/origin/research-venue-specialists-state
           git -c core.sparseCheckout=false worktree add --detach "$RUNNER_TEMP/venue-specialists-state" refs/remotes/origin/research-venue-specialists-state
           git -C "$RUNNER_TEMP/venue-specialists-state" config user.name 'github-actions[bot]'
           git -C "$RUNNER_TEMP/venue-specialists-state" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           echo "VENUE_SPECIALIST_CODE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
-      - name: Collect only official pre-race research snapshots and coverage
-        run: |
-          python -m research.venue_specialists_v1.run --out "$RUNNER_TEMP/venue-specialists-state/data/venue_specialists_v1"
-      - name: Persist research data, never production state
-        id: persist
+      - name: Capture, push, confirm and review every minute
+        run: python -m research.venue_specialists_v1.worker --state "$RUNNER_TEMP/venue-specialists-state" --seconds 480 --interval 60
+      - name: Retain research evidence on persistence failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: venue-research-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/venue-specialists-state/data/venue_specialists_v1/
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Request the next research-only run during JST operation
         if: always()
-        run: |
-          ROOT="$RUNNER_TEMP/venue-specialists-state"
-          if [ ! -d "$ROOT/data/venue_specialists_v1" ]; then exit 0; fi
-          git -C "$ROOT" add data/venue_specialists_v1/
-          if git -C "$ROOT" diff --cached --quiet; then exit 0; fi
-          git -C "$ROOT" commit -m 'research: freeze venue-specialist pre-race logs and coverage'
-          git -C "$ROOT" push origin HEAD:refs/heads/research-venue-specialists-state
-          echo "persisted_sha=$(git -C "$ROOT" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Verify pushed Git snapshots and add durable receipts
-        if: always() && steps.persist.outputs.persisted_sha != ''
         env:
-          VENUE_STATE_SHA: "${{ steps.persist.outputs.persisted_sha }}"
+          GH_RESEARCH_TOKEN: ${{ github.token }}
         run: |
-          ROOT="$RUNNER_TEMP/venue-specialists-state"
-          python -m research.venue_specialists_v1.run --out "$ROOT/data/venue_specialists_v1" --verify-commit "$VENUE_STATE_SHA"
-          git -C "$ROOT" add data/venue_specialists_v1/receipts/ || true
-          if ! git -C "$ROOT" diff --cached --quiet; then
-            git -C "$ROOT" commit -m 'research: confirm immutable pre-deadline Git receipts'
-            git -C "$ROOT" push origin HEAD:refs/heads/research-venue-specialists-state
-          fi
-          echo 'Research LOG remote checkpoint completed; no Discord/X calls.'
-      - name: Verify official results after the race and save independent reviews
-        if: success() && steps.persist.outputs.persisted_sha != ''
-        run: |
-          ROOT="$RUNNER_TEMP/venue-specialists-state"
-          python -m research.venue_specialists_v1.review --out "$ROOT/data/venue_specialists_v1"
-      - name: Persist only research reviews and derived scoreboards
-        if: success() && steps.persist.outputs.persisted_sha != ''
-        run: |
-          ROOT="$RUNNER_TEMP/venue-specialists-state"
-          git -C "$ROOT" add -A data/venue_specialists_v1/
-          if ! git -C "$ROOT" diff --cached --quiet; then
-            git -C "$ROOT" commit -m 'research: record official result reviews by specialist'
-            git -C "$ROOT" push origin HEAD:refs/heads/research-venue-specialists-state
-          fi
+          python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          import json, os, urllib.request
+          now=datetime.now(ZoneInfo('Asia/Tokyo'))
+          if 8<=now.hour<24:
+              url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/workflows/four-venue-specialists-research.yml/dispatches'
+              request=urllib.request.Request(url,data=json.dumps({'ref':'main'}).encode(),method='POST',headers={'Authorization':'Bearer '+os.environ['GH_RESEARCH_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
+              with urllib.request.urlopen(request,timeout=20) as response:
+                  print('Independent research continuation requested:',response.status)
+          else:
+              print('Outside JST operation; backup schedule starts the next day.')
+          PY
