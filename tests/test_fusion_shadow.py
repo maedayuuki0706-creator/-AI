@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -234,8 +235,15 @@ class RunnerIsolationTests(unittest.TestCase):
                     "motors": {}, "venues": {"06": {"course_win": [55, 18, 17, 12, 7, 2]}},
                     "meta": {"snapshot_at": "2026-10-11T07:00:00+09:00"}}
         forbidden = AssertionError("Shadow code must never dispatch, log production predictions or read live results")
-        with patch.object(base, "analyze_official", return_value=official), \
-                patch.object(hiyori_source, "fetch_race", return_value={"source_url": "fixture-only", "rows": []}), \
+        parallel = threading.Barrier(2)
+        def observed_official(*args):
+            parallel.wait(timeout=3)
+            return official
+        def observed_hiyori(*args):
+            parallel.wait(timeout=3)
+            return {"source_url": "fixture-only", "rows": []}
+        with patch.object(base, "analyze_official", side_effect=observed_official), \
+                patch.object(hiyori_source, "fetch_race", side_effect=observed_hiyori), \
                 patch.object(hiyori_model, "analyze", return_value=analyses["hiyori"]), \
                 patch.object(pt2_sheet_db, "load_database", return_value=database), \
                 patch.object(runner, "now_jst", return_value=NOW), \
