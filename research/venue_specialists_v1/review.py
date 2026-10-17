@@ -82,6 +82,8 @@ def evaluate(forecast, receipt, result):
         "profit_yen": (payout - len(picks)*100) if not exclude else None,
         "hit": bool(hits) if not exclude else None,
         "scenario_mechanism_verified": False,
+        "full_finish_verified": bool(result.get("details")),
+        "details_missing_reason":result.get("details_missing_reason"),
         "limitations": ["Official finishing order does not establish each boat's tactics or failure causes",
                         "Actual 1M track/video not reviewed"],
     }
@@ -113,6 +115,7 @@ def summarize(root, day):
         if result["race_id"][:8]>day:continue
         row["graded"] += 1
         row["main_head_hits"] += int(bool(result.get("main_head_correct")))
+        row["full_finish_verified_count"]=row.get("full_finish_verified_count",0)+int(bool(result.get("full_finish_verified")))
         diagnostic=result.get("common_v2_diagnostics") or {}
         if not diagnostic:pattern="actual_tactics_unverified"
         elif diagnostic.get("method_and_formation_covered") is True:pattern="winner_method_and_formation_covered"
@@ -178,10 +181,17 @@ def run(root, *, now=None, official=None, max_fetch=24):
             result["raw_html"]=html
             result["sha256"]=__import__("hashlib").sha256(html.encode()).hexdigest()
             if result.get("status")=="settled" and len(result.get("payouts") or {})==1 and not result.get("refund_lanes"):
-                details=parse_result(html,key[:8],forecast["jcd"],int(key[-2:]))
-                result["details"]=details
-                if details["method"]=="恵まれ" or any(b["status"]!="finished" for b in details["finish"]):
-                    result["status"]="accident"
+                try:
+                    details=parse_result(html,key[:8],forecast["jcd"],int(key[-2:]))
+                except ValueError:
+                    # The official site can publish settled payouts before the
+                    # six finishers/ST/method. Score the official payout only;
+                    # never manufacture missing manoeuvre evidence.
+                    result["details_missing_reason"]="official_payout_available_six_finish_details_unavailable"
+                else:
+                    result["details"]=details
+                    if details["method"]=="恵まれ" or any(b["status"]!="finished" for b in details["finish"]):
+                        result["status"]="accident"
             result["observed_at"] = now.isoformat()
             result["source_url"] = url
             if result.get("status") == "pending":

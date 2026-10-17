@@ -115,3 +115,16 @@ class PersistenceTests(unittest.TestCase):
             (b/PREFIX/'b.json').write_text('{"b":2}');sha=persist(b,'B')
             self.assertEqual(json.loads(g(b,'show',sha+':'+PREFIX+'/a.json')),{'a':1})
             self.assertEqual(json.loads(g(b,'show',sha+':'+PREFIX+'/b.json')),{'b':2})
+
+
+class PartialOfficialTests(unittest.TestCase):
+    def test_official_payout_without_six_finish_does_not_fabricate_tactics(self):
+        from research.venue_specialists_v1.tests.test_review import fixture as pair
+        f,receipt=pair()
+        x=review.evaluate(f,receipt,{'status':'settled','payouts':{'3-6-4':2490},
+                                   'details_missing_reason':'official_details_pending'})
+        self.assertEqual(x['status'],'graded')
+        self.assertFalse(x['full_finish_verified'])
+        self.assertFalse(x['scenario_mechanism_verified'])
+        self.assertNotIn('common_v2_diagnostics',x)
+        self.assertEqual(x['selection'],'second_not_selected_given_head')
