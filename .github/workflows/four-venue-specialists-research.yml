@@ -55,7 +55,7 @@ jobs:
           path: ${{ runner.temp }}/venue-specialists-state/data/venue_specialists_v1/
           retention-days: 14
           if-no-files-found: ignore
-      - name: Request the next research-only run during JST operation
+      - name: Continue the independent research worker, including idle overnight
         if: always()
         env:
           GH_RESEARCH_TOKEN: ${{ github.token }}
@@ -64,12 +64,16 @@ jobs:
           from datetime import datetime
           from zoneinfo import ZoneInfo
           import json, os, urllib.request
+          import time
           now=datetime.now(ZoneInfo('Asia/Tokyo'))
-          if 8<=now.hour<24:
-              url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/workflows/four-venue-specialists-research.yml/dispatches'
-              request=urllib.request.Request(url,data=json.dumps({'ref':'main'}).encode(),method='POST',headers={'Authorization':'Bearer '+os.environ['GH_RESEARCH_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
-              with urllib.request.urlopen(request,timeout=20) as response:
-                  print('Independent research continuation requested:',response.status)
-          else:
-              print('Outside JST operation; backup schedule starts the next day.')
+          url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/workflows/four-venue-specialists-research.yml/dispatches'
+          for attempt in range(3):
+              try:
+                  request=urllib.request.Request(url,data=json.dumps({'ref':'main'}).encode(),method='POST',headers={'Authorization':'Bearer '+os.environ['GH_RESEARCH_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
+                  with urllib.request.urlopen(request,timeout=20) as response:
+                      print('Independent research continuation requested:',response.status,'JST hour:',now.hour)
+                  break
+              except Exception:
+                  if attempt==2: raise
+                  time.sleep(2*(attempt+1))
           PY
