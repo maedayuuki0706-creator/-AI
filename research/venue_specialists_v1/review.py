@@ -174,6 +174,14 @@ def run(root, *, now=None, official=None, max_fetch=24):
             continue
         checked += 1
         try:
+            # Restart after result publication but before review publication:
+            # reuse the immutable result, including its original observation time.
+            cached_result = read(root/"results"/key[:8]/(key+".json"))
+            if cached_result:
+                restored = evaluate(forecast, receipt, cached_result)
+                save_immutable(out_path, restored)
+                saved += 1
+                continue
             url = official.official_url("raceresult",key[:8], forecast["jcd"], int(key[-2:]))
             html=official.fetch(url)
             result = parse_payout(html)

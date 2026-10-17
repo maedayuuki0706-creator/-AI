@@ -44,7 +44,8 @@ def _deadline(day, hhmm):
 
 
 def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
-                 venue_stats=None, motors=None, players=None, db_meta=None, clock=None):
+                 venue_stats=None, motors=None, players=None, db_meta=None, clock=None,
+                 baseline=None):
     clock = clock or now_jst
     if official is None:
         from .official import Official
@@ -60,7 +61,27 @@ def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
         obj = _read_json(path)
         if obj.get("race_id") != key or obj.get("digest") != digest({k: v for k,v in obj.items() if k != "digest"}):
             raise ValueError("Existing immutable forecast corrupt or mismatched")
-        return {"race_id": key, "status": "already_frozen"}
+        # Reuse the already frozen official input. A baseline arriving later may
+        # complete Yuuki BEFORE its cutoff, without editing the specialist card.
+        yuuki = _capture_yuuki(_read_json(input_path), paths, clock, baseline)
+        return {"race_id": key, "status": "already_frozen", "yuuki": yuuki}
+    if input_path.exists():
+        # A crash between atomic input and forecast publication is recoverable
+        # only while genuinely still before the capture cutoff. Keep that input.
+        snapshot = _read_json(input_path)
+        meta = snapshot.get("meta") or {}
+        if (meta.get("day"), str(meta.get("jcd")).zfill(2), meta.get("rno"), meta.get("deadline")) != (day, jcd, int(rno), hhmm):
+            raise ValueError("Partial input identity/deadline mismatch")
+        forecast = analyze(snapshot, venues_db=venue_stats, motor_db=motors,
+                           mode="live", now=clock().isoformat())
+        if deadline - clock() < timedelta(minutes=3):
+            raise ValueError("Partial-input recovery completed too late")
+        save_immutable(path, forecast)
+        from .log_contract import save_event
+        save_event(paths, forecast, clock=clock, kind="interrupted_input_recovery")
+        return {"race_id": key, "status": "locally_frozen_uncheckpointed",
+                "recovered_partial_input": True, "digest": forecast["digest"],
+                "yuuki": _capture_yuuki(snapshot, paths, clock, baseline)}
     boats = official.parse_racelist_boats(day, jcd, rno)
     if len(boats) != 6 or {int(b["lane"]) for b in boats} != set(range(1, 7)):
         raise ValueError("Six valid official entrants are mandatory")
@@ -113,6 +134,7 @@ def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
                  "captured_at": observed.isoformat()},
         "boats": rows,
         "source": {"provider": "BOAT RACE official", "beforeinfo_url": url,
+                   "racelist_url": official.official_url("racelist", day, jcd, rno),
                    "beforeinfo_sha256": sha256(html.encode("utf-8")).hexdigest(),
                    "venue_priors_snapshot_digest": digest(venue_stats or {}),
                    "motor_snapshot_digest": digest(motors or {}),
@@ -127,6 +149,8 @@ def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
                         "tide": tide},
     }
     if snapshot_at:snapshot["meta"]["db_snapshot_at"]=snapshot_at
+    from .preinspection import reference
+    snapshot["source"]["preinspection"] = reference(paths, jcd, day, rows, observed.isoformat())
     if hasattr(official, "envelope"):
         card_url = official.official_url("racelist", day, jcd, rno)
         snapshot["official_originals"] = {"racelist": official.envelope(card_url),
@@ -146,8 +170,27 @@ def collect_race(day, jcd, rno, hhmm, root, *, official=None, tide_source=None,
     if deadline - clock() < timedelta(minutes=3):
         raise ValueError("Analysis completed too late; retain partial input for audit")
     save_immutable(path, forecast)
+    from .log_contract import save_event
+    save_event(paths, forecast, clock=clock)
+    yuuki = _capture_yuuki(snapshot, paths, clock, baseline)
     return {"race_id": key, "status": "locally_frozen_uncheckpointed",
-            "digest": forecast["digest"], "selected_picks": len(forecast["virtual_card"])}
+            "digest": forecast["digest"], "selected_picks": len(forecast["virtual_card"]), "yuuki": yuuki}
+
+
+def _capture_yuuki(snapshot, root, clock, baseline):
+    from .log_contract import capture_yuuki
+    try:
+        return capture_yuuki(snapshot, root, clock=clock, baseline=baseline)
+    except Exception as exc:
+        # A Yuuki failure must be visible and must never discard a specialist
+        # original already written in this same tick.
+        stamp = clock().strftime("%Y%m%d/%H%M%S_%f")
+        meta = snapshot.get("meta") or {}
+        key = f"{meta.get('day')}_{meta.get('jcd')}_{int(meta.get('rno') or 0):02}"
+        event = {"race_id": key, "observed_at": clock().isoformat(),
+                 "status": "yuuki_capture_error", "type": type(exc).__name__, "reason": str(exc)[:200]}
+        save_immutable(Path(root) / "yuuki" / "attempts" / (stamp + "_" + key + ".json"), event)
+        return event
 
 
 def schedule(day, *, official, clock):
@@ -168,7 +211,7 @@ def schedule(day, *, official, clock):
     return sorted(future, key=lambda r: (r[3], r[1], r[2])), errors
 
 
-def run(root, *, clock=None, official=None, max_workers=4):
+def run(root, *, clock=None, official=None, max_workers=2, baseline=None):
     clock = clock or now_jst
     if official is None:
         from .official import Official
@@ -202,7 +245,8 @@ def run(root, *, clock=None, official=None, max_workers=4):
     def attempt(args):
         try:
             return collect_race(*args, root, clock=clock, official=official,
-                                venue_stats=venue_db, motors=motor_db,players=player_db,db_meta=db_meta)
+                                venue_stats=venue_db, motors=motor_db,players=player_db,db_meta=db_meta,
+                                baseline=baseline)
         except Exception as exc:
             item={"race_id": race_id(args[0], args[1], args[2]), "status": "missing",
                   "observed_at":clock().isoformat(), "deadline":args[3],
@@ -263,6 +307,8 @@ def verify_commit(root, commit_sha, *, git_show, confirmed_at=None):
     AFTER push completion avoids a false predeadline receipt.
     """
     root = Path(root)
+    if len(commit_sha) != 40 or any(c not in "0123456789abcdef" for c in commit_sha):
+        raise ValueError("A full fetched Git commit SHA is required")
     saved_at = confirmed_at or now_jst()
     confirmed = []
     for path in sorted((root / "forecasts").glob("*/*.json")):
@@ -274,19 +320,23 @@ def verify_commit(root, commit_sha, *, git_show, confirmed_at=None):
         if remote != record:
             raise ValueError("Remote Git object mismatch")
         receipt_path = root / "receipts" / record["race_id"][:8] / (record["race_id"] + ".json")
-        if receipt_path.exists():
-            previous = _read_json(receipt_path)
-            if previous.get("race_id") != record["race_id"] or previous.get("digest") != record["digest"]:
-                raise ValueError("Existing receipt identity/digest mismatch")
-            confirmed.append(previous)
-            continue
         input_path=root/"inputs"/record["race_id"][:8]/(record["race_id"]+".json")
         snapshot=_read_json(input_path)
         if digest(snapshot)!=record["snapshot_digest"]:raise ValueError("Input digest mismatch")
         input_remote_path="data/venue_specialists_v1/"+str(input_path.relative_to(root)).replace(os.sep,"/")
         if json.loads(git_show(commit_sha,input_remote_path))!=snapshot:raise ValueError("Remote input mismatch")
+        if receipt_path.exists():
+            previous = _read_json(receipt_path)
+            if previous.get("race_id") != record["race_id"] or previous.get("digest") != record["digest"]:
+                raise ValueError("Existing receipt identity/digest mismatch")
+            if previous.get("status") == "confirmed_before_deadline":
+                from .log_contract import validate_receipt
+                validate_receipt(record, previous, snapshot)
+            confirmed.append(previous)
+            continue
         deadline = datetime.fromisoformat(record["deadline_at"])
-        valid = saved_at < deadline
+        valid = (datetime.fromisoformat(record["captured_at"]) <= datetime.fromisoformat(record["created_at"])
+                 <= saved_at < deadline and record.get("status") == "prospective_uncheckpointed")
         receipt = {"race_id": record["race_id"], "digest": record["digest"],
                    "commit_sha": commit_sha, "checked_at": saved_at.isoformat(),
                    "snapshot_digest":record["snapshot_digest"], "input_path":input_remote_path,
