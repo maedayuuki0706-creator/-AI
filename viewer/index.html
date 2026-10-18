@@ -6,8 +6,16 @@
 <meta name="theme-color" content="#132336">
 <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
 <link rel="dns-prefetch" href="https://boat-sheet-feed.onrender.com">
-<title>RACE VIEW | BOAT AI NAVI - レース情報</title>
-<link rel="stylesheet" href="styles.css?v=5">
+<title>競艇AIナビ | 全国締切順・無料AI予想・モーター評価</title>
+<meta name="description" content="全国24場の締切順レース情報・PT2無料AI予想・選手コース別成績・モーターAI評価をまとめてチェック。情報の取得日時と研究上の限界も公開しています。">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="競艇AIナビ">
+<meta property="og:title" content="競艇AIナビ｜無料予想とモーターAI評価">
+<meta property="og:description" content="締切前レースをまとめて探す。モーターの伸び・出足・回り足を◎○△で比較。">
+<meta property="og:url" content="https://boat-ai-readonly-view.onrender.com/">
+<meta name="twitter:card" content="summary">
+<link rel="canonical" href="https://boat-ai-readonly-view.onrender.com/">
+<link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 <div class="topline"><div class="topline-inner">
@@ -23,7 +31,37 @@
   </div>
   <div class="header-mark" aria-label="全国24場"><b>24</b><span>VENUES<br>IN JAPAN</span></div>
 </header>
-<section class="deadline-board" aria-label="締切前の全レース">
+<nav class="portal-nav" aria-label="サイト案内">
+  <a href="#home">ホーム</a>
+  <a href="#deadlines">締切順</a>
+  <button type="button" data-open-tab="pt2">無料予想</button>
+  <button type="button" data-open-tab="motor">モーター評価</button>
+  <button type="button" data-open-tab="player">選手データ</button>
+</nav>
+<section class="home-landing" id="home" aria-labelledby="home-title">
+ <div class="home-lead">
+  <div class="home-copy">
+   <p class="home-kicker"><span class="home-live-dot"></span> BOAT AI NAVI / RESEARCH DESK</p>
+   <h2 id="home-title">数字で読み解く、<br><span>次のレース。</span></h2>
+   <p class="home-desc">全国の締切順・AI予想・モーターの足色・選手データをひとつに。<br>当たりも外れも検証しながら、データでボートレースを研究するサイトです。</p>
+   <a class="home-primary" href="#deadlines">締切前のレースを見る <span aria-hidden="true">↗</span></a>
+  </div>
+  <aside class="home-live-card" aria-label="直近の締切">
+   <span class="home-card-kicker">NEXT DEADLINE / JST</span>
+   <strong id="home-next-race">公式締切を確認中</strong>
+   <span id="home-next-time">現在の開催情報を読み込んでいます…</span>
+   <span id="home-race-count" class="home-live-note">レース数を確認中</span>
+  </aside>
+ </div>
+ <div class="home-links" aria-label="おすすめ機能">
+  <a href="#deadlines" class="home-feature"><span class="home-feature-code">01 / RACE SCHEDULE</span><strong>全国の締切順</strong><span>今から間に合うレースを一覧で確認 ↗</span></a>
+  <button type="button" class="home-feature" data-open-tab="motor"><span class="home-feature-code">02 / MOTOR REPORT</span><strong>モーターAI評価</strong><span>伸び・出足・回り足を◎○△で比較 ↗</span></button>
+  <button type="button" class="home-feature" data-open-tab="player"><span class="home-feature-code">03 / RACER DATA</span><strong>選手データ検索</strong><span>選手名・登録番号からコース別成績へ ↗</span></button>
+ </div>
+ <div class="home-data-strip"><span>全国24場のレースに対応</span><span>モーターデータ <b id="home-motor-count">取得中</b></span><span id="home-motor-updated">データ更新日時を確認中</span></div>
+ <p class="home-disclaimer">このサイトのAI評価は研究・情報提供を目的とする参考値です。的中・利益を保証するものではありません。</p>
+</section>
+<section class="deadline-board" id="deadlines" aria-label="締切前の全レース">
   <div class="deadline-head">
     <div><div class="kicker">LIVE RACE LINEUP / JST</div><h2>締切順・全国のレース</h2></div>
     <span id="deadline-summary" class="deadline-summary">締切データ取得待ち</span>
@@ -35,15 +73,8 @@
   <div id="deadline-items" class="deadline-items"><p class="deadline-empty">締切順のレースを読み込んでいます…</p></div>
   <p id="deadline-updated" class="deadline-updated">公式公開データを参照／不明な時刻は表示しません。</p>
 </section>
-<section class="hero">
-  <div class="hero-content">
-    <div class="eyebrow"><span class="signal"></span> RACE DATA DESK / PT2 EDITION</div>
-    <h2>数字と展開から、レースを読む。</h2>
-    <p>競艇場・レースを選んで、PT2の予想と出走表をチェック。気になる選手は名前で検索。コース別の数字から、得意な攻めを見つけよう。</p>
-  </div>
-  <div class="hero-mark" aria-hidden="true">RACE.</div>
-</section>
-<section class="search-desk" aria-label="選手検索">
+
+<section class="search-desk" id="racer-search" aria-label="選手検索">
   <div class="search-heading"><div class="kicker">RACER FILE</div><h2>選手を探す</h2></div>
   <form id="player-search-form" role="search"><label class="sr-only" for="player-query">選手名・登録番号</label><input id="player-query" type="search" placeholder="選手名・登録番号（例：毒島、4238）" autocomplete="off" maxlength="80" aria-controls="player-results"><button id="player-search-button" type="submit">検索 ↗</button></form>
   <p class="search-hint">名前の一部でもOK。1〜6コースの1着率、決まり手、平均STを確認。</p>
@@ -64,7 +95,7 @@
   <div class="status" id="status" role="status" aria-live="polite">データソースを確認しています…</div>
   <span class="toolbar-meta">PERSONAL VIEW / READ ONLY</span>
 </div>
-<section class="workspace">
+<section class="workspace" id="race-center">
   <div class="workspace-top">
     <div><div class="kicker">RACE CENTER</div><h2>レースデータ</h2></div>
     <span class="update-note">表示タブを切り替えて確認</span>
@@ -73,10 +104,12 @@
     <button class="tab" id="tab-pt2" type="button" aria-selected="true">PT2 予想</button>
     <button class="tab" id="tab-race" type="button" aria-selected="false">出走表</button>
     <button class="tab" id="tab-player" type="button" aria-selected="false">選手検索</button>
+    <button class="tab" id="tab-motor" type="button" aria-selected="false">モーターAI評価</button>
   </nav>
   <section id="view-pt2" aria-labelledby="tab-pt2"><div class="panel empty">予想を取得しています…</div></section>
   <section id="view-race" class="hidden" aria-labelledby="tab-race"><div class="panel empty">出走表を取得しています…</div></section>
   <section id="view-player" class="hidden" aria-labelledby="tab-player"><div class="panel empty">選手名や登録番号を入力してください。</div></section>
+  <section id="view-motor" class="hidden" aria-labelledby="tab-motor"><div class="panel empty">選択レースのモーター情報を取得します。</div></section>
 </section>
 <footer class="foot">
   <span class="footer-label">ABOUT THIS VIEWER</span>
@@ -85,6 +118,7 @@
 </footer>
 </main>
 <script src="live_schedule.js?v=5" defer></script>
-<script src="app.js?v=5" defer></script>
+<script src="motor_panel.js?v=6" defer></script>
+<script src="app.js?v=6" defer></script>
 </body>
 </html>
