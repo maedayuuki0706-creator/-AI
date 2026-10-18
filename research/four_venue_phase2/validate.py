@@ -3,6 +3,7 @@ import argparse,json
 from pathlib import Path
 from . import model
 from .collect import VENUES
+from .settle import settle
 from research.edogawa_phase2.acquire import put
 from research.edogawa_phase2.study import wilson,writecsv
 from research.edogawa_phase2.validate import evaluate_history,paired_uncertainty
@@ -13,23 +14,32 @@ def replay(pair,fitted):
     if receipt.get('status')!='confirmed_before_deadline' or receipt.get('digest')!=base['digest'] or review.get('forecast_digest')!=base['digest']:raise ValueError('Original identity/receipt invalid')
     if not scenario.aware(base['created_at'])<=scenario.aware(receipt['checked_at'])<scenario.aware(base['deadline_at']):raise ValueError('Original receipt late')
     if pair['input_original_digest']!=base['snapshot_digest']:raise ValueError('Original input mismatch')
-    if review.get('status')!='graded' or len(review.get('winning_combinations',[]))!=1:return [],[]
+    refundable=review.get('status')=='excluded' and bool(review.get('refund_lanes'))
+    if (review.get('status')!='graded' and not refundable) or len(review.get('winning_combinations',[]))!=1:return [],[]
     actual=review['winning_combinations'][0];a=actual.split('-');out=[];logs=[]
     for v in ['A','B']:
         pred=model.predict(snap,fitted,v,mode='replay',now=snap['meta']['captured_at'])
         picks=[r['combination'] for r in pred['virtual_card']];primary=pred['primary_prediction'].split('-')
+        cohort='返還確認' if refundable else '返還なし・全6艇未照合'
+        baseline_picks=[r['combination'] for r in base['virtual_card']]
+        baseline_settle=settle(baseline_picks,review.get('official_trifectas'),review.get('refund_lanes'))
+        improved_settle=settle(picks,review.get('official_trifectas'),review.get('refund_lanes'))
         row={'場':fitted['venue'],'場コード':fitted['venue_code'],'race_id':pair['race_id'],'日付':pair['race_id'][:8],
-             '改良版':v,'既存的中':int(review['hit']),'改良的中':int(actual in picks),
+             '集計群':cohort,'改良版':v,'既存的中':int(actual in baseline_picks),'改良的中':int(actual in picks),
              '1着予測正解':int(primary[0]==a[0]),'2着予測正解':int(primary[1]==a[1]),'3着予測正解':int(primary[2]==a[2]),
              '既存買い目':','.join(r['combination'] for r in base['virtual_card']),'改良買い目':','.join(picks),'実出目':actual,
              '仮想投資円':1000,'ROI':None,'トリガミ':None,'攻め起点一致':None,'想定決まり手一致':None,
+             '既存払戻返還円':baseline_settle['return_yen'],'改良払戻返還円':improved_settle['return_yen'],'既存返還円':baseline_settle['refund_yen'],'改良返還円':improved_settle['refund_yen'],
              '区分':'既存締切前原本と改良の同入力・後付け研究','ユーザー考察':'','映像URL':'','再検証日':''}
         out.append(row)
+        formation_candidates={x['combination'] for b in pred['lanes'] for h in b['hypotheses'] for x in h['formations']}
+        ticket_reason=[]
+        if actual not in picks:ticket_reason.append('展開形成候補にあったが固定10点から外れた' if actual in formation_candidates else '展開形成候補と固定10点の双方に含まれなかった')
         logs.append({'baseline_reference':{'source_state_sha':pair['source_state_sha'],'forecast_digest':base['digest'],'input_digest':pair['input_original_digest']},
                      'research_replay':pred,'actual_trifecta':actual,'actual_attack_origin_verified':False,
                      'prediction_error':['1着艇の予測ミス']*(primary[0]!=a[0])+['2着・3着候補の評価ミス']*(primary[1:]!=a[1:])+['攻め方・旋回経路は映像未確認で判定不能'],
-                     'ticket_loss_reason':['買い目に含まなかった']*(actual not in picks),
-                     'normal_cohort':'公式全6艇結果・事故明細未結合','roi':None,'torigami':None,
+                     'ticket_loss_reason':ticket_reason,'cause_status':'着順との不一致を記録。実戦の戦術原因は未確定',
+                     'normal_cohort':cohort,'baseline_settlement':baseline_settle,'improved_settlement':improved_settle,'roi':None,'torigami':None,
                      'original_is_prospective':True,'new_model_is_prospective':False,'user_comment':''})
     return out,logs
 
@@ -65,11 +75,16 @@ def run(study,pairs):
     comparison=[]
     for jcd,name in VENUES.items():
         for v in ['A','B']:
-            rows=[r for r in paired if r['場コード']==jcd and r['改良版']==v];n=len(rows)
+            rows=[r for r in paired if r['場コード']==jcd and r['改良版']==v and r['集計群']!='返還確認'];n=len(rows)
             comparison.append({'場':name,'改良版':v,'同入力比較R':n,'既存的中数':sum(r['既存的中'] for r in rows),'改良的中数':sum(r['改良的中'] for r in rows),
                 '既存的中率':sum(r['既存的中'] for r in rows)/n if n else None,'改良的中率':sum(r['改良的中'] for r in rows)/n if n else None,
                 **paired_uncertainty(rows),'実測締切前研究R':0,'ROI':None,'注意':'改良は後付け再計算。事前特徴量は原本からのみ。期間/標本不足'})
-    summary={'historical':metrics,'comparison':comparison,'pending_pairs':pending,'prospective_research_races':0,
+    ablation=[]
+    for jcd,name in VENUES.items():
+        byid={r['race_id']:r for r in paired if r['場コード']==jcd and r['改良版']=='A' and r['集計群']!='返還確認'}
+        changes=[{'日付':r['日付'],'既存的中':byid[r['race_id']]['改良的中'],'改良的中':r['改良的中']} for r in paired if r['場コード']==jcd and r['改良版']=='B' and r['race_id'] in byid]
+        ablation.append({'場':name,'比較':'BからAを引いた差',**paired_uncertainty(changes)})
+    summary={'historical':metrics,'comparison':comparison,'B_vs_A':ablation,'refund_comparison':[r for r in paired if r['集計群']=='返還確認'],'pending_pairs':pending,'prospective_research_races':0,
         'C':'検証済み水面/選手/モーター係数なし・停止',
         'holdout_limit':'全期間の記述集計を既に閲覧したため最終評価は診断。将来の未観測期間で再評価が必要',
         'history_limit':'過去事前原本なし。Aのみ艇番=予想コースの仮定。実進入・ST・当該決まり手を予想入力に使わない。B/C/既存の長期比較は不能',

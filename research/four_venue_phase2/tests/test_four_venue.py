@@ -1,7 +1,7 @@
 import copy,json,subprocess,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
-from research.four_venue_phase2 import collect,model,shadow,resource_guard
+from research.four_venue_phase2 import collect,model,shadow,resource_guard,cards
 from research.edogawa_phase2.tests.test_phase2 import snapshot,training,at,NOW
 from research.scenario_v2 import engine as scenario
 
@@ -145,5 +145,15 @@ class FourVenue(unittest.TestCase):
         s=snap('16')
         for b in s['boats']:b['course']=str(b['course']);b['lane']=str(b['lane'])
         self.assertEqual(len(model.predict(s,fitted('16'),'A',mode='replay',now=NOW)['virtual_card']),10)
+    def test_dead_heat_payouts_preserved(self):
+        txt=TEXT.replace('04 4 4004','03 4 4004').replace('３連単 2-1-3 1500','３連単 2-1-3 1500\n                 2-1-4 1800\n        ３連複 1-2-3 600')
+        rows,_=collect.parse_venue('2026-10-17',txt,META,'16')
+        self.assertTrue(rows[0]['dead_heat_confirmed']);self.assertEqual(len(rows[0]['official_trifectas']),2)
+        self.assertEqual(rows[0]['official_trifectas'][1]['payout_per_100'],1800)
+    def test_B_program_class_and_deadline_from_source(self):
+        text='03BBGN\n １Ｒ 予選 Ｈ１８００ｍ 電話投票締切予定１１：１４\n1 4813宮内直哉36東京52B1 4.65 19.05 4.43 22.67 54 23.17 18 31.11 6 5\n03BEND\n'
+        r=cards.parse('2026-10-17',text,META)[0]
+        self.assertEqual(r['deadline_scheduled'],'11:14');self.assertEqual(r['boats'][0]['racer_class'],'B1')
+        self.assertFalse(r['six_boats_parsed']);self.assertFalse(r['prerace_publication_verified'])
 
 if __name__=='__main__':unittest.main()

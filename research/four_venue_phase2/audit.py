@@ -19,6 +19,27 @@ def motor_table(records):
                      '選手数':len({b['racer_id'] for r,b in pairs}),'判定':'番号再利用・交換日未監査。月内記述のみ・性能係数に採用不可'})
     return rows
 
+def abnormal_conditional(records):
+    groups=defaultdict(Counter)
+    for r in records:
+        if not r['abnormal_confirmed'] or r.get('dead_heat_confirmed'):continue
+        bs=[next((b for b in r['boats'] if b.get('finish')==p),None) for p in [1,2,3]]
+        if any(not b or b.get('course') is None for b in bs):continue
+        c,b,d=[x['course'] for x in bs]
+        if len({c,b,d})!=3:continue
+        groups[c,r['method']][b,d]+=1
+    rows=[]
+    for c in range(1,7):
+        for method in study.METHODS:
+            cnt=groups[c,method];n=sum(cnt.values())
+            for b in range(1,7):
+                for d in range(1,7):
+                    if len({c,b,d})!=3:continue
+                    k=cnt[b,d];lo,hi=study.wilson(k,n)
+                    rows.append({'集計群':'事故等確認・上位3艇進入確認のみ','1着コース':c,'決まり手':method,'2着コース':b,'3着コース':d,
+                                 '該当数':k,'条件標本数':n,'条件付き割合':k/n if n else None,'95下限':lo,'95上限':hi,'用途':'事後記述・通常と分離・学習不採用'})
+    return rows
+
 def run(acquisition,source,out,cards=None):
     raw=Path(acquisition).read_bytes();days=json.loads(raw)
     if len(days)!=365 or len({x['day'] for x in days})!=365:raise ValueError('365 unique calendar checkpoints required')
@@ -35,6 +56,11 @@ def run(acquisition,source,out,cards=None):
             r.update(venue_code=jcd,venue=name)
             # K has exhibition values but no archived pre-race publication time.
             r['historical_prerace_available']=False
+            if r.get('dead_heat_confirmed'):
+                r['normal_eligible']=False;r['trifecta_from_finish']=None
+                r['missing_fields']=[x for x in r['missing_fields'] if x!='six_numeric_finishes_unresolved']
+                missing[:]=[x for x in missing if not (x['race_id']==r['race_id'] and x['field'] in ['six_numeric_finishes_unresolved','trifecta_consistency'])]
+                r['exclusion_reason']='公式同着。全6艇の記録はあるが単一の1〜6着に補完しない'
             card=cardmap.get(r['race_id']);r['program_archive']=card
             if card:
                 r['deadline_scheduled']=card['deadline_scheduled']
@@ -50,9 +76,11 @@ def run(acquisition,source,out,cards=None):
                 missing.append({'race_id':r['race_id'],'field':field,'reason':'公式Kに事前原本・対応観測証拠なし。補完しない'})
             if any(b.get('racer_class') is None for b in r['boats']):missing.append({'race_id':r['race_id'],'field':'racer_class','reason':'B/Kで同一艇・同一選手を確認できず'})
         tables=study.describe(records);tables['motors']=motor_table(records)
+        tables['conditional']=[{'集計群':'通常6艇',**r} for r in tables['conditional']]+abnormal_conditional(records)
         summary={'場コード':jcd,'場':name,'取得R':len(records),'開催日数':len({r['date'] for r in records}),
                  '公式確認日数':sum(d['status']=='parsed' for d in days),'取得失敗日数':sum(d['status']!='parsed' for d in days),
                  '正常有効R':sum(r['normal_eligible'] for r in records),'異常確認R':sum(r['abnormal_confirmed'] for r in records),
+                 '同着R':sum(r.get('dead_heat_confirmed',False) for r in records),
                  '進入変更R':sum(r['entry_changed'] is True for r in records),'未照合R':sum(not r['official_verified'] for r in records),
                  '番組表結合R':sum(bool(r.get('program_archive')) for r in records),'級別6艇確認R':sum(len(r['boats'])==6 and all(b.get('racer_class') for b in r['boats']) for r in records),
                  '元CSV取得R':len(original),'元CSV着順不足R':sum(any(study.integer(r.get(p)) is None for p in study.POSITIONS) for r in original),

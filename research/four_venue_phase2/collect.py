@@ -5,7 +5,7 @@ checkpoints. A missing archive is NOT evidence that a venue held no races.
 The unchanged audited Edogawa parser is adapted by selecting a venue section;
 original bytes, URL, timestamp and hash always refer to the untouched K archive.
 """
-import argparse, hashlib, json, re, urllib.request, urllib.error
+import argparse, hashlib, json, re, urllib.request, urllib.error,zipfile,unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -28,10 +28,43 @@ def parse_venue(day,txt,meta,jcd):
                    attack_origin_actual=None,tide=None,current=None)
         # No pre-race average ST/class or motor period is provided by K.
         for b in row['boats']:b.update(average_st=None,racer_class=None)
+        nums=[b['finish'] for b in row['boats'] if b['finish'] is not None]
+        row['dead_heat_confirmed']=len(nums)==6 and len(set(nums))<6
+        row['finish_groups']={str(k):[b['lane'] for b in row['boats'] if b['finish']==k] for k in sorted(set(nums))}
+        block=next(b for b in re.split(r'(?m)(?=^\s*\d{1,2}R\s+.*?H\s*\d{4}m)',section[1]) if re.match(r'\s*'+str(row['race_no'])+r'R\s+',b))
+        paysec=re.search(r'3連単(.*?)(?:3連複|$)',unicodedata.normalize('NFKC',block),re.S)
+        row['official_trifectas']=[{'combination':'-'.join(m.group(i) for i in (1,2,3)),'payout_per_100':int(m[4])}
+            for m in re.finditer(r'([1-6])-([1-6])-([1-6])\s+(\d+)',paysec[1])] if paysec else []
     if len(rows)!=len(headers):raise ValueError('Header/record count mismatch')
     if len({r['race_no'] for r in rows})!=len(rows):raise ValueError('Duplicate official race')
     return rows,{'section_present':True,'race_headers':len(headers),'parsed_races':len(rows),
                  'cancellation_mentions':section[1].count('中止')+section[1].count('不成立')}
+
+def cached_body(root,reuse,sha):
+    for base in [Path(root),Path(reuse)]:
+        p=base/'raw'/(sha+'.lzh')
+        if p.exists():
+            b=p.read_bytes()
+            if digest(b)!=sha:raise ValueError('Cached digest mismatch')
+            return b
+    with zipfile.ZipFile(Path(reuse)/'official_raw_archives.zip') as z:
+        names=[n for n in z.namelist() if n.split('/')[-1]==sha+'.lzh']
+        if len(names)!=1:raise ValueError('Missing/ambiguous cached archive')
+        b=z.read(names[0])
+        if digest(b)!=sha:raise ValueError('ZIP member digest mismatch')
+        return b
+
+def reparse(acquisition,root,reuse):
+    raw=Path(acquisition).read_bytes();out=[]
+    for d in json.loads(raw):
+        if d['status']=='parsed':
+            txt=unpack(cached_body(root,reuse,d['sha256']));d['venues']={}
+            for jcd in VENUES:
+                rows,cov=parse_venue(d['day'],txt,d,jcd);d['venues'][jcd]={**cov,'races':rows}
+        out.append(d)
+    body=json.dumps(out,ensure_ascii=False,sort_keys=True).encode();path=Path(root)/'acquisition'/(digest(body)+'.json');put(path,body)
+    print(json.dumps({'reparsed_manifest':str(path),'source_manifest_sha256':digest(raw),'GETs':0}),flush=True)
+    return path
 
 def collect(root,reuse,workers=2,retry_failed=False):
     root,reuse=Path(root),Path(reuse)
@@ -40,11 +73,21 @@ def collect(root,reuse,workers=2,retry_failed=False):
         path=root/'days'/f'{day}.json'
         if path.exists():
             old=json.loads(path.read_text())
+            retries=sorted((root/'retries').glob(day+'_*.json'))
+            for candidate in retries:
+                resolved=json.loads(candidate.read_text())
+                if resolved['status']=='parsed':return resolved
             if old['status']=='parsed' or not retry_failed:return old
         cached=reuse/'official_days'/f'{day}.json'
         if cached.exists():
             meta=json.loads(cached.read_text());sha=meta.get('sha256')
-            body=(reuse/'raw'/f'{sha}.lzh').read_bytes()
+            rawpath=reuse/'raw'/f'{sha}.lzh'
+            if rawpath.exists():body=rawpath.read_bytes()
+            else:
+                with zipfile.ZipFile(reuse/'official_raw_archives.zip') as z:
+                    matches=[n for n in z.namelist() if n.split('/')[-1]==sha+'.lzh']
+                    if len(matches)!=1:raise ValueError('Missing/ambiguous cached archive')
+                    body=z.read(matches[0])
             if digest(body)!=sha:raise ValueError('Reused raw digest mismatch')
             meta={**meta,'reuse':'Edogawa_PR36_982110b','raw_path':f'data/research_edogawa_phase2/20261018/raw/{sha}.lzh',
                   'raw_zip':'data/research_edogawa_phase2/20261018/official_raw_archives.zip'}
@@ -97,5 +140,6 @@ def collect(root,reuse,workers=2,retry_failed=False):
     print(json.dumps(summary,ensure_ascii=False),flush=True);return out,summary
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--out',required=True);p.add_argument('--reuse',required=True);p.add_argument('--retry-failed',action='store_true');a=p.parse_args()
-    collect(a.out,a.reuse,retry_failed=a.retry_failed)
+    p=argparse.ArgumentParser();p.add_argument('--out',required=True);p.add_argument('--reuse',required=True);p.add_argument('--retry-failed',action='store_true');p.add_argument('--reparse');a=p.parse_args()
+    if a.reparse:reparse(a.reparse,a.out,a.reuse)
+    else:collect(a.out,a.reuse,retry_failed=a.retry_failed)

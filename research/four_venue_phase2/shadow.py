@@ -89,10 +89,11 @@ def review_bundle(state,bundle,result,confirmed_receipt):
     base=Path(state)/PREFIX;day=bundle['meta']['day'];key=bundle['race_id']+'.json'
     immutable(base/'results'/day/key,result)
     normal=result.get('normal_verified') is True and result.get('refund_lanes')==[]
-    if result.get('trifecta') in scenario.COMBINATIONS:
+    multi=len(result.get('official_trifectas',[]))>1
+    if result.get('trifecta') in scenario.COMBINATIONS and not multi:
         reviews=[model.evaluate(p,result) for p in bundle['variants']]
-    else:reviews=[{'variant':p['variant'],'hit':None,'roi':None,'attack_origin_correct':None,'reason':'不成立・結果不足等。通常成績から分離'} for p in bundle['variants']]
-    out={'race_id':bundle['race_id'],'forecast_digest':bundle['digest'],'cohort':'通常確認済' if normal else '事故返還/成立未確認',
+    else:reviews=[{'variant':p['variant'],'hit':None,'roi':None,'attack_origin_correct':None,'reason':'同着複数出目・不成立・結果不足等。専用集計待ちとして通常成績から分離'} for p in bundle['variants']]
+    out={'race_id':bundle['race_id'],'forecast_digest':bundle['digest'],'cohort':'同着複数出目' if multi else '通常確認済' if normal else '事故返還/成立未確認',
          'reviews':reviews,'user_comment':'','video_source_url':'','reviewed_at':None,'phase1_complete':False}
     out['digest']=scenario.digest(out);immutable(base/'reviews'/day/key,out);return out
 

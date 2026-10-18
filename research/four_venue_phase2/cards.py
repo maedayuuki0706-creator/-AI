@@ -41,25 +41,26 @@ def run(acquisition,out,probe):
             body=f.read_bytes();probes['2026-10-17']=(body,unpack(body))
     def one(d):
         day=d['day'];path=root/'days'/(day+'.json')
-        if path.exists():return json.loads(path.read_text())
+        resolved=root/'resolved_days'/(day+'.json')
+        if resolved.exists():return json.loads(resolved.read_text())
+        old=json.loads(path.read_text()) if path.exists() else None
+        if old and old['status']!='not_requested_no_selected_K_section':return old
         url='https://www1.mbrace.or.jp/od2/B/'+day[:7].replace('-','')+'/b'+day[2:].replace('-','')+'.lzh'
         meta={'source_url':url,'observed_at':datetime.now(timezone.utc).isoformat()}
-        # A day with no selected venue K section does not require B acquisition.
-        if not any(v['section_present'] for v in d.get('venues',{}).values()):
-            result={'day':day,'status':'not_requested_no_selected_K_section','races':[],**meta}
-        else:
-            try:
-                if day in probes:body,txt=probes[day];meta['reuse']='inspected_program_probe'
-                else:
-                    with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'FourVenuePhase2Research/1.0'}),timeout=15) as response:
-                        if response.geturl()!=url:raise ValueError('Unexpected redirect')
-                        body=response.read(2000001)
-                    if len(body)>2000000:raise ValueError('Oversize archive')
-                    txt=unpack(body)
-                meta['sha256']=digest(body);put(root/'raw'/(meta['sha256']+'.lzh'),body)
-                result={'day':day,'status':'parsed','races':parse(day,txt,meta),**meta}
-            except Exception as e:result={'day':day,'status':'unavailable_not_imputed','races':[],**meta,'error':str(e)[:200]}
-        put(path,json.dumps(result,ensure_ascii=False,sort_keys=True).encode());return result
+        # Do not equate absence in results with absence of a scheduled meeting.
+        # Prior unrequested checkpoints are resolved additively on the next run.
+        try:
+            if day in probes:body,txt=probes[day];meta['reuse']='inspected_program_probe'
+            else:
+                with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'FourVenuePhase2Research/1.0'}),timeout=15) as response:
+                    if response.geturl()!=url:raise ValueError('Unexpected redirect')
+                    body=response.read(2000001)
+                if len(body)>2000000:raise ValueError('Oversize archive')
+                txt=unpack(body)
+            meta['sha256']=digest(body);put(root/'raw'/(meta['sha256']+'.lzh'),body)
+            result={'day':day,'status':'parsed','races':parse(day,txt,meta),**meta}
+        except Exception as e:result={'day':day,'status':'unavailable_not_imputed','races':[],**meta,'error':str(e)[:200]}
+        put(resolved if old else path,json.dumps(result,ensure_ascii=False,sort_keys=True).encode());return result
     records=[]
     with ThreadPoolExecutor(max_workers=2) as pool:
         for i,r in enumerate(pool.map(one,days),1):

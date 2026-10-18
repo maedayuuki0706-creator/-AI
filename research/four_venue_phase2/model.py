@@ -56,7 +56,8 @@ def predict(snapshot,m,variant,*,mode,now,code_sha=None):
             'historical_course_share':heads/m['training_n'],
             'supported_conditions_max':max((h['supported_observations'] for h in lane['hypotheses']),default=0),
             'interpretation':'歴史頻度と事前観測根拠を併記。現在レースの勝率として未校正'}
-        lane['unlikely_or_uncertain_reason']='根拠の欠測は支持なしとして表示。薄い勝ち筋も削除しないが同じ強さには扱わない'
+        supported=lane['relative_evidence']['supported_conditions_max']
+        lane['unlikely_or_uncertain_reason']=f"{course}コースの学習期1着は{heads}/{m['training_n']}R（{heads/m['training_n']:.1%}）。事前支持条件は最大{supported}件。欠測: "+','.join(lane['missing_fields'])+'。本番の進路・抵抗は未観測で、勝ち筋の成立確率は未校正'
         lane['reversal_risk']='道中の出口加速・進路で逆転され得る。周回/映像ラベルがないため確率不明'
         lane['alternative_scenarios']=[h['loss_path']+'。他の攻め起点の分岐を再検討' for h in lane['hypotheses']]
     ranked=[]
