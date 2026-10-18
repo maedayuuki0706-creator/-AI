@@ -119,7 +119,7 @@ function raceHtml(){
  const title=VENUES.find(v=>v[0]===state.venue)?.[1]||'場';
  const byRacer=new Map(roster.map((r,i)=>[String(r['登録番号']||''),r]));
  const rows=data.length?data:roster.map((r,i)=>({...r,'枠':String(i+1)}));
- let h='<section class="panel"><div class="section-head"><div><h2>'+safe(title)+' '+state.race+'R ／ 出走表</h2><p>'+(state.raceSnapshotAt?'保存時点の出走表 ／ '+safe(displayTime(state.raceSnapshotAt)):'公式出走フィード')+'</p></div></div><div class="notice">選手名を押すと、コース別1着率などのデータベース情報を確認できます。保存済みの出走表は取得時点の情報です。最新情報は「情報を更新」で確認してください。</div><div class="table-wrap"><table><thead><tr><th>艇</th><th>選手</th><th>級別</th><th>全国勝率</th><th>平均ST</th><th>モーター</th><th>2連率</th><th>展開材料</th></tr></thead><tbody>';
+ let h='<section class="panel"><div class="section-head"><div><h2>'+safe(title)+' '+state.race+'R ／ 出走表</h2><p>'+(state.raceSnapshotAt?'保存時点の出走表 ／ '+safe(displayTime(state.raceSnapshotAt)):'公式出走フィード')+'</p></div></div><div class="notice">選手名を押すと、コース別1着率などのデータベース情報を確認できます。保存済みの出走表は取得時点の情報です。最新情報は「情報を更新」で確認してください。</div><button class="motor-race-link" data-view-motor type="button">モーターAI評価を見る ／ 伸び・出足・回り足を比較 ↗</button><div class="table-wrap"><table><thead><tr><th>艇</th><th>選手</th><th>級別</th><th>全国勝率</th><th>平均ST</th><th>モーター</th><th>2連率</th><th>展開材料</th></tr></thead><tbody>';
  rows.forEach((r,i)=>{
  const lane=Number(r['枠']||i+1);if(lane<1||lane>6)return;
  const reg=String(r['登録番号']||'');const d=byRacer.get(reg)||roster[lane-1]||{};
@@ -404,7 +404,10 @@ function setupPlayerSearch(){
   if(button){playerState.selected=button.dataset.playerId;renderPlayers();}
   if(e.target.closest('[data-player-refresh]'))loadPlayers(true);
  });
- $('view-race').addEventListener('click',e=>{const button=e.target.closest('button[data-player-id]');if(button?.dataset.playerId)openPlayer(button.dataset.playerId);});
+ $('view-race').addEventListener('click',e=>{
+   if(e.target.closest('button[data-view-motor]')){setTab('motor');return;}
+   const button=e.target.closest('button[data-player-id]');if(button?.dataset.playerId)openPlayer(button.dataset.playerId);
+ });
 }
 function boot(){
  const params=new URLSearchParams(location.search);
@@ -428,7 +431,7 @@ function boot(){
  $('day').addEventListener('change',()=>{if(!$('day').value)return;state.day=$('day').value;state.active=null;state.userSelectedVenue=true;loadRace();loadVenues(true);window.RaceSchedule?.load(state.day,true);});
  $('venue').addEventListener('change',selectRace);
  $('race').addEventListener('change',selectRace);
- $('refresh').addEventListener('click',()=>{if(state.tab==='player')loadPlayers(true);else {loadRace(true);window.RaceSchedule?.load(state.day,true);}});
+ $('refresh').addEventListener('click',()=>{if(state.tab==='player')loadPlayers(true);else {loadRace(true);window.RaceSchedule?.load(state.day,true);if(state.tab==='motor')window.MotorPanel?.load(true);}});
  // The deadline board selects the first still-open race. Never default to a stale 若松8R.
  if(state.userSelectedVenue)loadRace();
  else {
@@ -446,7 +449,12 @@ function boot(){
      state.venue=jcd;state.race=rno;state.userSelectedVenue=!auto;
      venueOptions();raceOptions();loadRace();
    },
-   onFollow:()=>{state.userSelectedVenue=false;},
+   onFollow:()=>{
+     state.userSelectedVenue=false;
+     if(state.day!==jstToday()){
+       state.day=jstToday();$('day').value=state.day;state.active=null;loadVenues(true);window.RaceSchedule?.load(state.day,true);
+     }
+   },
    onNewDay:key=>{
      state.day=key.slice(0,4)+'-'+key.slice(4,6)+'-'+key.slice(6,8);
      $('day').value=state.day;state.active=null;loadVenues(true);
