@@ -2,7 +2,7 @@
 (function (root) {
   'use strict';
   const RAW='https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/main/data/race_cards/';
-  const FEED='https://boat-sheet-feed.onrender.com/schedule.json';
+  const FEED='https://boat-ai-navi-schedule.onrender.com/schedule.json';
   const fmt=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'});
   const clock=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
   const isDay=s=>/^20\d{6}$/.test(String(s||''));
@@ -111,7 +111,7 @@
     try{fetched=fromCard(normalized,await json(RAW+normalized+'.json'+tag,9000));}
     catch(e){problems.push('保存済み日程: '+String(e.message||e));}
     if(!fetched){
-      try{fetched=fromFeed(normalized,await json(FEED+'?date='+normalized,30000));}
+      try{fetched=fromFeed(normalized,await json(FEED+'?date='+normalized,85000));}
       catch(e){problems.push('公式フィード: '+String(e.message||e));}
     }
     if(id!==requested||currentDay()!==normalized)return;
