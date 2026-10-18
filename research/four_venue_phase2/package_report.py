@@ -15,7 +15,7 @@ def run(study,out):
     overview=[]
     for r in summary['venues']:
         overview.append({'場':r['場'],'取得R':r['取得R'],'正常有効R':r['正常有効R'],'事故等R':r['異常確認R'],'同着R':r['同着R'],
-            '開催日数':r['開催日数'],'学習R':r['学習R'],'検証R':r['検証R'],'最終評価R':r['最終評価R'],
+            '公式中止R':r['公式中止R'],'開催日数':r['開催日数'],'学習R':r['学習R'],'検証R':r['検証R'],'最終評価R':r['最終評価R'],
             '級別6艇確認R':r['級別6艇確認R'],'進入変更R':r['進入変更R'],'改良版締切前実測R':0,'改善判定':'100/300Rの前向き実測待ち'})
     add('概要','2025-10-18〜2026-10-17。通常・事故等・同着を分離。改良版の前向き実測は0R。',overview)
     comparisons=[]
@@ -32,24 +32,37 @@ def run(study,out):
     add('モーター月別','番号再利用/交換日未監査。月別の記述値のみ。出足・伸びの性能を確定しない。',tables['motors'])
     add('時系列A評価','学習は6/30まで。事前原本がないためAのみ枠なりを仮定した後付け診断。',validation['historical'])
     add('比較レース','既存は締切前受領済み原本。改良A/Bは後付け再計算。仮想10点×100円。',paired)
-    paths=[];reviews=[]
+    paths=[];reviews=[];branches=[]
     for p in sorted((root/'replays').glob('*.json')):
         log=json.loads(p.read_text());pred=log['research_replay'];meta=pred['meta']
         actual=log['actual_trifecta'];scenario=pred['primary_scenario']
         reviews.append({'レースID':meta['race_id'],'日付':meta['day'],'場':next(r['場'] for r in summary['venues'] if r['場コード']==pred['venue_code']),
             '改良版':pred['variant'],'研究区分':'後付け研究','本命3連単':pred['primary_prediction'],'実出目':actual,
+            '入力原本日時':meta['captured_at'],'締切日時':meta['deadline_at'],'研究生成日時':pred['generated_at'],'コードSHA':pred.get('code_sha'),'集計群':log['normal_cohort'],
             '想定攻め起点':scenario['attack_origin_lane'],'想定決まり手':scenario['tactic'],'実攻め起点':None,'実戦術確認':'映像未確認',
             '予測の不一致':' / '.join(log['prediction_error']),'舟券の不一致':' / '.join(log['ticket_loss_reason']),
             'ユーザー考察':'','映像URL':'','映像確認日時':'','再検証結論':'','モデルdigest':pred['model_digest']})
         for b in pred['lanes']:
+            for h in b['hypotheses']:
+                branch={'レースID':meta['race_id'],'日付':meta['day'],'場コード':pred['venue_code'],'改良版':pred['variant'],
+                    '1着仮説艇':b['lane'],'攻め起点艇':h['attack_origin_lane'],'想定決まり手':h['tactic'],'分岐ID':h['id'],
+                    '勝つ条件と進路':h['win_path'],'崩れる条件':h['loss_path'],'本番未観測条件':' / '.join(h['unobserved_conditions']),
+                    '支持条件数':h['supported_observations'],'事前根拠状態':h['evidence_status'],
+                    '2・3着候補':','.join(f['combination'] for f in h['formations']),
+                    '2着連動理由':' / '.join(f['second_reason'] for f in h['formations']),
+                    '3着連動理由':' / '.join(f['third_reason'] for f in h['formations'])}
+                reaction={x['lane']:x['hypothesis'] for x in h['reactions']}
+                branch.update({str(i)+'号艇反応':reaction.get(i,'勝者とする仮説の主体') for i in range(1,7)})
+                branches.append(branch)
             paths.append({'レースID':meta['race_id'],'日付':meta['day'],'場コード':pred['venue_code'],'改良版':pred['variant'],
                 '艇番':b['lane'],'選手名':b['name'],'選手番号':b['racer_id'],'予想コース':b['predicted_course'],
                 '勝ち筋':' / '.join(b['win_paths']),'負け筋':' / '.join(b['loss_paths']),
-                '攻め起点と反応':' / '.join(str(h['attack_origin_lane'])+'号艇起点 '+h['tactic']+' '+','.join(str(x['lane'])+'号艇:'+x['hypothesis'] for x in h['reactions']) for h in b['hypotheses']),
+                '攻め起点候補':','.join(str(x) for x in sorted({h['attack_origin_lane'] for h in b['hypotheses']})),
                 '連動候補':' / '.join(h['id']+':'+','.join(f['combination'] for f in h['formations']) for h in b['hypotheses']),
-                '根拠と不確実性':b['unlikely_or_uncertain_reason'],'代替シナリオ':' / '.join(b['alternative_scenarios']),
+                '根拠と不確実性':b['unlikely_or_uncertain_reason'],'代替シナリオ':' / '.join(h['id'] for h in b['hypotheses'])+'。崩れる条件は展開分岐表で照合',
                 '道中逆転リスク':b['reversal_risk'],'ユーザー考察':''})
     add('全艇展開','実在の凍結済み事前入力から後付け再計算。全6艇・他5艇反応・連動候補。',paths)
+    add('展開分岐','1行1仮説。勝者と攻め起点を分離し、他5艇の反応・2/3着連動理由を保存。',branches)
     add('ユーザーレビュー','黄色欄に考察・映像・再検証結論を記入。元予想は変更せずレースIDと版で紐付ける。',reviews)
     rawraces=[];boats=[]
     for r in records:
@@ -72,6 +85,7 @@ def run(study,out):
         [{'場':v,'不足項目':f,'件数':n,'理由':reason} for (v,f,reason),n in sorted(missing.items())])
     add('差分監査','江戸川元CSVと公式値、B/K差分。元CSV/原本は不変。',tables['differences'])
     add('日別取得','365日×4場。取得失敗を非開催扱いしない。Kにない予定レースは別途確認。',tables['coverage'])
+    add('中止と予定差分','公式Bの予定とK払戻欄を照合。中止136Rを結果欠測・予想保存漏れと区別。',tables.get('program_only',[]))
     add('Phase1と未達','Phase2の研究開始・コード動作をPhase1完了扱いにしない。',[
         {'項目':'新ゆうき完全原本の自動保存','状態':'未完了','必要作業':'6艇・展開・固定10点・締切前リモート受領の実測'},
         {'項目':'浜名湖実開催保存','状態':'未完了','必要作業':'公式日程2026-10-21開始。前検・展示・締切前保存を実測'},
@@ -99,6 +113,8 @@ def run(study,out):
     lines += ['', '## 品質監査', '', 'K原本365日を確認。既存174日を再利用、新規191日、失敗0日。計8876R、通常8192R、事故等682R、同着2R。',
               '江戸川は元2041Rを全件公式照合し、公式にある28Rを追加。元212Rの着順不足は公式異常記録と確認し、欠落順位を作らなかった。',
               '児島2026-05-23 3Rは3着同着、浜名湖2026-05-31 7Rは2着同着。複数の3連単と配当を保存し、通常分布から分離した。',
+              'KとBは各365日を確認。予定9012Rは結果8876Rと公式中止136Rに対応し、未解明の予定レースは0R。江戸川中止127R・唐津6R・浜名湖3R。',
+              '番組表の100.00%表記で隣接項目が連結する固定長仕様を修正し、級別の解析漏れ20Rを解消。全8876Rで6艇級別を同一選手IDで照合した。K/Bそれぞれ751場日付ヘッダーも取得日と一致。',
               'KとBは独立原本。B/K選手IDが一致した場合だけ級別等を結合。締切予定を締切前受領の証拠に使わない。',
               '', '## 同入力比較（改良は後付け）','', '|場|版|R|既存的中|改良的中|判定|','|---|---|---:|---:|---:|---|']
     lines += ['|'+ '|'.join(str(r[k]) for k in ['場','改良版','同入力比較R','既存的中数','改良的中数','status'])+'|' for r in validation['comparison']]

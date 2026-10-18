@@ -4,11 +4,13 @@ Reuses the unchanged scenario_v2 engine and PR36 A/B probability tables.
 Surface/player/motor observations remain hypotheses, never adopted coefficients.
 """
 from datetime import datetime
+from pathlib import Path
+import hashlib
 from research.edogawa_phase2 import model as prior
 from research.scenario_v2 import engine as scenario
 from .collect import VENUES
 
-VERSION='four-venue-phase2-ab-v0.1-unvalidated'
+VERSION='four-venue-phase2-ab-v0.2-unvalidated'
 COMBOS=prior.COMBOS
 SPECIALIZATION={j:{'venue':n,'validated_coefficients':[],
     'blocked':['潮位・流速の時空間対応','選手構成・季節の交絡','モーター使用期間・出足/伸びの観測']} for j,n in VENUES.items()}
@@ -68,10 +70,12 @@ def predict(snapshot,m,variant,*,mode,now,code_sha=None):
     ranked.sort(key=lambda r:(-r['supported_observations'] if variant=='B' else 0,-r['historical_score'],r['combination']))
     chosen=ranked[:10];primary=chosen[0]['combination'];head=int(primary[0])
     branches.sort(key=lambda h:(h['winner_lane']!=head,-h['supported_observations'],h['id']))
+    actual_generated=datetime.now(scenario.JST).isoformat() if mode=='replay' else base['generated_at']
     record={'version':VERSION,'venue_code':m['venue_code'],'variant':variant,'research_only':True,
         'status':'prospective_uncheckpointed' if mode=='live' else 'retrospective_replay',
-        'meta':base['meta'],'generated_at':base['generated_at'],'input_digest':scenario.digest(snapshot),
+        'meta':base['meta'],'generated_at':actual_generated,'replay_asof_at':base['generated_at'] if mode=='replay' else None,'input_digest':scenario.digest(snapshot),
         'model_digest':m['digest'],'training_end':m['training_end'],'code_sha':code_sha,
+        'research_code_digest':hashlib.sha256(b''.join(p.read_bytes() for p in sorted(Path(__file__).parent.glob('*.py')))).hexdigest(),
         'lanes':base['lanes'],'virtual_card':chosen,'unit_yen':100,'stake_yen':1000,
         'primary_prediction':primary,'primary_scenario':branches[0] if branches else None,
         'not_selected':[{**r,'reason':'固定10点に対し採用順位11位以下。A=場別コース分布、B=支持根拠優先後に連動統計'} for r in ranked[10:]],

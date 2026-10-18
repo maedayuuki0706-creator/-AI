@@ -9,7 +9,7 @@ from research.edogawa_phase2.study import wilson,writecsv
 from research.edogawa_phase2.validate import evaluate_history,paired_uncertainty
 from research.scenario_v2 import engine as scenario
 
-def replay(pair,fitted):
+def replay(pair,fitted,cache=None,code_sha=None):
     snap,base,review,receipt=[pair[k] for k in ['inputs','forecasts','reviews','receipts']]
     if receipt.get('status')!='confirmed_before_deadline' or receipt.get('digest')!=base['digest'] or review.get('forecast_digest')!=base['digest']:raise ValueError('Original identity/receipt invalid')
     if not scenario.aware(base['created_at'])<=scenario.aware(receipt['checked_at'])<scenario.aware(base['deadline_at']):raise ValueError('Original receipt late')
@@ -18,7 +18,11 @@ def replay(pair,fitted):
     if (review.get('status')!='graded' and not refundable) or len(review.get('winning_combinations',[]))!=1:return [],[]
     actual=review['winning_combinations'][0];a=actual.split('-');out=[];logs=[]
     for v in ['A','B']:
-        pred=model.predict(snap,fitted,v,mode='replay',now=snap['meta']['captured_at'])
+        existing=Path(cache)/(pair['race_id']+'_'+v+'.json') if cache else None
+        if existing and existing.exists():
+            pred=json.loads(existing.read_text())['research_replay'];scenario.verify(pred)
+            if pred['model_digest']!=fitted['digest'] or pred['input_digest']!=scenario.digest(snap) or pred['code_sha']!=code_sha:raise ValueError('Changed replay identity; new study output required')
+        else:pred=model.predict(snap,fitted,v,mode='replay',now=snap['meta']['captured_at'],code_sha=code_sha)
         picks=[r['combination'] for r in pred['virtual_card']];primary=pred['primary_prediction'].split('-')
         cohort='返還確認' if refundable else '返還なし・全6艇未照合'
         baseline_picks=[r['combination'] for r in base['virtual_card']]
@@ -43,7 +47,8 @@ def replay(pair,fitted):
                      'original_is_prospective':True,'new_model_is_prospective':False,'user_comment':''})
     return out,logs
 
-def run(study,pairs):
+def run(study,pairs,code_sha):
+    if len(code_sha)!=40:raise ValueError('Full published research code SHA required')
     root=Path(study);records=json.loads((root/'audited_races.json').read_text());pairs=json.loads(Path(pairs).read_text())
     hist=[];paired=[];metrics=[];models={};pending=[]
     for jcd,name in VENUES.items():
@@ -68,7 +73,7 @@ def run(study,pairs):
             if pair['race_id'].split('_')[1]!=jcd:continue
             if pair.get('errors') or not all(k in pair for k in ['inputs','forecasts','reviews','receipts']):
                 pending.append({'race_id':pair['race_id'],'reason':'既存原本/照合/受領の不足','errors':pair.get('errors')});continue
-            out,logs=replay(pair,fitted);paired.extend(out)
+            out,logs=replay(pair,fitted,root/'replays',code_sha);paired.extend(out)
             if not logs:pending.append({'race_id':pair['race_id'],'reason':'既存結果が未確定/除外。通常成績に補完しない'})
             for log in logs:
                 pred=log['research_replay'];put(root/'replays'/(pair['race_id']+'_'+pred['variant']+'.json'),json.dumps(log,ensure_ascii=False,sort_keys=True).encode())
@@ -96,4 +101,4 @@ def run(study,pairs):
     print(json.dumps(summary,ensure_ascii=False),flush=True);return summary
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--study',required=True);p.add_argument('--pairs',required=True);a=p.parse_args();run(a.study,a.pairs)
+    p=argparse.ArgumentParser();p.add_argument('--study',required=True);p.add_argument('--pairs',required=True);p.add_argument('--code-sha',required=True);a=p.parse_args();run(a.study,a.pairs,a.code_sha)

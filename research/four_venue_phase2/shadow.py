@@ -106,6 +106,7 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--model',required=True);p.add_argument('--state',required=True);p.add_argument('--source-state');p.add_argument('--rno',type=int);p.add_argument('--forecast');p.add_argument('--result');p.add_argument('--receipt');p.add_argument('--publish',action='store_true');p.add_argument('--mode',choices=['preflight','capture','resume','review'],default='preflight');a=p.parse_args()
     fitted=json.loads(Path(a.model).read_text())
     if a.mode=='preflight':print(json.dumps(preflight(fitted),ensure_ascii=False));return
+    if git(a.state,'branch','--show-current')!=BRANCH:raise ValueError('Wrong state branch; no files written')
     with locked(a.state):
         try:
             if a.mode=='capture':

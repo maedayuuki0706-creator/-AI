@@ -25,4 +25,30 @@ python3 -m research.four_venue_phase2.collect \
 
 日別チェックポイント・SHA256付き原本を追記保存する。再開時は取得済み日を再取得しない。
 公式アーカイブの取得失敗を「非開催」と判定しない。失敗日の再試行は別履歴を残す。
-潮・潮流、前検級別・平均ST、映像上の攻め起点、モーター使用期間が未取得なら不明とする。
+潮・潮流、前検資料・平均ST、映像上の攻め起点、モーター使用期間が未取得なら不明とする。
+
+## 固定した品質監査
+
+公式K/Bを各365日確認。予定9012Rは結果8876Rと公式中止136Rに対応し、未解明の予定Rは0。
+結果は通常8192R、事故等682R、同着2R。6艇級別は全8876Rで同一選手IDを確認。
+K/Bの751場日付ヘッダーも各々一致。平均STの歴史事前原本・潮・返還明細等は欠測として残す。
+現行データ/研究IDは `data/research_four_venue_phase2/20251018_20261017/CURRENT.json` を参照。
+
+## 分析・検証
+
+`audit` → `validate`（公開コードSHAを必須指定）→ `package_report` → `archive` の順で実行。
+`build_workbook.mjs` は Artifact Tool の実行環境で `workbook_data.json 出力ディレクトリ` を指定する。
+研究モデルは `model_manifests/03.json`, `16.json`, `23.json`, `06.json`。
+CLIは `python3 -m research.four_venue_phase2.shadow --mode preflight --model MODEL --state unused` から確認できる。
+
+改良A/Bは研究用。Cは検証済み係数がないため停止。再計算には実際の生成時刻と元入力の時刻を別保存する。
+前向き原本・GitHub受領は0Rで、自動稼働成功とは扱わない。
+
+## 独立稼働の未解決点
+
+新しい手動workflowは研究ブランチにのみ存在し、既定ブランチへの登録は行っていない。
+GitHubのworkflow_dispatchは既定ブランチへの登録が必要なため、現状では未稼働。
+https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow
+
+代替は独立実行環境から既存入力を読み取る `shadow` CLI。恒久実行先/書込認証の確定は未完了。
+既存workflowやmainの変更でこの制約を回避しない。研究workflowは他ジョブ実行/待機時に見送り、同時実行1に制限する。

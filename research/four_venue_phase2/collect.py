@@ -22,6 +22,8 @@ def parse_venue(day,txt,meta,jcd):
     selected='03KBGN\n'+section[1]+'\n03KEND\n'
     rows=parse_text(day,selected,meta['source_url'],meta['sha256'],meta['observed_at'])
     headers=re.findall(r'(?m)^\s*(\d{1,2})R\s+.*?H\s*\d{4}m',section[1])
+    cancelled_numbers=sorted({int(n) for n in re.findall(r'(?m)^\s*(\d{1,2})R\s+中\s*止',section[1])})
+    void_numbers=sorted({int(n) for n in re.findall(r'(?m)^\s*(\d{1,2})R\s+不\s*成\s*立',section[1])})
     for row in rows:
         row['race_id']=day.replace('-','')+jcd+f"{row['race_no']:02}"
         row.update(venue_code=jcd,venue=VENUES[jcd],data_source='BOATRACE_official_K',
@@ -30,6 +32,8 @@ def parse_venue(day,txt,meta,jcd):
         for b in row['boats']:b.update(average_st=None,racer_class=None)
         nums=[b['finish'] for b in row['boats'] if b['finish'] is not None]
         row['dead_heat_confirmed']=len(nums)==6 and len(set(nums))<6
+        row['cancelled']=row.get('cancelled',False) or row['race_no'] in cancelled_numbers
+        row['void_confirmed']=row['race_no'] in void_numbers
         row['finish_groups']={str(k):[b['lane'] for b in row['boats'] if b['finish']==k] for k in sorted(set(nums))}
         block=next(b for b in re.split(r'(?m)(?=^\s*\d{1,2}R\s+.*?H\s*\d{4}m)',section[1]) if re.match(r'\s*'+str(row['race_no'])+r'R\s+',b))
         paysec=re.search(r'3連単(.*?)(?:3連複|$)',unicodedata.normalize('NFKC',block),re.S)
@@ -38,7 +42,8 @@ def parse_venue(day,txt,meta,jcd):
     if len(rows)!=len(headers):raise ValueError('Header/record count mismatch')
     if len({r['race_no'] for r in rows})!=len(rows):raise ValueError('Duplicate official race')
     return rows,{'section_present':True,'race_headers':len(headers),'parsed_races':len(rows),
-                 'cancellation_mentions':section[1].count('中止')+section[1].count('不成立')}
+                 'cancelled_race_numbers':cancelled_numbers,'void_race_numbers':void_numbers,
+                 'cancellation_mentions':len(cancelled_numbers)+len(void_numbers)}
 
 def cached_body(root,reuse,sha):
     for base in [Path(root),Path(reuse)]:

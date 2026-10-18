@@ -4,6 +4,8 @@ from unittest.mock import patch
 from research.four_venue_phase2 import collect,model,shadow,resource_guard,cards
 from research.edogawa_phase2.tests.test_phase2 import snapshot,training,at,NOW
 from research.scenario_v2 import engine as scenario
+from research.four_venue_phase2.settle import settle
+from datetime import datetime
 
 def fitted(j='03'):
     rows=training()
@@ -155,5 +157,28 @@ class FourVenue(unittest.TestCase):
         r=cards.parse('2026-10-17',text,META)[0]
         self.assertEqual(r['deadline_scheduled'],'11:14');self.assertEqual(r['boats'][0]['racer_class'],'B1')
         self.assertFalse(r['six_boats_parsed']);self.assertFalse(r['prerace_publication_verified'])
+    def test_refund_and_winning_payout_kept_separate(self):
+        picks=['1-2-3','2-3-4','3-4-5','4-5-6','5-1-4','6-1-4','1-3-2','2-4-3','3-5-4','4-6-5']
+        r=settle(picks,{'2-3-4':960},[1]);self.assertEqual(r['refund_yen'],400);self.assertEqual(r['return_yen'],1360);self.assertIsNone(r['roi']);self.assertIsNone(r['torigami'])
+    def test_refund_unknown_not_zero(self):
+        picks=['1-2-3','2-3-4','3-4-5','4-5-6','5-1-4','6-1-4','1-3-2','2-4-3','3-5-4','4-6-5']
+        self.assertIsNone(settle(picks,{'2-3-4':960},None)['return_yen'])
+        with self.assertRaises(ValueError):settle(picks,{'1-2-3':960},[1])
+    def test_replay_actual_generation_time_not_backdated(self):
+        s=snap();s['meta'].update(day='20261017',captured_at='2026-10-17T11:00:00+09:00')
+        current=datetime.fromisoformat('2026-10-18T22:00:00+09:00')
+        with patch.object(model,'datetime') as clock:
+            clock.now.return_value=current
+            r=model.predict(s,fitted(),'A',mode='replay',now='2026-10-17T11:01:00+09:00')
+        self.assertEqual(r['generated_at'],current.isoformat());self.assertEqual(r['replay_asof_at'],'2026-10-17T11:01:00+09:00');self.assertEqual(r['status'],'retrospective_replay')
+    def test_B_fixed_width_100percent_does_not_merge_boat_number(self):
+        text='03BBGN\n 1R 予選 H1800m 電話投票締切予定11:14\n1 5300横田海人23愛知52B1 2.05  6.32 2.43  7.41 58 57.14 67100.00              9\n2 4082濱崎 誠46大阪51B1 4.86 27.71 8.00100.00 28 36.02 17 40.79 1 214263    12\n03BEND\n'
+        r=cards.parse('2026-10-17',text,META)[0]
+        self.assertEqual(r['boats'][0]['boat_number'],67);self.assertEqual(r['boats'][0]['boat_top2_rate'],100)
+        self.assertEqual(r['boats'][1]['local_win_rate'],8);self.assertEqual(r['boats'][1]['local_top2_rate'],100)
+    def test_cancelled_paytable_not_counted_as_held_race(self):
+        txt='16KBGN\n 1R 中　止\n 2R 中　止\n16KEND\n'
+        rows,cov=collect.parse_venue('2026-10-17',txt,META,'16')
+        self.assertEqual(rows,[]);self.assertEqual(cov['cancelled_race_numbers'],[1,2]);self.assertEqual(cov['parsed_races'],0)
 
 if __name__=='__main__':unittest.main()
