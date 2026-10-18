@@ -137,9 +137,10 @@
   "x_result_attempts": {
     "20261018:01:1": {
       "at": "2026-10-18T15:30:36.411749+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "98d42baaedc442eaab6a0fd5f695fc20",
-      "status": "reserved"
+      "retry_at": "2026-10-18T15:31:09.619663+09:00",
+      "status": "retryable"
     },
     "20261018:03:10": {
       "at": "2026-10-18T15:30:31.603912+09:00",
@@ -2045,10 +2046,12 @@
       "attempt": 1,
       "claimed_at": "2026-10-18T15:30:36.411749+09:00",
       "content_sha256": "34556c3818cb68867ff6ccea77b38c0125c9b5bfa4752c12626902b37c847259",
+      "error_type": "DefiniteRejection",
       "key": "result:20261018:01:1",
       "owner": "98d42baaedc442eaab6a0fd5f695fc20",
       "parent_post_id": "2111702151210959100",
       "phase": "result",
+      "request_started_at": "2026-10-18T15:30:37.687856+09:00",
       "row": {
         "day": "20261018",
         "deadline": "15:26",
@@ -2098,7 +2101,14 @@
         "source": "AI重なり本線",
         "venue": "桐生"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "official result pending",
+        "retryable": true,
+        "transport_http_status": 409
+      },
+      "updated_at": "2026-10-18T15:30:39.619663+09:00"
     },
     "result:20261018:02:1": {
       "attempt": 1,
