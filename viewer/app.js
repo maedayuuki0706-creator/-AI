@@ -6,7 +6,7 @@ const DATA_RAW='https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/mai
 const PACKS=new Map();
 const playerState={players:[],selected:'',snapshotAt:'',loadPromise:null,livePromise:null,lastChecked:0,status:'',composing:false};
 const $=id=>document.getElementById(id);
-const state={day:'',venue:'20',race:8,tab:'pt2',token:0,prediction:null,raceRows:[],rosterRows:[],active:null,
+const state={day:'',venue:'01',race:1,tab:'pt2',token:0,prediction:null,raceRows:[],rosterRows:[],active:null,
   pt2Status:'予想を読み込んでいます…',raceStatus:'出走情報はタブを開いたときに読み込みます。',
   raceLoadingKey:'',raceLoadedKey:'',userSelectedVenue:false,venueToken:0};
 const CACHE_PREFIX='boat-race-view-v4:';
@@ -68,7 +68,7 @@ function getPack(key){
 }
 function setStatus(x){$('status').textContent=x;}
 function updateAddress() {
- const params=new URLSearchParams();params.set('date',state.day);params.set('venue',state.venue);params.set('race',String(state.race));
+ const params=new URLSearchParams();params.set('date',state.day);params.set('venue',state.venue);params.set('race',String(state.race));if(!state.userSelectedVenue)params.set('auto','1');
  try{history.replaceState({},'',location.pathname+'?'+params.toString());}catch(e){}
  $('official').href='https://www.boatrace.jp/owpc/pc/race/racelist?hd='+yyyymmdd()+'&jcd='+state.venue+'&rno='+state.race;
 }
@@ -405,20 +405,41 @@ function setupPlayerSearch(){
 function boot(){
  const params=new URLSearchParams(location.search);
  const day=params.get('date')||jstToday();state.day=/^20\d{2}-\d\d-\d\d$/.test(day)?day:jstToday();
- const venue=params.get('venue');state.venue=VENUES.some(x=>x[0]===venue)?venue:'20';
- const race=Number(params.get('race'));state.race=Number.isInteger(race)&&race>=1&&race<=12?race:8;
+ const venue=params.get('venue');state.venue=VENUES.some(x=>x[0]===venue)?venue:'01';
+ const race=Number(params.get('race'));state.race=Number.isInteger(race)&&race>=1&&race<=12?race:1;
+ state.userSelectedVenue=Boolean((venue||params.has('race')||params.has('date'))&&params.get('auto')!=='1');
  $('day').value=state.day;venueOptions();raceOptions();
  $('tab-pt2').addEventListener('click',()=>setTab('pt2'));
  $('tab-race').addEventListener('click',()=>setTab('race'));
  $('tab-player').addEventListener('click',()=>{setTab('player');$('player-query').focus();});
  setupPlayerSearch();
- $('day').addEventListener('change',()=>{if(!$('day').value)return;state.day=$('day').value;state.active=null;loadRace();loadVenues(Boolean(venue));});
+ $('day').addEventListener('change',()=>{if(!$('day').value)return;state.day=$('day').value;state.active=null;state.userSelectedVenue=true;loadRace();loadVenues(true);window.RaceSchedule?.load(state.day,true);});
  $('venue').addEventListener('change',selectRace);
  $('race').addEventListener('change',selectRace);
- $('refresh').addEventListener('click',()=>{if(state.tab==='player')loadPlayers(true);else loadRace(true);});
- // 予想は即時読み込み。休止中の出走情報フィードを待たない。
- loadRace();
- loadVenues(Boolean(venue));
+ $('refresh').addEventListener('click',()=>{if(state.tab==='player')loadPlayers(true);else {loadRace(true);window.RaceSchedule?.load(state.day,true);}});
+ // The deadline board selects the first still-open race. Never default to a stale 若松8R.
+ if(state.userSelectedVenue)loadRace();
+ else {
+   $('view-pt2').innerHTML=inside('<div class="empty">締切前のレースを確認中です。情報がない場合は場とRを選んでください。</div>');
+   state.pt2Status='本日の開催・締切情報を確認中';
+   refreshStatus();
+ }
+ loadVenues(true);
+ window.RaceSchedule?.start({
+   venues:VENUES,
+   getDay:()=>state.day,
+   autoDate:()=>!params.has('date')&&!state.userSelectedVenue,
+   isAutoFollowing:()=>!state.userSelectedVenue,
+   onPick:(jcd,rno,auto)=>{
+     state.venue=jcd;state.race=rno;state.userSelectedVenue=!auto;
+     venueOptions();raceOptions();loadRace();
+   },
+   onFollow:()=>{state.userSelectedVenue=false;},
+   onNewDay:key=>{
+     state.day=key.slice(0,4)+'-'+key.slice(4,6)+'-'+key.slice(6,8);
+     $('day').value=state.day;state.active=null;loadVenues(true);
+   }
+ });
  getJson('data/manifest.json',5000).then(m=>{
    if(!Array.isArray(state.active)&&m.days?.[yyyymmdd()]){state.active=m.days[yyyymmdd()];venueOptions();}
  }).catch(()=>{});
