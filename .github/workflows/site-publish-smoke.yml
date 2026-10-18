@@ -1,0 +1,39 @@
+name: Verify published viewer only
+on:
+  push:
+    branches:
+      - research/site-publish-smoke-20261019
+permissions:
+  contents: read
+jobs:
+  site_published:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Wait for Render CDN and verify opt-in forecasts
+        run: |
+          node - <<'NODE'
+          const url='https://boat-ai-readonly-view.onrender.com/';
+          const wait=ms=>new Promise(r=>setTimeout(r,ms));
+          (async()=>{
+            for(let i=0;i<24;i++){
+              try{
+                const r=await fetch(url,{signal:AbortSignal.timeout(18000),cache:'no-store',headers:{'cache-control':'no-cache'}});
+                const h=await r.text();
+                if(r.ok&&h.includes('class="home-landing"')&&h.includes('class="workspace hidden"')&&h.includes('data-open-tab="pt2"')){
+                  const app=await fetch(url+'app.js?v=7',{signal:AbortSignal.timeout(15000)});
+                  const js=await app.text();
+                  const schedule=await fetch(url+'live_schedule.js?v=5',{signal:AbortSignal.timeout(15000)});
+                  const sch=await schedule.text();
+                  if(app.ok&&js.includes("loadSelectedPrediction(")&&js.includes("tab:'idle'")&&schedule.ok&&sch.includes('boat-ai-navi-schedule.onrender.com')){
+                    console.log('PASS published site: branded landing, opt-in predictions, independent schedule.');
+                    console.log('URL:',url);return;
+                  }
+                }
+                console.log('Waiting for current Render deployment',i+1,'http',r.status);
+              }catch(e){console.log('Waiting for Render CDN',i+1,String(e).slice(0,120));}
+              await wait(10000);
+            }
+            throw new Error('Public site did not update to the verified build within the smoke-test window.');
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          NODE
