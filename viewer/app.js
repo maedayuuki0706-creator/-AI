@@ -35,7 +35,7 @@ function lightPrediction(j) {
     models:{prototype2:{grade:p.grade,heads:p.heads,strategy_cards:{cards}}}};
 }
 function currentKey(){return yyyymmdd()+'_'+state.venue+'_'+String(state.race).padStart(2,'0');}
-function refreshStatus(){$('status').textContent=state.tab==='player'?(playerState.status||'選手名・登録番号で検索できます。'):state.tab==='pt2'?state.pt2Status:state.raceStatus;}
+function refreshStatus(){$('status').textContent=state.tab==='player'?(playerState.status||'選手名・登録番号で検索できます。'):state.tab==='pt2'?state.pt2Status:state.tab==='motor'?'モーターAI評価はデータベースの参考値です。':state.raceStatus;}
 function jstClock(){return new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'}).format(new Date());}
 const safe=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const jstToday=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -79,9 +79,10 @@ function venueOptions(){
 function raceOptions(){$('race').innerHTML=Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'R</option>').join('');$('race').value=String(state.race);}
 function setTab(tab){
  state.tab=tab;
- for(const name of ['pt2','race','player']){$('tab-'+name).setAttribute('aria-selected',String(tab===name));$('view-'+name).classList.toggle('hidden',tab!==name);}
+ for(const name of ['pt2','race','player','motor']){$('tab-'+name).setAttribute('aria-selected',String(tab===name));$('view-'+name).classList.toggle('hidden',tab!==name);}
  if(tab==='race')loadRaceData();
  if(tab==='player')loadPlayers();
+ if(tab==='motor')window.MotorPanel?.show();
  refreshStatus();
 }
 function inside(section){return '<section class="panel">'+section+'</section>';}
@@ -145,6 +146,7 @@ function applyCard(card){
  state.raceSnapshotAt=card.captured_at||'';
  cacheWrite('card:'+currentKey(),card);
  $('view-race').innerHTML=raceHtml();
+ window.MotorPanel?.render();
  state.raceStatus='保存済み出走表を表示中（'+displayTime(card.captured_at)+'）';
  refreshStatus();
  return true;
@@ -191,6 +193,7 @@ async function loadRaceData(force=false){
  if(state.raceRows.length||state.rosterRows.length){
   if(updated)state.raceSnapshotAt='';
   $('view-race').innerHTML=raceHtml();
+  window.MotorPanel?.render();
   state.raceStatus=updated?'出走情報を更新しました（'+jstClock()+' JST確認）':'保存済み出走表を表示中・最新フィードは取得できませんでした。';
  }else{
   $('view-race').innerHTML=inside('<h2>出走表</h2><div class="empty">出走情報を取得できませんでした。公式サイトを確認するか、情報を更新してください。</div>');
@@ -211,6 +214,7 @@ async function loadRace(force=false){
  else{$('view-pt2').innerHTML=inside('<div class="empty">PT2予想を読み込んでいます…</div>');state.pt2Status='PT2予想を読み込んでいます…';}
  refreshStatus();
  if(state.tab==='race')loadRaceData(force);
+ if(state.tab==='motor')window.MotorPanel?.show();
  const apply=data=>{
   if(token!==state.token)return;
   const light=lightPrediction(data);
@@ -412,6 +416,14 @@ function boot(){
  $('tab-pt2').addEventListener('click',()=>setTab('pt2'));
  $('tab-race').addEventListener('click',()=>setTab('race'));
  $('tab-player').addEventListener('click',()=>{setTab('player');$('player-query').focus();});
+ $('tab-motor').addEventListener('click',()=>setTab('motor'));
+ window.MotorPanel?.start({race:()=>({day:yyyymmdd(),venue:state.venue,venueName:VENUES.find(v=>v[0]===state.venue)?.[1]||'',race:state.race,roster:state.rosterRows,rows:state.raceRows,capturedAt:state.raceSnapshotAt}),roster:()=>loadRaceData()});
+ window.MotorPanel?.readMeta();
+ document.querySelectorAll('[data-open-tab]').forEach(button=>button.addEventListener('click',()=>{
+   const tab=button.getAttribute('data-open-tab');if(!['pt2','player','motor','race'].includes(tab))return;
+   setTab(tab);
+   document.getElementById('race-center').scrollIntoView({behavior:'smooth',block:'start'});
+ }));
  setupPlayerSearch();
  $('day').addEventListener('change',()=>{if(!$('day').value)return;state.day=$('day').value;state.active=null;state.userSelectedVenue=true;loadRace();loadVenues(true);window.RaceSchedule?.load(state.day,true);});
  $('venue').addEventListener('change',selectRace);
