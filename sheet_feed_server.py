@@ -1040,6 +1040,48 @@ def today_rows(day: str) -> list[list]:
     return _cached(f"today:{day}", build)
 
 
+def schedule_snapshot(day: str) -> dict:
+    """Read-only official race deadlines for every venue holding races on a date.
+
+    This endpoint does not predict, deliver, write Sheets, or modify existing
+    CSV endpoints. Partial official responses are explicitly identified.
+    """
+    def build():
+        venues = discover_venues(day)
+        races = []
+        failures = []
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            futures = {pool.submit(deadlines, day, jcd): jcd for jcd in venues}
+            for future in as_completed(futures):
+                jcd = futures[future]
+                try:
+                    times = future.result()
+                    # A partial time list must never masquerade as the full 12R.
+                    if len(times) != 12:
+                        failures.append(jcd)
+                        continue
+                    for rno, deadline in enumerate(times, 1):
+                        if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", deadline):
+                            failures.append(jcd)
+                            break
+                    else:
+                        races.extend({"jcd": jcd, "rno": rno, "deadline": deadline}
+                                     for rno, deadline in enumerate(times, 1))
+                except Exception:
+                    failures.append(jcd)
+        races.sort(key=lambda race: (race["deadline"], race["jcd"], race["rno"]))
+        return {
+            "day": day,
+            "generated_at": datetime.now(JST).isoformat(),
+            "source": "BOATRACE official racelist via existing read-only feed",
+            "venues": len(venues),
+            "races": races,
+            "partial": bool(failures),
+            "missing_venue_codes": sorted(set(failures)),
+        }
+    return _cached(f"read-only-schedule:{day}", build)
+
+
 def to_csv(rows: list[list], include_header: bool = True, header: list[str] | None = None) -> bytes:
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator="\n")
@@ -1100,6 +1142,12 @@ class Handler(BaseHTTPRequestHandler):
                 rows = [[code, VENUES[code]] for code in discover_venues(day)]
                 body = to_csv([["場コード", "場名"]] + rows, include_header=False)
                 self._send(200, body, "text/csv; charset=utf-8")
+                return
+
+            if parsed.path == "/schedule.json":
+                payload = schedule_snapshot(day)
+                self._send(200, json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                           "application/json; charset=utf-8")
                 return
 
             if parsed.path == "/race.csv":

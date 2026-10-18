@@ -1,0 +1,39 @@
+name: Isolated read-only schedule endpoint tests
+on:
+  push:
+    branches:
+      - feature/feed-readonly-schedule-20261018
+    paths:
+      - 'sheet_feed_server.py'
+      - 'tests/test_readonly_schedule.py'
+      - '.github/workflows/readonly-schedule-tests.yml'
+  pull_request:
+    branches:
+      - sheet-auto-update
+    paths:
+      - 'sheet_feed_server.py'
+      - 'tests/test_readonly_schedule.py'
+      - '.github/workflows/readonly-schedule-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: readonly-schedule-tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  schedule_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check parser syntax
+        run: python -m py_compile sheet_feed_server.py
+      - name: Offline API tests
+        run: |
+          python -m py_compile research/website_schedule/schedule_server.py
+          python -m unittest discover -s tests -p test_readonly_schedule.py -v
+          python -m unittest discover -s tests -p test_website_schedule_server.py -v
