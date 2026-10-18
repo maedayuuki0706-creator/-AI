@@ -65,6 +65,13 @@
     const todayDay=today(), isPast=day<todayDay, isToday=day===todayDay;
     headline.textContent=valid?('締切前 '+all.length+'R / 取得 '+saved.length+'R'):'締切データ取得待ち';
     const display=all.length?all:[];
+    const nextRace=document.getElementById('home-next-race');
+    const nextTime=document.getElementById('home-next-time');
+    const count=document.getElementById('home-race-count');
+    const first=all[0];
+    if(nextRace)nextRace.textContent=first?NAME.get(first.jcd)+' '+first.rno+'R':valid?'締切前レースなし':'日程を確認中';
+    if(nextTime)nextTime.textContent=first?'締切 '+first.deadline+' JST'+(isToday?' / '+left(first.at-Date.now()):' / 開催予定'):valid?(partial?'一部の時刻が未取得です':'開催終了・非開催の可能性があります'):'正しい締切情報がまだ届いていません';
+    if(count)count.textContent=valid?'締切前 '+all.length+'R'+(partial?'（取得分のみ）':''):'データ取得待ち';
     const existingScroll=el.scrollTop;
     if(!valid){
       el.innerHTML='<p class="deadline-empty">'+(loading?'開催・締切データを確認中…':'締切情報を確認できません。公式サイトから開催日程をご確認ください。')+'</p>';
