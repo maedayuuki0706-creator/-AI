@@ -63,6 +63,12 @@ def main():
         target = OUT / "races" / (key + ".json")
         target.parent.mkdir(exist_ok=True)
         target.write_text(json.dumps(pack, ensure_ascii=False, separators=(",", ":")) + "\n")
+        # A separate race-only file keeps the public starting card fast without
+        # downloading any of the saved forecast picks before the user clicks.
+        if pack.get("race"):
+            card_target = OUT / "cards" / (key + ".json")
+            card_target.parent.mkdir(exist_ok=True)
+            card_target.write_text(json.dumps(pack["race"], ensure_ascii=False, separators=(",", ":")) + "\n")
     manifest = {"built_at": datetime.now(ZoneInfo("Asia/Tokyo")).isoformat(), "days": {d: sorted(v) for d, v in days.items()}, "keys": sorted(packs)}
     (OUT / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")) + "\n")
     new_bytes = sum((OUT / "races" / (key + ".json")).stat().st_size for key in packs)
