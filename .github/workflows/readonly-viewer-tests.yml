@@ -1,0 +1,43 @@
+name: Read-only viewer isolated tests
+on:
+  push:
+    branches:
+      - feature/viewer-live-deadline-board-20261018
+    paths:
+      - 'viewer/**'
+      - '.github/workflows/readonly-viewer-tests.yml'
+  pull_request:
+    branches:
+      - feature/readonly-race-viewer-20261009
+    paths:
+      - 'viewer/**'
+      - '.github/workflows/readonly-viewer-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: readonly-viewer-tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  viewer_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check client scripts parse
+        run: |
+          node --check viewer/app.js
+          node --check viewer/live_schedule.js
+          node --check viewer/motor_panel.js
+      - name: Test read-only homepage and explicit-click forecasts
+        run: |
+          node viewer/tests/test_home_html.cjs
+          node viewer/tests/test_live_schedule.cjs
+          node viewer/tests/test_motor_panel.cjs
+          node viewer/tests/test_prediction_opt_in.cjs
+      - name: Validate independent static asset generator
+        run: python -m py_compile viewer/build_data.py
