@@ -66,18 +66,20 @@ export function remaining(at, now = Date.now()) {
 export async function request(url, type = 'json', timeout = 14000) {
   const control = new AbortController(), timer = setTimeout(() => control.abort(), timeout);
   try {
-    const response = await fetch(url,{signal:control.signal,cache:'no-cache',credentials:'omit',referrerPolicy:'no-referrer'});
+    const response = await fetch(url,{signal:control.signal,cache:'no-cache',credentials:'same-origin',referrerPolicy:'no-referrer'});
     if (!response.ok) { const error = new Error('HTTP '+response.status); error.status = response.status; throw error; }
     return type === 'json' ? await response.json() : await response.text();
   } finally { clearTimeout(timer); }
 }
 const memory = new Map();
-async function shared(key, fn, ttl = 300000) {
+async function shared(key, fn, ttl = 300000, force = false) {
   const old = memory.get(key);
-  if (old && Date.now()-old.at < ttl) return old.value;
+  if (!force && old && Date.now()-old.at < ttl) return old.value;
   const value = Promise.resolve().then(fn);
-  memory.set(key,{at:Date.now(),value});
-  try { return await value; } catch (error) { memory.delete(key); throw error; }
+  const entry = {at:Date.now(),value};
+  memory.set(key,entry);
+  try { return await value; }
+  catch (error) { if (memory.get(key) === entry) memory.delete(key); throw error; }
 }
 export async function loadSchedule(day) {
   if (!validDay(day)) throw new Error('日付を確認してください');
@@ -154,7 +156,7 @@ export async function loadCard(race, force = false) {
     if (boats.length !== 6 || new Set(boats.map(b => b.lane)).size !== 6) throw new Error('6艇の出走表を確認できませんでした');
     return {...race,boats:boats.sort((a,b) => a.lane-b.lane),deadline:rows[0]?.['締切'] || '',captured_at:new Date().toISOString(),source:'公式出走フィード'};
   };
-  return force ? read() : shared('card:'+race.key,read,120000);
+  return shared('card:'+race.key,read,120000,force);
 }
 export function compactPrediction(record, race) {
   if (!sameRace(record,race)) throw new Error('選択レースと予想が一致しません');

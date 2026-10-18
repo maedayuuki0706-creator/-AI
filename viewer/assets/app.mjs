@@ -131,7 +131,14 @@ function setupSelector(onSelect) {
     replaceQuery(p.toString()); onSelect(next);
   });
   // Changing a selector invalidates the previous forecast before another submit.
-  form.addEventListener('change',() => onSelect(null));
+  form.addEventListener('change',() => {
+    const params = new URLSearchParams(location.search);
+    if (raceSelection(location.search)) {
+      for (const key of ['date','venue','race']) params.delete(key);
+      replaceQuery(params.toString());
+    }
+    onSelect(null);
+  });
   return selected;
 }
 async function homePage() {
@@ -145,18 +152,18 @@ async function homePage() {
 }
 function racePage() {
   let serial = 0;
-  async function show(race) {
+  async function show(race, {force = false, countView = true} = {}) {
     const id = ++serial, target = $('race-content');
     if (!race) { target.innerHTML = empty('レースを選択してください','選択内容を変更した場合は、レースを選択ボタンで確定してください。'); return; }
     target.innerHTML = empty('出走表を確認中',NAMES.get(race.jcd)+' '+race.rno+'R の出走情報を読み込んでいます。',true);
     try {
-      const card = await loadCard(race); if (id !== serial) return;
+      const card = await loadCard(race,force); if (id !== serial) return;
       let html = '<section class="panel">'+title(race,card.source)+'<div class="info-row">'+pill(card.deadline ? '締切 '+card.deadline : '締切未確認')+'<span class="meta">'+esc(stamp(card.captured_at))+'</span></div><div class="detail-actions"><a class="button" href="'+esc(raceUrl('/predictions/',race))+'">このレースのAI予想'+arrow+'</a><a class="button button-outline" href="'+esc(raceUrl('/motors/',race))+'">6艇のモーター比較'+arrow+'</a></div><p class="table-note">表は横にスクロールできます。選手名を押すと選手データへ進みます。</p><div class="table-scroll" tabindex="0" role="region" aria-label="6艇の出走表、横スクロール"><table class="race-table"><thead><tr><th>艇</th><th>選手 / 登録番号</th><th>級別</th><th class="number">全国勝率</th><th class="number">平均ST</th><th class="number">モーター</th><th class="number">2連率</th></tr></thead><tbody>';
       for (const b of card.boats) html += '<tr><td>'+boat(b.lane)+'</td><td>'+(b.racer_id ? '<a class="racer-name" href="/racers/?q='+encodeURIComponent(b.racer_id)+'">'+esc(b.name || '名前未取得')+'</a>' : esc(b.name || '未取得'))+'<div class="small">'+esc(b.racer_id || '登録番号未取得')+'</div></td><td>'+esc(b.current_class || '—')+'</td><td class="number">'+fixed(b.win_rate,2)+'</td><td class="number">'+fixed(b.avg_st,2)+'</td><td class="number">'+(num(b.motor_number) === null ? '—' : '<a class="racer-name" href="/motors/?venue='+race.jcd+'&motor='+num(b.motor_number)+'">'+num(b.motor_number)+'</a>')+'</td><td class="number">'+pct(b.motor_top2_rate)+'</td></tr>';
       html += '</tbody></table></div><p class="table-note">出典：公開済みの公式出走入力・読取専用フィード。取得時点の情報です。欠場・進入・締切変更は公式発表で最終確認してください。</p><button class="text-link" id="race-refresh" type="button">出走表を更新 →</button></section>';
       target.innerHTML = html;
-      $('race-refresh').addEventListener('click',async () => { try { await loadCard(race,true); show(race); } catch (error) { toast(dataError(error)); } });
-      track('race_detail_view',{date:race.day,venue_code:race.jcd,race_number:race.rno});
+      $('race-refresh').addEventListener('click',() => show(race,{force:true,countView:false}));
+      if (countView) track('race_detail_view',{date:race.day,venue_code:race.jcd,race_number:race.rno});
     } catch (error) { if (id === serial) target.innerHTML = empty('出走表を取得できませんでした',dataError(error)); }
   }
   const selected = setupSelector(show); if (selected) show(selected);

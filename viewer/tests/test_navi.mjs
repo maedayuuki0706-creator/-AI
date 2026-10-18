@@ -92,7 +92,7 @@ class Element{
  set innerHTML(v){this._html=v;this.options=[...String(v).matchAll(/<option[^>]*>([^<]*)<\/option>/g)].map(m=>({textContent:m[1]}));}
  get innerHTML(){return this._html;}
  addEventListener(k,fn){(this.listeners[k]||=[]).push(fn);}
- async emit(k,props={}){for(const fn of this.listeners[k]||[])await fn({preventDefault(){},target:this,...props});}
+ async emit(k,props={}){for(const fn of [...(this.listeners[k]||[])])await fn({preventDefault(){},target:this,...props});}
  querySelectorAll(){return [];}setAttribute(k,v){this[k]=v;}getAttribute(k){return this[k]??null;}contains(){return false;}focus(){}
 }
 function environment(page,search=''){
@@ -165,5 +165,72 @@ test('basic consent: no tag before consent, one page_view after consent, no raw 
   assert.equal(events.filter(e=>e[0]==='event'&&e[1]==='page_view').length,1);
   assert.equal(events.find(e=>e[0]==='consent'&&e[1]==='update')[2].ad_storage,'denied');
   A.track('racer_search',{query:'SECRET',query_length:4,result_count:1});assert.ok(!JSON.stringify(window.dataLayer).includes('SECRET'));
+ }finally{env.restore();}
+});
+
+const cardFixture=(selected,name)=>({...selected,captured_at:'2026-10-18T10:00:00+09:00',deadline:'15:00',boats:Array.from({length:6},(_,i)=>({lane:i+1,racer_id:String(4200+i),name:name+(i+1),current_class:'A1',win_rate:6,avg_st:.15,motor_number:11+i,motor_top2_rate:30}))});
+const liveCsv=name=>({
+ race:'枠,登録番号,級別,全国勝率,平均ST,締切\n'+Array.from({length:6},(_,i)=>[i+1,4200+i,'A1',6,.15,'15:00'].join(',')).join('\n'),
+ roster:'登録番号,選手名,級別,モーターNo.,モーター2連率\n'+Array.from({length:6},(_,i)=>[4200+i,name+(i+1),'A1',51+i,45].join(',')).join('\n')
+});
+const settled=()=>new Promise(resolve=>setTimeout(resolve,15));
+test('shipped UI: refresh replaces a cached card and later reads keep the new data',async()=>{
+ const env=environment('race','?date=2026-10-17&venue=01&race=1'),selected=D.raceSelection(location.search),live=liveCsv('更新後');
+ try{
+  globalThis.fetch=async url=>{
+   env.calls.push(String(url));
+   if(String(url).includes('/data/cards/'))return env.reply(cardFixture(selected,'更新前'));
+   if(String(url).includes('/race_roster.csv'))return env.reply(live.roster);
+   if(String(url).includes('/race.csv'))return env.reply(live.race);
+   return env.reply({},404);
+  };
+  boot();await settled();assert.ok(env.get('race-content').innerHTML.includes('更新前1'));
+  await env.get('race-refresh').emit('click');await settled();
+  assert.ok(env.get('race-content').innerHTML.includes('更新後1'),'refresh must show new feed, not old cache');
+  assert.ok(!env.get('race-content').innerHTML.includes('更新前1'));
+  const later=await D.loadCard(selected);
+  assert.equal(later.boats[0].name,'更新後1','subsequent reads must keep the updated card');
+ }finally{env.restore();}
+});
+test('shipped UI: old race refresh completing late cannot reopen the old race',async()=>{
+ const env=environment('race','?date=2026-10-17&venue=02&race=1'),first=D.raceSelection(location.search),next={...first,rno:2,key:'20261017_02_02'},live=liveCsv('旧レース更新'),complete=[];
+ try{
+  globalThis.fetch=async url=>{
+   if(String(url).includes('/data/cards/'+first.key))return env.reply(cardFixture(first,'旧レース'));
+   if(String(url).includes('/data/cards/'+next.key))return env.reply(cardFixture(next,'選択中レース'));
+   if(String(url).includes('/race_roster.csv'))return new Promise(resolve=>complete.push(()=>resolve(env.reply(live.roster))));
+   if(String(url).includes('/race.csv'))return new Promise(resolve=>complete.push(()=>resolve(env.reply(live.race))));
+   return env.reply({},404);
+  };
+  boot();await settled();
+  const refreshing=env.get('race-refresh').emit('click');await settled();
+  assert.equal(complete.length,2);
+  env.get('race-number').value='2';await env.get('race-form').emit('change');await env.get('race-form').emit('submit');await settled();
+  assert.ok(env.get('race-content').innerHTML.includes('選択中レース1'));
+  complete.forEach(done=>done());await refreshing;await settled();
+  assert.ok(env.get('race-content').innerHTML.includes('選択中レース1'),'late refresh must preserve current race');
+  assert.ok(!env.get('race-content').innerHTML.includes('旧レース'));
+  assert.equal(new URLSearchParams(location.search).get('race'),'2');
+ }finally{env.restore();}
+});
+test('shipped UI: unconfirmed selector changes remove the old race from the shared URL',async()=>{
+ const env=environment('predictions','?date=2026-10-18&venue=19&race=12&utm_source=x');
+ try{
+  boot();env.get('race-number').value='11';await env.get('race-form').emit('change');
+  assert.equal(D.raceSelection(location.search),null,'URL must not retain the previous race');
+  assert.equal(new URLSearchParams(location.search).get('utm_source'),'x','preserve unrelated acquisition tags');
+  assert.equal(env.get('prediction-open').disabled,true);
+ }finally{env.restore();}
+});
+test('private preview can read its protected JSON while external sources remain cross-origin',async()=>{
+ const env=environment('home');
+ try{
+  globalThis.fetch=async(url,options)=>{
+   const local=new URL(url,location.origin).origin===location.origin;
+   if(local&&options.credentials!=='same-origin')return env.reply({},401);
+   return env.reply({ok:true});
+  };
+  assert.deepEqual(await D.request('/data/public/meta.json'),{ok:true},'same-site JSON must keep the signed-in session');
+  assert.deepEqual(await D.request(D.DATA_ROOT+'sheet_db/meta.json'),{ok:true});
  }finally{env.restore();}
 });
