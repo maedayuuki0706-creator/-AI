@@ -480,7 +480,7 @@ function boot(){
  $('day').addEventListener('change',()=>{
    if(!$('day').value)return;
    state.day=$('day').value;state.active=null;state.userSelectedVenue=true;state.raceSelected=true;
-   loadRace();setTab('race');loadVenues(true);window.RaceSchedule?.load(state.day,true);
+   loadRace();setTab('race');window.RaceSchedule?.load(state.day,true);
  });
  $('venue').addEventListener('change',selectRace);
  $('race').addEventListener('change',selectRace);
@@ -494,9 +494,13 @@ function boot(){
  // The deadline board selects the first still-open race. Never default to a stale 若松8R.
  if(state.raceSelected)loadRace();
  refreshStatus();
- loadVenues(true);
+ // Current venue schedule comes from the independent read-only API, not the old feed.
  window.RaceSchedule?.start({
    venues:VENUES,
+   onData:(date,items)=>{
+     if(date!==yyyymmdd())return;
+     state.active=[...new Set(items.map(x=>x.jcd))];venueOptions();
+   },
    getDay:()=>state.day,
    autoDate:()=>!params.has('date')&&!state.userSelectedVenue,
    isAutoFollowing:()=>!state.userSelectedVenue,
@@ -513,13 +517,13 @@ function boot(){
    onFollow:()=>{
      state.userSelectedVenue=false;
      if(state.day!==jstToday()){
-       state.day=jstToday();$('day').value=state.day;state.active=null;loadVenues(true);window.RaceSchedule?.load(state.day,true);
+       state.day=jstToday();$('day').value=state.day;state.active=null;window.RaceSchedule?.load(state.day,true);
      }
    },
    onNewDay:key=>{
      state.day=key.slice(0,4)+'-'+key.slice(4,6)+'-'+key.slice(6,8);
      $('day').value=state.day;state.active=null;state.raceSelected=false;
-     loadRace();loadVenues(true);
+     loadRace();
    }
  });
  getJson('data/manifest.json',5000).then(m=>{
