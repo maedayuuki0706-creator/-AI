@@ -1,0 +1,47 @@
+name: Edogawa 365-day Historical Research (One-time)
+on:
+  push:
+    branches:
+      - research/edogawa-365day-history-20261018
+    paths:
+      - .github/workflows/edogawa-history-365days.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: research-edogawa-history-365-days
+  cancel-in-progress: false
+jobs:
+  historical-backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/edogawa-365day-history-20261018
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Add decoder for official archival K records
+        run: python -m pip install --disable-pip-version-check lhafile
+      - name: Collect and audit historic Edogawa results
+        run: python research/edogawa_history/backfill_365days.py
+      - name: Upload independent historical research artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: edogawa-365day-history-20251018-20261017
+          path: data/research_edogawa_history/20251018_20261017/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Commit data to this research branch only
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/research_edogawa_history/20251018_20261017/
+          if ! git diff --cached --quiet; then
+            git commit -m "research(edogawa): add historical 365-day results and coverage audit"
+            git push origin HEAD:research/edogawa-365day-history-20261018
+          fi
