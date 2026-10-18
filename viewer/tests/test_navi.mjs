@@ -88,8 +88,7 @@ test('all eight public AI names are fixed TYPE A-H aliases (not ROI ranking)',()
  const venue=statsHtml(stats,'児島');
  for(const [id,alias] of Object.entries(expected)){
    assert.ok(national.includes('<td>'+alias),'missing national alias for '+id);
-   assert.ok(national.includes('<h3>'+alias+'</h3>')||Object.keys(expected).length>4,
-     'missing card alias for '+id);
+   // Top-four cards are ordered by ROI, so not every stream gets a card.
    assert.ok(venue.includes('<td>'+alias),'missing venue alias for '+id);
  }
  for(const old of ['日和','PT3 / ゆうき','メインくん','PT2','中穴くん','PT1','厳選くん','穴くん']){
