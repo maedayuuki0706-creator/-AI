@@ -179,7 +179,7 @@ function signalText(signal) {
 }
 export function predictionHtml(prediction) {
   const p = prediction, labels = {balanced:'総合型',probability:'本命型',value:'妙味型',longshot:'高配当型'};
-  let html = '<section class="panel">'+title(p,p.version)+'<div class="info-row">'+pill('公開済み','pill-green')+pill(p.deadline ? '締切 '+p.deadline : '締切時刻未取得')+'</div><p class="section-description">生成 '+esc(stamp(p.created_at))+' / '+esc(p.source)+'</p>';
+  let html = '<section class="panel">'+title(p,DISPLAY_AI_TYPES.prototype2)+'<div class="info-row">'+pill('公開済み','pill-green')+pill(p.deadline ? '締切 '+p.deadline : '締切時刻未取得')+'</div><p class="section-description">生成 '+esc(stamp(p.created_at))+' / '+esc(p.source)+'</p>';
   if (p.afterClose) html += '<p class="notice notice-warning">締切後に保存された予想です。事前に公開された予想としては扱えません。</p>';
   if (!p.created_at) html += '<p class="notice notice-warning">生成日時が未保存です。締切前の原本かを確認できません。</p>';
   html += '<h3 class="section-space">1着推定確率 <span class="small">保存済みのモデル値</span></h3><div class="head-probs">';
@@ -335,16 +335,27 @@ export function scoreMetrics(row) {
   const judged = num(row.judged), hits = num(row.hits), stake = num(row.stake_yen), returned = num(row.return_yen);
   return {judged,hits,hitRate:judged > 0 && hits !== null && hits >= 0 && hits <= judged ? hits/judged*100 : null,roi:stake > 0 && returned !== null && returned >= 0 ? returned/stake*100 : null,stake,returned,profit:stake !== null && returned !== null ? returned-stake : null};
 }
-const LABELS = {main:'メインくん',mid_odds:'中穴くん',longshot:'穴くん',hiyori:'日和',prototype1:'PT1',prototype2:'PT2',prototype3:'PT3 / ゆうき',selected:'厳選くん'};
+// Public-only aliases. The mapping is fixed by stream ID, NEVER by ROI order.
+ // Production model IDs, source keys, Discord/X names and saved results remain untouched.
+ export const DISPLAY_AI_TYPES = Object.freeze({
+   hiyori:'TYPE A',
+   prototype3:'TYPE B',
+   main:'TYPE C',
+   prototype2:'TYPE D',
+   mid_odds:'TYPE E',
+   prototype1:'TYPE F',
+   selected:'TYPE G',
+   longshot:'TYPE H'
+ });
 const yen = value => num(value) === null ? '—' : Number(value).toLocaleString('ja-JP')+'円';
 export function statsHtml(stats, venue = '') {
   const stream = venue ? stats.venues[venue] : stats.streams;
   if (!stream || !Object.keys(stream).length) return empty('この条件の公開集計はありません','集計のないAI・場を、0%と扱って表示することはありません。');
   const rows = Object.entries(stream).map(([key,row]) => ({key,row,...scoreMetrics(row)})).sort((a,b) => (b.roi ?? -1)-(a.roi ?? -1));
   let html = '<p class="stats-date">対象日 '+esc(isoDay(stats.day))+' / '+esc(venue || '全国')+'</p><div class="stats-cards">';
-  for (const m of rows.slice(0,4)) html += '<article class="stats-card"><h3>'+esc(LABELS[m.key] || m.row.label || m.key)+'</h3><p class="roi-value '+(m.roi >= 100 ? 'good-return' : '')+'">'+(m.roi === null ? '—' : fixed(m.roi))+'<small>'+(m.roi === null ? '' : '%')+'</small></p><p class="small">回収率</p><p class="hit-value">的中率 <b>'+pct(m.hitRate)+'</b></p><p class="small">判定 '+(m.judged ?? '—')+'R / 仮想購入</p></article>';
-  html += '</div><section class="panel section-space"><div class="section-header"><div><p class="eyebrow">PERFORMANCE TABLE</p><h2>AI別の検証結果</h2></div>'+pill('1点100円')+'</div><p class="table-note">対象レースはAIごとに異なります。横にスクロールして購入額・払戻額まで確認できます。</p><div class="table-scroll" tabindex="0" role="region" aria-label="AI別の仮想購入成績、横スクロール"><table class="score-table"><thead><tr><th>AI</th><th class="number">判定R</th><th class="number">的中</th><th class="number">的中率</th><th class="number">回収率</th><th class="number">仮想購入</th><th class="number">払戻</th><th class="number">収支</th><th class="number">万舟</th><th class="number">トリガミ</th><th class="number">平均点数</th></tr></thead><tbody>';
-  for (const m of rows) html += '<tr'+(m.hitRate >= 55 && m.roi >= 100 ? ' class="highlight"' : '')+'><td>'+esc(LABELS[m.key] || m.row.label || m.key)+(m.judged !== null && m.judged < 30 ? '<span class="stats-sample">少数サンプル・参考</span>' : '')+'</td><td class="number">'+(m.judged ?? '—')+'</td><td class="number">'+(m.hits ?? '—')+'</td><td class="number">'+pct(m.hitRate)+'</td><td class="number"><strong>'+pct(m.roi)+'</strong></td><td class="number">'+yen(m.stake)+'</td><td class="number">'+yen(m.returned)+'</td><td class="number">'+yen(m.profit)+'</td><td class="number">'+(num(m.row.manshu) ?? '—')+'</td><td class="number">'+(num(m.row.torigami) ?? '—')+'</td><td class="number">'+fixed(m.row.avg_points)+'</td></tr>';
+  for (const m of rows.slice(0,4)) html += '<article class="stats-card"><h3>'+esc(DISPLAY_AI_TYPES[m.key] || '未分類AI')+'</h3><p class="roi-value '+(m.roi >= 100 ? 'good-return' : '')+'">'+(m.roi === null ? '—' : fixed(m.roi))+'<small>'+(m.roi === null ? '' : '%')+'</small></p><p class="small">回収率</p><p class="hit-value">的中率 <b>'+pct(m.hitRate)+'</b></p><p class="small">判定 '+(m.judged ?? '—')+'R / 仮想購入</p></article>';
+  html += '</div><section class="panel section-space"><div class="section-header"><div><p class="eyebrow">PERFORMANCE TABLE</p><h2>AI別の検証結果</h2></div>'+pill('1点100円')+'</div><p class="table-note">TYPE A〜HはAIごとの固定表示名で、成績順位や強さの格付けではありません。対象レースはAIごとに異なります。横にスクロールして購入額・払戻額まで確認できます。</p><div class="table-scroll" tabindex="0" role="region" aria-label="AI別の仮想購入成績、横スクロール"><table class="score-table"><thead><tr><th>AI</th><th class="number">判定R</th><th class="number">的中</th><th class="number">的中率</th><th class="number">回収率</th><th class="number">仮想購入</th><th class="number">払戻</th><th class="number">収支</th><th class="number">万舟</th><th class="number">トリガミ</th><th class="number">平均点数</th></tr></thead><tbody>';
+  for (const m of rows) html += '<tr'+(m.hitRate >= 55 && m.roi >= 100 ? ' class="highlight"' : '')+'><td>'+esc(DISPLAY_AI_TYPES[m.key] || '未分類AI')+(m.judged !== null && m.judged < 30 ? '<span class="stats-sample">少数サンプル・参考</span>' : '')+'</td><td class="number">'+(m.judged ?? '—')+'</td><td class="number">'+(m.hits ?? '—')+'</td><td class="number">'+pct(m.hitRate)+'</td><td class="number"><strong>'+pct(m.roi)+'</strong></td><td class="number">'+yen(m.stake)+'</td><td class="number">'+yen(m.returned)+'</td><td class="number">'+yen(m.profit)+'</td><td class="number">'+(num(m.row.manshu) ?? '—')+'</td><td class="number">'+(num(m.row.torigami) ?? '—')+'</td><td class="number">'+fixed(m.row.avg_points)+'</td></tr>';
   html += '</tbody></table></div><p class="table-note">黄色は的中率55%以上かつ回収率100%以上。期間合計ではなく、表示日の集計です。未確定は除外し、トリガミは除外していません。</p><p class="meta">集計更新 '+esc(stamp(stats.generated_at))+(stats.saved ? ' / 保存済みスナップショット' : '')+'</p><p class="notice">仮想購入の検証結果です。実際の利益・今後の成績を示すものではありません。万舟はAI別の的中数のため、AI間で同じレースが重複します。</p><a class="text-link section-space" href="/lab/method/">集計方法と比較の読み方'+arrow+'</a></section>';
   return html;
 }
