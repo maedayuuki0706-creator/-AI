@@ -118,6 +118,7 @@
     loading=false;lastChecked=Date.now();
     if(fetched){
       saved=fetched.items;activeDay=normalized;source=fetched.source;captured=fetched.captured;partial=fetched.partial;error='';
+      config.onData?.(normalized,saved);
       autoPick();
     }else{
       saved=[];activeDay='';source='';captured='';partial=false;error=problems.join(' / ');
