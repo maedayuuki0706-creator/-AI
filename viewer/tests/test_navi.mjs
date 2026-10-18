@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import * as D from '../assets/data.mjs';
-import {predictionHtml,racerHtml,motorHtml,scoreMetrics,statsHtml,boot} from '../assets/app.mjs';
+import {predictionHtml,racerHtml,motorHtml,scoreMetrics,statsHtml,DISPLAY_AI_TYPES,boot} from '../assets/app.mjs';
 import {configured,safeLocation,fromX} from '../assets/analytics.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
@@ -77,6 +77,42 @@ test('real 8-AI stats: exact ROI, missing is not zero, public allowlist',()=>{
  const raw={day:'20261018',unit_yen:100,streams:{test:{label:'test',judged:1,hits:1,stake_yen:100,return_yen:200,internal_secret:'NO_OUTPUT'}},venues:{}};
  assert.ok(!JSON.stringify(D.publicStats(raw)).includes('NO_OUTPUT'));
 });
+test('all eight public AI names are fixed TYPE A-H aliases (not ROI ranking)',()=>{
+ const expected={
+  hiyori:'TYPE A',prototype3:'TYPE B',main:'TYPE C',prototype2:'TYPE D',
+  mid_odds:'TYPE E',prototype1:'TYPE F',selected:'TYPE G',longshot:'TYPE H'
+ };
+ assert.deepEqual(DISPLAY_AI_TYPES,expected);
+ const stats=D.publicStats(fixture('stats'));
+ const national=statsHtml(stats);
+ const venue=statsHtml(stats,'児島');
+ for(const [id,alias] of Object.entries(expected)){
+   assert.ok(national.includes('<td>'+alias),'missing national alias for '+id);
+   assert.ok(national.includes('<h3>'+alias+'</h3>')||Object.keys(expected).length>4,
+     'missing card alias for '+id);
+   assert.ok(venue.includes('<td>'+alias),'missing venue alias for '+id);
+ }
+ for(const old of ['日和','PT3 / ゆうき','メインくん','PT2','中穴くん','PT1','厳選くん','穴くん']){
+   assert.ok(!national.includes(old),'old national display name leaked: '+old);
+   assert.ok(!venue.includes(old),'old venue display name leaked: '+old);
+ }
+ assert.ok(national.includes('成績順位や強さの格付けではありません'));
+ // Changing results must NOT relabel a stream merely because its ranking changed.
+ const swapped=D.publicStats({day:'20261018',unit_yen:100,
+  streams:{
+   hiyori:{judged:111,hits:22,stake_yen:10000,return_yen:4000},
+   main:{judged:222,hits:133,stake_yen:10000,return_yen:19000}
+  },venues:{}});
+ const html=statsHtml(swapped);
+ assert.ok(html.indexOf('TYPE C')<html.indexOf('TYPE A'),
+   'row ordering is ROI, but TYPE aliases must stay attached to stable IDs');
+ assert.ok(html.includes('<td>TYPE A</td><td class="number">111</td>'));
+ assert.ok(html.includes('<td>TYPE C</td><td class="number">222</td>'));
+ const preview=D.compactPrediction(forecast,race);
+ assert.ok(predictionHtml({...preview,source:'原本'}).includes('TYPE D'));
+ assert.ok(!predictionHtml({...preview,source:'原本'}).includes('PT2'));
+});
+
 test('GA4 config, sanitized page URL, X acquisition',()=>{
  assert.equal(configured({preview:false,analytics:{enabled:false,measurementId:'G-123456'}}),false);
  assert.equal(configured({preview:true,analytics:{enabled:true,measurementId:'G-123456'}}),false);
