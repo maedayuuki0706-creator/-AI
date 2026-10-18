@@ -228,3 +228,31 @@ td .small{margin-top:3px}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
+
+
+/* LIVE race lineup — independent of forecast/loading panels. */
+.deadline-board{margin:3px 0 18px;padding:19px 22px 15px;background:#fff;border:1px solid #d7e2ea;box-shadow:0 8px 25px rgba(25,52,75,.055)}
+.deadline-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:13px}
+.deadline-head h2{margin:5px 0 0;font-size:23px;letter-spacing:-.04em;color:#192d43}
+.deadline-summary{white-space:nowrap;font-weight:900;font-size:13px;color:#174869}
+.deadline-tools{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:#566a7c}
+#deadline-follow{background:#213f5a;color:white;font-size:11px;border:0;padding:8px 11px;cursor:pointer;font-weight:700}
+.deadline-items{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;max-height:360px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.deadline-item{display:flex;flex-direction:column;gap:5px;align-items:flex-start;justify-content:center;padding:10px 11px;min-height:83px;border:1px solid #dce4eb;border-left:4px solid #6f879e;background:#f6f8fa;text-align:left;cursor:pointer;transition:background .15s,border-color .15s}
+.deadline-item:hover,.deadline-item:focus-visible{background:#e8f2fa;border-color:#38658a;outline-offset:2px}
+.deadline-item.next{border-left-color:#ce353e;background:#fff6f6}
+.deadline-when{font-size:20px;font-family:var(--mono);font-weight:900;color:#19324e;font-variant-numeric:tabular-nums;line-height:1}
+.deadline-venue{font-size:12px;font-weight:700;color:#2b455b}
+.deadline-venue b{color:#bc283c}
+.deadline-count{font-size:10px;color:#62798b}
+.deadline-empty{grid-column:1/-1;margin:0;background:#f1f5f8;padding:23px 12px;color:#516b81;text-align:center;font-size:12px}
+.deadline-updated{font-size:10px;color:#748898;margin:11px 0 0}
+[hidden]#deadline-follow{display:none}
+@media(max-width:830px){.deadline-items{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:600px){
+ .deadline-board{padding:13px 12px 12px;margin-bottom:12px}
+ .deadline-head h2{font-size:18px}.deadline-summary{font-size:10px}
+ .deadline-tools{font-size:10px;align-items:flex-start}
+ .deadline-items{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:330px}
+ .deadline-item{min-height:72px;padding:8px 9px}.deadline-when{font-size:18px}.deadline-venue{font-size:11px}
+}
