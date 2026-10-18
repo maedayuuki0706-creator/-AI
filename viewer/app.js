@@ -6,7 +6,7 @@ const DATA_RAW='https://raw.githubusercontent.com/maedayuuki0706-creator/-AI/mai
 const PACKS=new Map();
 const playerState={players:[],selected:'',snapshotAt:'',loadPromise:null,livePromise:null,lastChecked:0,status:'',composing:false};
 const $=id=>document.getElementById(id);
-const state={day:'',venue:'01',race:1,tab:'pt2',token:0,prediction:null,raceRows:[],rosterRows:[],active:null,
+const state={day:'',venue:'01',race:1,tab:'idle',raceSelected:false,token:0,prediction:null,raceRows:[],rosterRows:[],active:null,
   pt2Status:'予想を読み込んでいます…',raceStatus:'出走情報はタブを開いたときに読み込みます。',
   raceLoadingKey:'',raceLoadedKey:'',userSelectedVenue:false,venueToken:0};
 const CACHE_PREFIX='boat-race-view-v4:';
@@ -35,7 +35,7 @@ function lightPrediction(j) {
     models:{prototype2:{grade:p.grade,heads:p.heads,strategy_cards:{cards}}}};
 }
 function currentKey(){return yyyymmdd()+'_'+state.venue+'_'+String(state.race).padStart(2,'0');}
-function refreshStatus(){$('status').textContent=state.tab==='player'?(playerState.status||'選手名・登録番号で検索できます。'):state.tab==='pt2'?state.pt2Status:state.tab==='motor'?'モーターAI評価はデータベースの参考値です。':state.raceStatus;}
+function refreshStatus(){$('status').textContent=state.tab==='idle'?'締切順からレースを選ぶか、「予想を見る」を押してください。':state.tab==='player'?(playerState.status||'選手名・登録番号で検索できます。'):state.tab==='pt2'?state.pt2Status:state.tab==='motor'?'モーターAI評価はデータベースの参考値です。':state.raceStatus;}
 function jstClock(){return new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit'}).format(new Date());}
 const safe=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const jstToday=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -77,12 +77,39 @@ function venueOptions(){
  $('venue').value=state.venue;
 }
 function raceOptions(){$('race').innerHTML=Array.from({length:12},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'R</option>').join('');$('race').value=String(state.race);}
-function setTab(tab){
+function countPredictionOpen(source){
+ // Analytics instrumentation is dormant until the owner explicitly installs GA4.
+ // Do not infer "views" from schedule rotation or background fetches.
+ if(typeof window.gtag==='function'){
+   window.gtag('event','prediction_open',{date:yyyymmdd(),venue_code:state.venue,race_number:state.race,entry_point:source||'tab'});
+ }
+}
+function setTab(tab,source='tab'){
+ if(!['pt2','race','player','motor'].includes(tab))return;
  state.tab=tab;
+ $('race-center').classList.remove('hidden');
  for(const name of ['pt2','race','player','motor']){$('tab-'+name).setAttribute('aria-selected',String(tab===name));$('view-'+name).classList.toggle('hidden',tab!==name);}
- if(tab==='race')loadRaceData();
+ if(tab==='pt2'){
+   countPredictionOpen(source);
+   if(!state.raceSelected){
+     state.pt2Status='予想を見るにはレースを選択してください。';
+     $('view-pt2').innerHTML=inside('<h2>レースを選択してください</h2><p>締切順一覧から気になるレースを選ぶと、ここでAI予想を確認できます。</p>');
+   }else{
+     // The reader explicitly asked to view this forecast. Keep the race fixed.
+     state.userSelectedVenue=true;
+     updateAddress();
+     loadSelectedPrediction();
+   }
+ }
+ if(tab==='race'){
+   if(state.raceSelected)loadRaceData();
+   else $('view-race').innerHTML=inside('<h2>レースを選択してください</h2><p>締切順か日付・競艇場・R番号から選択してください。</p>');
+ }
  if(tab==='player')loadPlayers();
- if(tab==='motor')window.MotorPanel?.show();
+ if(tab==='motor'){
+   if(state.raceSelected)window.MotorPanel?.show();
+   else $('view-motor').innerHTML=inside('<h2>レースを選択してください</h2><p>モーター評価を見るにはレースを選んでください。</p>');
+ }
  refreshStatus();
 }
 function inside(section){return '<section class="panel">'+section+'</section>';}
@@ -119,7 +146,7 @@ function raceHtml(){
  const title=VENUES.find(v=>v[0]===state.venue)?.[1]||'場';
  const byRacer=new Map(roster.map((r,i)=>[String(r['登録番号']||''),r]));
  const rows=data.length?data:roster.map((r,i)=>({...r,'枠':String(i+1)}));
- let h='<section class="panel"><div class="section-head"><div><h2>'+safe(title)+' '+state.race+'R ／ 出走表</h2><p>'+(state.raceSnapshotAt?'保存時点の出走表 ／ '+safe(displayTime(state.raceSnapshotAt)):'公式出走フィード')+'</p></div></div><div class="notice">選手名を押すと、コース別1着率などのデータベース情報を確認できます。保存済みの出走表は取得時点の情報です。最新情報は「情報を更新」で確認してください。</div><button class="motor-race-link" data-view-motor type="button">モーターAI評価を見る ／ 伸び・出足・回り足を比較 ↗</button><div class="table-wrap"><table><thead><tr><th>艇</th><th>選手</th><th>級別</th><th>全国勝率</th><th>平均ST</th><th>モーター</th><th>2連率</th><th>展開材料</th></tr></thead><tbody>';
+ let h='<section class="panel"><div class="section-head"><div><h2>'+safe(title)+' '+state.race+'R ／ 出走表</h2><p>'+(state.raceSnapshotAt?'保存時点の出走表 ／ '+safe(displayTime(state.raceSnapshotAt)):'公式出走フィード')+'</p></div></div><div class="notice">選手名を押すと、コース別1着率などのデータベース情報を確認できます。保存済みの出走表は取得時点の情報です。最新情報は「情報を更新」で確認してください。</div><div class="race-action-row"><button class="predict-race-link" data-view-prediction type="button">このレースの予想を見る ↗</button><button class="motor-race-link" data-view-motor type="button">モーターAI評価を見る ↗</button></div><div class="table-wrap"><table><thead><tr><th>艇</th><th>選手</th><th>級別</th><th>全国勝率</th><th>平均ST</th><th>モーター</th><th>2連率</th><th>展開材料</th></tr></thead><tbody>';
  rows.forEach((r,i)=>{
  const lane=Number(r['枠']||i+1);if(lane<1||lane>6)return;
  const reg=String(r['登録番号']||'');const d=byRacer.get(reg)||roster[lane-1]||{};
@@ -201,20 +228,36 @@ async function loadRaceData(force=false){
  }
  refreshStatus();
 }
-async function loadRace(force=false){
- const token=++state.token,key=currentKey();
+function loadRace(force=false){
+ // Called by changes of date/venue/R, including automatic deadline rotation.
+ // Never reveal or fetch predictions here. A click on "予想を見る" is required.
+ ++state.token;
  updateAddress();
  state.raceLoadingKey='';state.raceLoadedKey='';state.raceSnapshotAt='';
- state.raceRows=[];state.rosterRows=[];
- $('view-race').innerHTML=inside('<div class="empty">出走表タブを開くと詳細を取得します。</div>');
- state.raceStatus='出走情報はタブを開いたときに読み込みます。';
- const cached=cacheRead('pt2:'+key,7*86400000);
- state.prediction=cached?.value||null;
- if(state.prediction){$('view-pt2').innerHTML=predictionHtml(state.prediction);state.pt2Status='保存済みのPT2予想を表示中';}
- else{$('view-pt2').innerHTML=inside('<div class="empty">PT2予想を読み込んでいます…</div>');state.pt2Status='PT2予想を読み込んでいます…';}
+ state.raceRows=[];state.rosterRows=[];state.prediction=null;
+ $('view-race').innerHTML=inside('<div class="empty">出走表を読み込む場合は「出走表」を押してください。</div>');
+ $('view-pt2').innerHTML=inside('<div class="empty">このレースの予想を見るには「予想を見る」を押してください。</div>');
+ state.pt2Status='予想は手動で開いたときに取得します。';
+ state.raceStatus='出走表はタブを開いたときに読み込みます。';
  refreshStatus();
- if(state.tab==='race')loadRaceData(force);
- if(state.tab==='motor')window.MotorPanel?.show();
+ if(state.tab==='race'&&state.raceSelected)loadRaceData(force);
+ if(state.tab==='motor'&&state.raceSelected)window.MotorPanel?.show();
+}
+async function loadSelectedPrediction(force=false){
+ if(!state.raceSelected){
+   state.pt2Status='レースを先に選択してください。';refreshStatus();return;
+ }
+ const token=state.token,key=currentKey();
+ const cached=force?null:cacheRead('pt2:'+key,7*86400000);
+ state.prediction=cached?.value||null;
+ if(state.prediction){
+   $('view-pt2').innerHTML=predictionHtml(state.prediction);
+   state.pt2Status='保存済みのPT2予想を表示中';
+ }else{
+   $('view-pt2').innerHTML=inside('<div class="empty">選択したレースのPT2予想を読み込んでいます…</div>');
+   state.pt2Status='PT2予想を取得中…';
+ }
+ refreshStatus();
  const apply=data=>{
   if(token!==state.token)return;
   const light=lightPrediction(data);
@@ -280,9 +323,11 @@ async function loadVenues(keepSelection) {
 }
 function selectRace(){
  state.userSelectedVenue=true;
+ state.raceSelected=true;
  state.venue=$('venue').value;
  state.race=Number($('race').value);
  loadRace();
+ setTab('race');
 }
 const PLAYER_FIELDS=[['登録番号','id'],['選手名','name'],['級別','class'],['支部','branch'],['勝率','win'],['平均ST','avg_st'],['逃げ率','escape'],['差し率','sashi'],['まくり率','makuri'],['まくり差し率','makurisashi'],['元A級','former_a'],['得意決まり手','best_method'],['総合評価','overall_grade'],['モーター整備力','maintenance_grade'],['ペラ調整力','propeller_grade'],['弱機立て直し力','weak_motor_recovery'],['弱機立て直しサンプル数','weak_motor_samples'],['整備改善値','maintenance_improvement'],['ペラ改善値','propeller_improvement'],['整備サンプル数','maintenance_samples'],['ペラサンプル数','propeller_samples'],['最新調整コメント','latest_adjustment_comment'],['メモ','memo']];
 const normalizeQuery=v=>String(v||'').normalize('NFKC').replace(/[\s\u3000]+/g,'').toLowerCase();
@@ -405,6 +450,7 @@ function setupPlayerSearch(){
   if(e.target.closest('[data-player-refresh]'))loadPlayers(true);
  });
  $('view-race').addEventListener('click',e=>{
+   if(e.target.closest('button[data-view-prediction]')){setTab('pt2','race_detail');return;}
    if(e.target.closest('button[data-view-motor]')){setTab('motor');return;}
    const button=e.target.closest('button[data-player-id]');if(button?.dataset.playerId)openPlayer(button.dataset.playerId);
  });
@@ -415,8 +461,9 @@ function boot(){
  const venue=params.get('venue');state.venue=VENUES.some(x=>x[0]===venue)?venue:'01';
  const race=Number(params.get('race'));state.race=Number.isInteger(race)&&race>=1&&race<=12?race:1;
  state.userSelectedVenue=Boolean((venue||params.has('race')||params.has('date'))&&params.get('auto')!=='1');
+ state.raceSelected=Boolean(VENUES.some(v=>v[0]===venue)&&Number.isInteger(race)&&race>=1&&race<=12);
  $('day').value=state.day;venueOptions();raceOptions();
- $('tab-pt2').addEventListener('click',()=>setTab('pt2'));
+ $('tab-pt2').addEventListener('click',()=>setTab('pt2','tab'));
  $('tab-race').addEventListener('click',()=>setTab('race'));
  $('tab-player').addEventListener('click',()=>{setTab('player');$('player-query').focus();});
  $('tab-motor').addEventListener('click',()=>setTab('motor'));
@@ -424,21 +471,27 @@ function boot(){
  window.MotorPanel?.readMeta();
  document.querySelectorAll('[data-open-tab]').forEach(button=>button.addEventListener('click',()=>{
    const tab=button.getAttribute('data-open-tab');if(!['pt2','player','motor','race'].includes(tab))return;
-   setTab(tab);
+   setTab(tab,'top_navigation');
    document.getElementById('race-center').scrollIntoView({behavior:'smooth',block:'start'});
  }));
  setupPlayerSearch();
- $('day').addEventListener('change',()=>{if(!$('day').value)return;state.day=$('day').value;state.active=null;state.userSelectedVenue=true;loadRace();loadVenues(true);window.RaceSchedule?.load(state.day,true);});
+ $('day').addEventListener('change',()=>{
+   if(!$('day').value)return;
+   state.day=$('day').value;state.active=null;state.userSelectedVenue=true;state.raceSelected=true;
+   loadRace();setTab('race');loadVenues(true);window.RaceSchedule?.load(state.day,true);
+ });
  $('venue').addEventListener('change',selectRace);
  $('race').addEventListener('change',selectRace);
- $('refresh').addEventListener('click',()=>{if(state.tab==='player')loadPlayers(true);else {loadRace(true);window.RaceSchedule?.load(state.day,true);if(state.tab==='motor')window.MotorPanel?.load(true);}});
+ $('refresh').addEventListener('click',()=>{
+   if(state.tab==='player')loadPlayers(true);
+   else if(state.tab==='pt2')loadSelectedPrediction(true);
+   else if(state.tab==='motor')window.MotorPanel?.load(true);
+   else if(state.tab==='race')loadRaceData(true);
+   window.RaceSchedule?.load(state.day,true);
+ });
  // The deadline board selects the first still-open race. Never default to a stale 若松8R.
- if(state.userSelectedVenue)loadRace();
- else {
-   $('view-pt2').innerHTML=inside('<div class="empty">締切前のレースを確認中です。情報がない場合は場とRを選んでください。</div>');
-   state.pt2Status='本日の開催・締切情報を確認中';
-   refreshStatus();
- }
+ if(state.raceSelected)loadRace();
+ refreshStatus();
  loadVenues(true);
  window.RaceSchedule?.start({
    venues:VENUES,
@@ -446,8 +499,11 @@ function boot(){
    autoDate:()=>!params.has('date')&&!state.userSelectedVenue,
    isAutoFollowing:()=>!state.userSelectedVenue,
    onPick:(jcd,rno,auto)=>{
-     state.venue=jcd;state.race=rno;state.userSelectedVenue=!auto;
+     state.venue=jcd;state.race=rno;state.raceSelected=true;state.userSelectedVenue=!auto;
+     // Manual race selection opens only race information. The prediction remains behind a click.
+     if(state.tab==='pt2')state.tab='idle';
      venueOptions();raceOptions();loadRace();
+     if(!auto){setTab('race');$('race-center').scrollIntoView({behavior:'smooth',block:'start'});}
    },
    onFollow:()=>{
      state.userSelectedVenue=false;
@@ -457,7 +513,7 @@ function boot(){
    },
    onNewDay:key=>{
      state.day=key.slice(0,4)+'-'+key.slice(4,6)+'-'+key.slice(6,8);
-     $('day').value=state.day;state.active=null;loadVenues(true);
+     $('day').value=state.day;state.active=null;state.raceSelected=false;loadVenues(true);
    }
  });
  getJson('data/manifest.json',5000).then(m=>{
