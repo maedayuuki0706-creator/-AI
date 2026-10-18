@@ -1,0 +1,643 @@
+{
+  "baseline": {
+    "days": 35,
+    "hit_rate": 43.2,
+    "hits": 1662,
+    "profit_yen": -1185530,
+    "return_yen": 3350270,
+    "roi": 73.9,
+    "samples": 3844,
+    "stake_yen": 4535800
+  },
+  "days": [
+    "20260913",
+    "20260914",
+    "20260915",
+    "20260916",
+    "20260917",
+    "20260918",
+    "20260919",
+    "20260920",
+    "20260921",
+    "20260922",
+    "20260923",
+    "20260924",
+    "20260925",
+    "20260926",
+    "20260927",
+    "20260928",
+    "20260929",
+    "20260930",
+    "20261001",
+    "20261002",
+    "20261003",
+    "20261004",
+    "20261005",
+    "20261006",
+    "20261007",
+    "20261008",
+    "20261009",
+    "20261010",
+    "20261011",
+    "20261013",
+    "20261014",
+    "20261015",
+    "20261016",
+    "20261017",
+    "20261018"
+  ],
+  "definition": "settled pre-close predictions; flat 100 yen per displayed pick",
+  "guardrails": {
+    "min_train_samples": 40,
+    "min_validation_days": 2,
+    "min_validation_samples": 24,
+    "no_martingale": true,
+    "no_one_day_promotion": true,
+    "time_split": "oldest 70% days train / newest 30% days validation"
+  },
+  "note": "No rule is guaranteed. Only out-of-time validated rules are eligible for future production review.",
+  "train_baseline": {
+    "days": 24,
+    "hit_rate": 43.1,
+    "hits": 1132,
+    "profit_yen": -827860,
+    "return_yen": 2317540,
+    "roi": 73.7,
+    "samples": 2627,
+    "stake_yen": 3145400
+  },
+  "validated_avoid_rules": [
+    {
+      "conditions": {
+        "attack_gap": "15pt+",
+        "head_gap": "<5pt"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 14,
+        "hit_rate": 38.3,
+        "hits": 18,
+        "profit_yen": -20030,
+        "return_yen": 47770,
+        "roi": 70.5,
+        "samples": 47,
+        "stake_yen": 67800
+      },
+      "validation": {
+        "days": 11,
+        "hit_rate": 30.0,
+        "hits": 9,
+        "profit_yen": -28450,
+        "return_yen": 14550,
+        "roi": 33.8,
+        "samples": 30,
+        "stake_yen": 43000
+      }
+    },
+    {
+      "conditions": {
+        "grade": "C",
+        "venue": "平和島"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 11,
+        "hit_rate": 22.7,
+        "hits": 17,
+        "profit_yen": -52200,
+        "return_yen": 53600,
+        "roi": 50.7,
+        "samples": 75,
+        "stake_yen": 105800
+      },
+      "validation": {
+        "days": 6,
+        "hit_rate": 24.0,
+        "hits": 6,
+        "profit_yen": -22220,
+        "return_yen": 13380,
+        "roi": 37.6,
+        "samples": 25,
+        "stake_yen": 35600
+      }
+    },
+    {
+      "conditions": {
+        "tide_range": "medium",
+        "wind": "0-1m"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 10,
+        "hit_rate": 43.2,
+        "hits": 35,
+        "profit_yen": -46140,
+        "return_yen": 52660,
+        "roi": 53.3,
+        "samples": 81,
+        "stake_yen": 98800
+      },
+      "validation": {
+        "days": 10,
+        "hit_rate": 33.8,
+        "hits": 22,
+        "profit_yen": -44550,
+        "return_yen": 30850,
+        "roi": 40.9,
+        "samples": 65,
+        "stake_yen": 75400
+      }
+    },
+    {
+      "conditions": {
+        "head_gap": "<5pt",
+        "tide_level": "low"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 10,
+        "hit_rate": 38.3,
+        "hits": 23,
+        "profit_yen": -31730,
+        "return_yen": 54070,
+        "roi": 63.0,
+        "samples": 60,
+        "stake_yen": 85800
+      },
+      "validation": {
+        "days": 11,
+        "hit_rate": 24.4,
+        "hits": 11,
+        "profit_yen": -36830,
+        "return_yen": 27170,
+        "roi": 42.5,
+        "samples": 45,
+        "stake_yen": 64000
+      }
+    },
+    {
+      "conditions": {
+        "venue": "平和島"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 11,
+        "hit_rate": 30.3,
+        "hits": 30,
+        "profit_yen": -58660,
+        "return_yen": 76340,
+        "roi": 56.5,
+        "samples": 99,
+        "stake_yen": 135000
+      },
+      "validation": {
+        "days": 6,
+        "hit_rate": 28.6,
+        "hits": 10,
+        "profit_yen": -26090,
+        "return_yen": 21110,
+        "roi": 44.7,
+        "samples": 35,
+        "stake_yen": 47200
+      }
+    },
+    {
+      "conditions": {
+        "points": "11-12",
+        "selected": "yes"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 20,
+        "hit_rate": 54.5,
+        "hits": 36,
+        "profit_yen": -24960,
+        "return_yen": 54240,
+        "roi": 68.5,
+        "samples": 66,
+        "stake_yen": 79200
+      },
+      "validation": {
+        "days": 10,
+        "hit_rate": 31.0,
+        "hits": 9,
+        "profit_yen": -18200,
+        "return_yen": 16600,
+        "roi": 47.7,
+        "samples": 29,
+        "stake_yen": 34800
+      }
+    },
+    {
+      "conditions": {
+        "venue": "多摩川"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 16,
+        "hit_rate": 36.0,
+        "hits": 49,
+        "profit_yen": -52730,
+        "return_yen": 114270,
+        "roi": 68.4,
+        "samples": 136,
+        "stake_yen": 167000
+      },
+      "validation": {
+        "days": 3,
+        "hit_rate": 42.3,
+        "hits": 11,
+        "profit_yen": -16080,
+        "return_yen": 15520,
+        "roi": 49.1,
+        "samples": 26,
+        "stake_yen": 31600
+      }
+    },
+    {
+      "conditions": {
+        "tide_phase": "falling",
+        "wind": "0-1m"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 13,
+        "hit_rate": 47.3,
+        "hits": 43,
+        "profit_yen": -41140,
+        "return_yen": 63660,
+        "roi": 60.7,
+        "samples": 91,
+        "stake_yen": 104800
+      },
+      "validation": {
+        "days": 11,
+        "hit_rate": 35.4,
+        "hits": 28,
+        "profit_yen": -43100,
+        "return_yen": 48300,
+        "roi": 52.8,
+        "samples": 79,
+        "stake_yen": 91400
+      }
+    },
+    {
+      "conditions": {
+        "head_gap": "<5pt",
+        "head_top": "<25%"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 22,
+        "hit_rate": 29.1,
+        "hits": 149,
+        "profit_yen": -234570,
+        "return_yen": 458830,
+        "roi": 66.2,
+        "samples": 512,
+        "stake_yen": 693400
+      },
+      "validation": {
+        "days": 11,
+        "hit_rate": 20.8,
+        "hits": 16,
+        "profit_yen": -52640,
+        "return_yen": 59760,
+        "roi": 53.2,
+        "samples": 77,
+        "stake_yen": 112400
+      }
+    },
+    {
+      "conditions": {
+        "venue": "戸田",
+        "wave": "0-2cm"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 11,
+        "hit_rate": 42.9,
+        "hits": 36,
+        "profit_yen": -32180,
+        "return_yen": 78220,
+        "roi": 70.9,
+        "samples": 84,
+        "stake_yen": 110400
+      },
+      "validation": {
+        "days": 7,
+        "hit_rate": 32.2,
+        "hits": 19,
+        "profit_yen": -36340,
+        "return_yen": 41260,
+        "roi": 53.2,
+        "samples": 59,
+        "stake_yen": 77600
+      }
+    },
+    {
+      "conditions": {
+        "head_top": "<25%"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 22,
+        "hit_rate": 29.1,
+        "hits": 168,
+        "profit_yen": -277790,
+        "return_yen": 503610,
+        "roi": 64.4,
+        "samples": 578,
+        "stake_yen": 781400
+      },
+      "validation": {
+        "days": 11,
+        "hit_rate": 21.5,
+        "hits": 17,
+        "profit_yen": -51420,
+        "return_yen": 63780,
+        "roi": 55.4,
+        "samples": 79,
+        "stake_yen": 115200
+      }
+    },
+    {
+      "conditions": {
+        "venue": "桐生"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 6,
+        "hit_rate": 40.0,
+        "hits": 24,
+        "profit_yen": -32450,
+        "return_yen": 37350,
+        "roi": 53.5,
+        "samples": 60,
+        "stake_yen": 69800
+      },
+      "validation": {
+        "days": 8,
+        "hit_rate": 37.5,
+        "hits": 27,
+        "profit_yen": -37510,
+        "return_yen": 47090,
+        "roi": 55.7,
+        "samples": 72,
+        "stake_yen": 84600
+      }
+    },
+    {
+      "conditions": {
+        "venue": "福岡"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 17,
+        "hit_rate": 44.0,
+        "hits": 66,
+        "profit_yen": -60570,
+        "return_yen": 125430,
+        "roi": 67.4,
+        "samples": 150,
+        "stake_yen": 186000
+      },
+      "validation": {
+        "days": 5,
+        "hit_rate": 40.0,
+        "hits": 18,
+        "profit_yen": -23490,
+        "return_yen": 30310,
+        "roi": 56.3,
+        "samples": 45,
+        "stake_yen": 53800
+      }
+    },
+    {
+      "conditions": {
+        "venue": "戸田"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 16,
+        "hit_rate": 36.0,
+        "hits": 50,
+        "profit_yen": -55780,
+        "return_yen": 122020,
+        "roi": 68.6,
+        "samples": 139,
+        "stake_yen": 177800
+      },
+      "validation": {
+        "days": 7,
+        "hit_rate": 31.7,
+        "hits": 20,
+        "profit_yen": -36160,
+        "return_yen": 47040,
+        "roi": 56.5,
+        "samples": 63,
+        "stake_yen": 83200
+      }
+    },
+    {
+      "conditions": {
+        "tide_range": "small"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 7,
+        "hit_rate": 44.3,
+        "hits": 35,
+        "profit_yen": -28390,
+        "return_yen": 67010,
+        "roi": 70.2,
+        "samples": 79,
+        "stake_yen": 95400
+      },
+      "validation": {
+        "days": 6,
+        "hit_rate": 40.3,
+        "hits": 62,
+        "profit_yen": -74220,
+        "return_yen": 111780,
+        "roi": 60.1,
+        "samples": 154,
+        "stake_yen": 186000
+      }
+    },
+    {
+      "conditions": {
+        "attack_gap": "10-14pt",
+        "head_gap": "20pt+"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 16,
+        "hit_rate": 54.6,
+        "hits": 65,
+        "profit_yen": -33490,
+        "return_yen": 84710,
+        "roi": 71.7,
+        "samples": 119,
+        "stake_yen": 118200
+      },
+      "validation": {
+        "days": 11,
+        "hit_rate": 42.2,
+        "hits": 35,
+        "profit_yen": -30830,
+        "return_yen": 48170,
+        "roi": 61.0,
+        "samples": 83,
+        "stake_yen": 79000
+      }
+    },
+    {
+      "conditions": {
+        "venue": "丸亀",
+        "wave": "0-2cm"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 6,
+        "hit_rate": 46.3,
+        "hits": 25,
+        "profit_yen": -31450,
+        "return_yen": 35150,
+        "roi": 52.8,
+        "samples": 54,
+        "stake_yen": 66600
+      },
+      "validation": {
+        "days": 4,
+        "hit_rate": 43.3,
+        "hits": 13,
+        "profit_yen": -13240,
+        "return_yen": 20760,
+        "roi": 61.1,
+        "samples": 30,
+        "stake_yen": 34000
+      }
+    },
+    {
+      "conditions": {
+        "venue": "浜名湖"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 13,
+        "hit_rate": 40.7,
+        "hits": 46,
+        "profit_yen": -40540,
+        "return_yen": 91460,
+        "roi": 69.3,
+        "samples": 113,
+        "stake_yen": 132000
+      },
+      "validation": {
+        "days": 5,
+        "hit_rate": 40.0,
+        "hits": 18,
+        "profit_yen": -19780,
+        "return_yen": 32820,
+        "roi": 62.4,
+        "samples": 45,
+        "stake_yen": 52600
+      }
+    },
+    {
+      "conditions": {
+        "grade": "C",
+        "venue": "戸田"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 16,
+        "hit_rate": 28.4,
+        "hits": 27,
+        "profit_yen": -41340,
+        "return_yen": 88060,
+        "roi": 68.1,
+        "samples": 95,
+        "stake_yen": 129400
+      },
+      "validation": {
+        "days": 7,
+        "hit_rate": 34.2,
+        "hits": 13,
+        "profit_yen": -20060,
+        "return_yen": 34340,
+        "roi": 63.1,
+        "samples": 38,
+        "stake_yen": 54400
+      }
+    },
+    {
+      "conditions": {
+        "venue": "戸田",
+        "wind": "0-1m"
+      },
+      "status": "avoid",
+      "train": {
+        "days": 10,
+        "hit_rate": 45.6,
+        "hits": 26,
+        "profit_yen": -28520,
+        "return_yen": 44680,
+        "roi": 61.0,
+        "samples": 57,
+        "stake_yen": 73200
+      },
+      "validation": {
+        "days": 6,
+        "hit_rate": 31.2,
+        "hits": 10,
+        "profit_yen": -15540,
+        "return_yen": 26660,
+        "roi": 63.2,
+        "samples": 32,
+        "stake_yen": 42200
+      }
+    }
+  ],
+  "validated_positive_rules": [
+    {
+      "conditions": {
+        "head_gap": "20pt+",
+        "slit_shape": "outer_attack_3"
+      },
+      "status": "positive",
+      "train": {
+        "days": 15,
+        "hit_rate": 62.2,
+        "hits": 28,
+        "profit_yen": 13730,
+        "return_yen": 59130,
+        "roi": 130.2,
+        "samples": 45,
+        "stake_yen": 45400
+      },
+      "validation": {
+        "days": 11,
+        "hit_rate": 57.5,
+        "hits": 23,
+        "profit_yen": 1820,
+        "return_yen": 42620,
+        "roi": 104.5,
+        "samples": 40,
+        "stake_yen": 40800
+      }
+    }
+  ],
+  "validation_baseline": {
+    "days": 11,
+    "hit_rate": 43.5,
+    "hits": 530,
+    "profit_yen": -357670,
+    "return_yen": 1032730,
+    "roi": 74.3,
+    "samples": 1217,
+    "stake_yen": 1390400
+  },
+  "version": "strategy-rule-miner-v3-tide-tactical"
+}
