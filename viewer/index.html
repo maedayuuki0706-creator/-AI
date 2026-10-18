@@ -15,7 +15,7 @@
 <meta property="og:url" content="https://boat-ai-readonly-view.onrender.com/">
 <meta name="twitter:card" content="summary">
 <link rel="canonical" href="https://boat-ai-readonly-view.onrender.com/">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 <div class="topline"><div class="topline-inner">
@@ -34,7 +34,7 @@
 <nav class="portal-nav" aria-label="サイト案内">
   <a href="#home">ホーム</a>
   <a href="#deadlines">締切順</a>
-  <button type="button" data-open-tab="pt2">無料予想</button>
+  <button type="button" data-open-tab="pt2">予想を見る</button>
   <button type="button" data-open-tab="motor">モーター評価</button>
   <button type="button" data-open-tab="player">選手データ</button>
 </nav>
@@ -43,7 +43,7 @@
   <div class="home-copy">
    <p class="home-kicker"><span class="home-live-dot"></span> BOAT AI NAVI / RESEARCH DESK</p>
    <h2 id="home-title">数字で読み解く、<br><span>次のレース。</span></h2>
-   <p class="home-desc">全国の締切順・AI予想・モーターの足色・選手データをひとつに。<br>当たりも外れも検証しながら、データでボートレースを研究するサイトです。</p>
+   <p class="home-desc">全国の締切順・モーターの足色・選手データをひとつに。<br>気になるレースを選び、AI予想を見たい時だけ開ける競艇研究サイトです。</p>
    <a class="home-primary" href="#deadlines">締切前のレースを見る <span aria-hidden="true">↗</span></a>
   </div>
   <aside class="home-live-card" aria-label="直近の締切">
@@ -55,8 +55,9 @@
  </div>
  <div class="home-links" aria-label="おすすめ機能">
   <a href="#deadlines" class="home-feature"><span class="home-feature-code">01 / RACE SCHEDULE</span><strong>全国の締切順</strong><span>今から間に合うレースを一覧で確認 ↗</span></a>
-  <button type="button" class="home-feature" data-open-tab="motor"><span class="home-feature-code">02 / MOTOR REPORT</span><strong>モーターAI評価</strong><span>伸び・出足・回り足を◎○△で比較 ↗</span></button>
-  <button type="button" class="home-feature" data-open-tab="player"><span class="home-feature-code">03 / RACER DATA</span><strong>選手データ検索</strong><span>選手名・登録番号からコース別成績へ ↗</span></button>
+  <button type="button" class="home-feature home-feature--prediction" data-open-tab="pt2"><span class="home-feature-code">02 / AI PREDICTION</span><strong>AI予想を見る</strong><span>選択したレースの買い目をここで開く ↗</span></button>
+  <button type="button" class="home-feature" data-open-tab="motor"><span class="home-feature-code">03 / MOTOR REPORT</span><strong>モーターAI評価</strong><span>伸び・出足・回り足を◎○△で比較 ↗</span></button>
+  <button type="button" class="home-feature" data-open-tab="player"><span class="home-feature-code">04 / RACER DATA</span><strong>選手データ検索</strong><span>選手名・登録番号からコース別成績へ ↗</span></button>
  </div>
  <div class="home-data-strip"><span>全国24場のレースに対応</span><span>モーターデータ <b id="home-motor-count">取得中</b></span><span id="home-motor-updated">データ更新日時を確認中</span></div>
  <p class="home-disclaimer">このサイトのAI評価は研究・情報提供を目的とする参考値です。的中・利益を保証するものではありません。</p>
@@ -95,18 +96,18 @@
   <div class="status" id="status" role="status" aria-live="polite">データソースを確認しています…</div>
   <span class="toolbar-meta">PERSONAL VIEW / READ ONLY</span>
 </div>
-<section class="workspace" id="race-center">
+<section class="workspace hidden" id="race-center" aria-label="選択したレースの詳細">
   <div class="workspace-top">
     <div><div class="kicker">RACE CENTER</div><h2>レースデータ</h2></div>
     <span class="update-note">表示タブを切り替えて確認</span>
   </div>
   <nav class="tabs" aria-label="情報切り替え">
-    <button class="tab" id="tab-pt2" type="button" aria-selected="true">PT2 予想</button>
+    <button class="tab" id="tab-pt2" type="button" aria-selected="false">予想を見る</button>
     <button class="tab" id="tab-race" type="button" aria-selected="false">出走表</button>
     <button class="tab" id="tab-player" type="button" aria-selected="false">選手検索</button>
     <button class="tab" id="tab-motor" type="button" aria-selected="false">モーターAI評価</button>
   </nav>
-  <section id="view-pt2" aria-labelledby="tab-pt2"><div class="panel empty">予想を取得しています…</div></section>
+  <section id="view-pt2" class="hidden" aria-labelledby="tab-pt2"><div class="panel empty">「予想を見る」を押すと、選択したレースの予想を取得します。</div></section>
   <section id="view-race" class="hidden" aria-labelledby="tab-race"><div class="panel empty">出走表を取得しています…</div></section>
   <section id="view-player" class="hidden" aria-labelledby="tab-player"><div class="panel empty">選手名や登録番号を入力してください。</div></section>
   <section id="view-motor" class="hidden" aria-labelledby="tab-motor"><div class="panel empty">選択レースのモーター情報を取得します。</div></section>
@@ -119,6 +120,6 @@
 </main>
 <script src="live_schedule.js?v=5" defer></script>
 <script src="motor_panel.js?v=6" defer></script>
-<script src="app.js?v=6" defer></script>
+<script src="app.js?v=7" defer></script>
 </body>
 </html>
