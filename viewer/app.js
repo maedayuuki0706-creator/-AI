@@ -191,9 +191,11 @@ async function loadRaceData(force=false){
   $('view-race').innerHTML=(state.raceRows.length||state.rosterRows.length)?raceHtml():inside('<div class="empty">出走表を読み込んでいます…</div>');
  }
  if(!force){
-  const pack=await getPack(key);
+  // Separate public race-card asset: do not prefetch bundled PT2 predictions.
+  // Historic combined packs are read ONLY after a visitor explicitly asks for a prediction.
+  const raceOnly=await getJson('data/cards/'+key+'.json',5000).catch(()=>null);
   if(token!==state.token)return;
-  if(pack?.race&&applyCard(pack.race)){
+  if(raceOnly&&applyCard(raceOnly)){
    state.raceLoadingKey='';state.raceLoadedKey=key;return;
   }
   try{
@@ -501,7 +503,10 @@ function boot(){
    onPick:(jcd,rno,auto)=>{
      state.venue=jcd;state.race=rno;state.raceSelected=true;state.userSelectedVenue=!auto;
      // Manual race selection opens only race information. The prediction remains behind a click.
-     if(state.tab==='pt2')state.tab='idle';
+     if(state.tab==='pt2'){
+       state.tab='idle';$('race-center').classList.add('hidden');
+       $('view-pt2').classList.add('hidden');$('tab-pt2').setAttribute('aria-selected','false');
+     }
      venueOptions();raceOptions();loadRace();
      if(!auto){setTab('race');$('race-center').scrollIntoView({behavior:'smooth',block:'start'});}
    },
@@ -513,7 +518,8 @@ function boot(){
    },
    onNewDay:key=>{
      state.day=key.slice(0,4)+'-'+key.slice(4,6)+'-'+key.slice(6,8);
-     $('day').value=state.day;state.active=null;state.raceSelected=false;loadVenues(true);
+     $('day').value=state.day;state.active=null;state.raceSelected=false;
+     loadRace();loadVenues(true);
    }
  });
  getJson('data/manifest.json',5000).then(m=>{
