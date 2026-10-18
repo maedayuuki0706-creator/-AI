@@ -1,4 +1,21 @@
-# PT2 & 出走表 閲覧専用ビュー
+# 競艇AIナビ：複数ページ版（2026-10-19）
+
+6つの主ページと独立URLを持つ静的サイト。公開前レビューは
+[RELEASE_REVIEW.md](docs/RELEASE_REVIEW.md)、解析・SEO設定は
+[ANALYTICS_SEO.md](docs/ANALYTICS_SEO.md)を参照。
+
+ページを編集するときはbuild_pages.pyを更新し、python3 viewer/build_pages.pyで生成する。
+ブラウザはassets/app.mjs・data.mjs・analytics.mjs・site.cssを利用する。
+GitHub/Sheets/Discord/Xへの書込みを行わない。予想は明示ボタン後だけ取得する。
+GA4は既定で無効。既存公開サイトへの反映はユーザー承認後のみ。
+
+確認用の独立Sitesには、build_pages.pyのoutput・preview・origin引数で作った静的ファイルを配置する。
+本番は従来のRender静的配信がそのまま利用でき、追加のサーバや有料依存は不要。
+旧JS/CSSは既存CI互換のため保持しているが、現行HTMLからは読み込まない。
+
+以下は以前の1ページ版の設計記録。現行版の仕様・制約は上記のレビューを優先する。
+
+# 旧版：PT2 & 出走表 閲覧専用ビュー
 
 このフォルダは、既存の競艇AI本番システムと独立した**公開静的サイト**です。
 
