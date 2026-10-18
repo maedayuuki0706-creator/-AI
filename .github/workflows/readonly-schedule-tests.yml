@@ -33,4 +33,7 @@ jobs:
       - name: Check parser syntax
         run: python -m py_compile sheet_feed_server.py
       - name: Offline API tests
-        run: python -m unittest discover -s tests -p test_readonly_schedule.py -v
+        run: |
+          python -m py_compile research/website_schedule/schedule_server.py
+          python -m unittest discover -s tests -p test_readonly_schedule.py -v
+          python -m unittest discover -s tests -p test_website_schedule_server.py -v
