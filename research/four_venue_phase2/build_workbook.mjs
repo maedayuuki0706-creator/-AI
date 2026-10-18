@@ -35,6 +35,7 @@ for(let ix=0;ix<src.sheets.length;ix++){
   const h=hs[j],c=col(j),body=s.getRange(`${c}6:${c}${last}`),whole=s.getRange(`${c}5:${c}${last}`);
   if(/率|割合|95下限|95上限|差_/.test(h))body.setNumberFormat('0.0%');
   if(h==='日付'){body.setNumberFormat('yyyy-mm-dd');whole.format.columnWidth=15;}
+  if(/日時|時刻/.test(h))whole.format.columnWidth=36;
   if(/ID|race_id/.test(h)){body.setNumberFormat('0');whole.format.columnWidth=27;}
   if(/SHA|digest|URL/.test(h))whole.format.columnWidth=/URL/.test(h)?78:66;
   if(/反応|勝ち筋|負け筋|理由|条件|進路|リスク|根拠|考察|結論|内容|処理|制約|注意|不足項目|欠測項目|候補/.test(h))whole.format.columnWidth=45;

@@ -14,12 +14,28 @@ def restore(root,original):
                 basename=name.split('/')[-1];body=z.read(name)
                 if basename!=digest(body)+'.lzh':raise ValueError('Raw archive member digest mismatch')
                 put(target/'raw'/basename,body)
+    for archive in sorted((root/'studies').glob('*/venue_*_database_analysis.zip')):
+        jcd=archive.name.split('_')[1]
+        if jcd not in {'03','16','23','06'}:raise ValueError('Unexpected venue archive')
+        with zipfile.ZipFile(archive) as z:
+            for name in z.namelist():
+                if name!=Path(name).name or not name.endswith(('.csv.gz','.json.gz','.sqlite.gz')):raise ValueError('Unexpected venue member path')
+                put(archive.parent/jcd/name,z.read(name))
+    for archive in sorted((root/'studies').glob('*/retrospective_replays.zip')):
+        with zipfile.ZipFile(archive) as z:
+            for name in z.namelist():
+                if name!=Path(name).name or not name.endswith('.json'):raise ValueError('Unexpected replay member path')
+                put(archive.parent/'replays'/name,z.read(name))
     for p in root.rglob('*.gz'):
         if p.name.endswith('.sqlite.gz'):continue
         put(p.with_suffix(''),gzip.decompress(p.read_bytes()))
     # Daily states are reconstructed only when absent, from the chosen audited
     # manifest. Old acquisition checkpoints remain unchanged in an active tree.
     candidates=[p for p in (root/'acquisition').glob('*.json') if not p.name.endswith('_summary.json')]
+    current=root/'CURRENT.json'
+    if current.exists():
+        preferred=Path(json.loads(current.read_text())['acquisition_path']).name.removesuffix('.gz')
+        candidates.sort(key=lambda p:p.name!=preferred)
     for p in candidates:
         data=json.loads(p.read_text())
         if not isinstance(data,list):continue
