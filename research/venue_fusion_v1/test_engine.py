@@ -151,7 +151,7 @@ class FusionTest(TestCase):
         snap,src=sources()
         a=fusion.generate(snap,src,mode="replay",now=NOW)
         with mock.patch.object(fusion.venue,"analyze",autospec=True) as mocked:
-            mocked.return_value={"race_id":a["race_id"],"digest":a["venue_diagnostics_digest"],
+            mocked.return_value={"race_id":a["race_id"],"venue":"江戸川","digest":a["venue_diagnostics_digest"],
                 "seven_features":a["venue_observations"],
                 "lane_audits":[{"lane":i,"score":.1 if i==6 else 0.0} for i in range(1,7)]}
             b=fusion.generate(snap,src,mode="replay",now=NOW)
@@ -159,7 +159,7 @@ class FusionTest(TestCase):
         self.assertEqual(len(b["variants"]["existing_main_plus_yuuki_plus_venue"]),10)
         self.assertEqual(a["variants"]["existing_main"],b["variants"]["existing_main"])
         with mock.patch.object(fusion.venue,"analyze",autospec=True) as mocked:
-            mocked.return_value={"race_id":a["race_id"],"digest":a["venue_diagnostics_digest"],
+            mocked.return_value={"race_id":a["race_id"],"venue":"江戸川","digest":a["venue_diagnostics_digest"],
                 "seven_features":a["venue_observations"],
                 "lane_audits":[{"lane":i,"score":3.0} for i in range(1,7)]}
             with self.assertRaisesRegex(ValueError,"Unbounded venue"):
