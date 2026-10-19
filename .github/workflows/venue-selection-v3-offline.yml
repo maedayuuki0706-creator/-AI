@@ -1,0 +1,56 @@
+name: Four-venue V3 offline learning & selection tests
+on:
+  push:
+    branches:
+      - research/venue-selection-v3-20261019
+    paths:
+      - 'research/four_venue_phase2/selection_v3.py'
+      - 'research/four_venue_phase2/evaluate_selection_v3.py'
+      - 'research/four_venue_phase2/tests/test_selection_v3.py'
+      - '.github/workflows/venue-selection-v3-offline.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: offline-venue-selection-v3-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline-v3-study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: work
+          persist-credentials: false
+      - name: Checkout original immutable Oct19 pre-race logs
+        uses: actions/checkout@v4
+        with:
+          repository: maedayuuki0706-creator/-AI
+          ref: 75d7c047c801e57638f1ce824504e9ee4c571f0e
+          path: state
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate Python and run no-network research tests
+        working-directory: work
+        run: |
+          python -m py_compile research/four_venue_phase2/selection_v3.py research/four_venue_phase2/evaluate_selection_v3.py
+          python -m unittest research.four_venue_phase2.tests.test_selection_v3 -v
+      - name: Re-evaluate frozen inputs and 2026 historical holdout offline
+        working-directory: work
+        run: |
+          python -m research.four_venue_phase2.evaluate_selection_v3 \
+            --history data/research_four_venue_phase2/20251018_20261017/studies/eed2cf3775203abb/audited_races.json.gz \
+            --models research/four_venue_phase2/model_manifests \
+            --state ../state/data/venue_specialists_v1 \
+            --state-sha 75d7c047c801e57638f1ce824504e9ee4c571f0e \
+            --out ../v3_results
+      - name: Upload auditable A/B and V3 comparisons as research artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-venue-v3-offline-20261019
+          path: v3_results/
+          retention-days: 30
+          if-no-files-found: error
