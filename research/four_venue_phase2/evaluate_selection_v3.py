@@ -376,6 +376,18 @@ def main():
     (opts.out/"report.md").write_text(report_markdown(result),encoding="utf-8")
     # Include every race, all cards, and immutable source identities to audit small differences.
     (opts.out/"per_race.json").write_text(json.dumps(history+replay,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+    history_summary={
+        venue:{
+            cohort:{
+                variant:result["historical"].get(f"{venue}/{cohort}/{variant}")
+                for variant in VARIANTS
+            }
+            for cohort in ["historical_jul_sep","historical_oct1_17"]
+        }
+        for venue in JCD
+    }
+    print("HISTORICAL_DIAGNOSTIC="+json.dumps(history_summary,ensure_ascii=False))
+    print("PAIR_DIAGNOSTIC="+json.dumps(result["paired_uncertainty"],ensure_ascii=False))
     print(json.dumps({"models":result["venue_training_n"],"oct19":result["oct19"],
        "historic_graded":len(history)//3,"oct19_graded":len(replay)//4,
        "rejected":rejected,"output":str(opts.out)},ensure_ascii=False))
