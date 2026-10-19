@@ -139,7 +139,9 @@ def snapshot_candidates(snapshot, manifest, variant, *, mode="replay", now=None,
                 prohibit(v)
     prohibit(snapshot)
     base = scenario.generate(snapshot, mode=mode, now=now)
-    bycourse = course_to_lane(base["lanes"])
+    # scenario_v2 lane records expose "predicted_course"; the original
+    # frozen input (not the outcome) owns the authoritative course field.
+    bycourse = course_to_lane(snapshot["boats"])
     weights = _scoring(manifest, variant)
     ranked = rank_weights(weights, bycourse)
     chosen = choose(ranked, variant)
