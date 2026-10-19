@@ -1,0 +1,42 @@
+name: Venue Specialist Miss Audit (isolated read-only)
+on:
+  push:
+    branches: [research/venue-miss-audit-20261019]
+    paths:
+      - 'research/venue_specialists_v1/miss_audit.py'
+      - 'research/venue_specialists_v1/tests/test_miss_audit.py'
+      - '.github/workflows/venue-miss-audit-readonly.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  postmortem:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout research audit code only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          path: work
+      - name: Checkout frozen research LOG snapshot (read only)
+        uses: actions/checkout@v4
+        with:
+          repository: maedayuuki0706-creator/-AI
+          ref: 736e40a15c40e0ad1e0b41faca04bba55bb803ef
+          persist-credentials: false
+          path: state
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run isolated venue-miss audit
+        run: |
+          python -m py_compile work/research/venue_specialists_v1/miss_audit.py
+          python work/research/venue_specialists_v1/miss_audit.py --state state/data/venue_specialists_v1 --out /tmp/venue-miss-audit --state-sha 736e40a15c40e0ad1e0b41faca04bba55bb803ef
+      - name: Upload immutable evidence and full race-by-race report
+        uses: actions/upload-artifact@v4
+        with:
+          name: specialist-venue-miss-audit-20261019
+          path: /tmp/venue-miss-audit/
+          if-no-files-found: error
+          retention-days: 30
