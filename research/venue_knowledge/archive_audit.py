@@ -70,12 +70,25 @@ def summarize(records):
         actual_changed=actual_changed if isinstance(actual_changed,bool) else None
         motor_ids=[b.get("motor_number") for b in row.get("boats",[]) if isinstance(b,dict)]
         entry=(venue,period)
-        groups[entry].append((rid,day,first,actual_changed,band,motor_ids))
+        allboats=row.get("boats") or []
+        has_six_verified_courses=(
+            len(allboats)==6
+            and all(isinstance(b,dict) and isinstance(b.get("course"),int)
+                    and b["course"] in range(1,7) for b in allboats)
+            and len({b["course"] for b in allboats})==6
+        )
+        actual_mismatch=(
+            any(b["course"]!=b["lane"] for b in allboats)
+            if has_six_verified_courses else None
+        )
+        groups[entry].append((rid,day,first,actual_changed,band,motor_ids,actual_mismatch))
     for (jcd,period),data in sorted(groups.items()):
         n=len(data)
         by_head=Counter(d[2] for d in data)
         known=[d[3] for d in data if d[3] is not None]
         band_counter=Counter(d[4] for d in data)
+        observed_course=[d[6] for d in data if d[6] is not None]
+        crosscheck_disagreement=sum(d[6]!=d[3] for d in data if d[6] is not None and d[3] is not None)
         outcomes[f"{jcd}/{period}"]={
             "venue":JCD[jcd],"jcd":jcd,"era":period,
             "normal_graded":n,"first_lane_counts":{str(i):by_head[i] for i in range(1,7)},
@@ -83,6 +96,10 @@ def summarize(records):
             "entry_changed_count_known":sum(known),
             "entry_known_count":len(known),
             "entry_changed_pct_when_known":round(100*sum(known)/len(known),2) if known else None,
+            "six_actual_course_present":len(observed_course),
+            "course_mismatch_with_lane":sum(observed_course),
+            "entry_boolean_vs_course_crosscheck_disagreement":crosscheck_disagreement,
+            "zero_changes_need_independent_roster_review":len(known)>500 and not any(known),
             "race_days":len(set(d[1] for d in data)),
             "wind_band_counts":dict(band_counter),
             "wind_direction_checked_for_predeadline":False,
@@ -91,13 +108,27 @@ def summarize(records):
             "learned_predictive_effect":False,
             "is_transition_excluded_from_train":period=="excluded_transition_dec2025",
         }
+    expected_groups={
+        "karatsu":["23/before_dec2025_pit_change",
+                    "23/excluded_transition_dec2025",
+                    "23/after_dec2025_pit_change"],
+        "hamanako":["06/before_current_motor_20260409",
+                    "06/current_motor_period_20260409"]
+    }
+    absent=[key for keys in expected_groups.values() for key in keys if key not in outcomes]
     return {"schema":"venue-history-breaks-v1",
-            "analysis_only":True,"archive_source":"BOAT RACE official B/K audited history",
+            "analysis_only":True,
+            "expected_study_groups_missing":absent,
+            "pit_change_before_after_test_possible":(
+                "23/before_dec2025_pit_change" in outcomes
+                and "23/after_dec2025_pit_change" in outcomes),"archive_source":"BOAT RACE official B/K audited history",
             "historical_result_data_available_at_original_deadline":False,
             "groups":outcomes,
             "warnings":[
                 "Retrospective K archive from AFTER race, cannot be fed into historical simulated bets as pre-deadline weather/course",
                 "Karatsu official document specifies month Dec2025, not exact switch date; whole December excluded as cautious unknown transition",
+                "No before/after conclusion if one structural era has zero verified normal races; this archive may have no Karatsu before-Dec records",
+                "Edogawa zero reported entry changes, if seen, needs course-parser/raw-K provenance review before claiming absolute frame-only entries",
                 "Hamanako motor IDs across Apr9 renewal cannot be considered the same physical motor",
                 "Only aggregate groups shown. Re-check within-venue race grade, time, conditions before drawing causal conclusions",
                 "All groups are descriptive and retrospective, not an automatic venue coefficient",
@@ -114,6 +145,9 @@ def markdown(res):
             row["venue"],row["era"],str(row["normal_graded"]),f"{row['head_lane1_pct']}%",
             f"{row['entry_changed_count_known']}/{row['entry_known_count']}",
             str(row["wind_band_counts"].get("6m+",0))])+" |")
+    if res["expected_study_groups_missing"]:
+        out.extend(["", "**この履歴から比較できない群**："+
+                    "、".join(res["expected_study_groups_missing"])+"。ゼロサンプルの群について因果効果は推定しない。"])
     out.extend(["", "## 訓練データを混ぜないためのゲート","",
                 "- 唐津：2025年12月のピット位置変更前後を別集計。**12月全体は暫定的な切替月として隔離**。正確な変更日が公式に確定した場合のみ修正。",
                 "- 浜名湖：2026年4月9日の新モーター開始前後を分離。同じモーター番号でも使い回しによる同一機とは扱わない。",
