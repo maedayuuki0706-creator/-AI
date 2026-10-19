@@ -212,7 +212,7 @@ def supplement(rid, row, provenance, official=None):
         if r.get('entry_number') != int(lane) or not numeric(r.get('number'), 1000, 9999):
             raise ValueError('Invalid racer identity')
     by_lane = {str(b['lane']):b for b in (official or {}).get('boats', [])}
-    conflicts = []
+    conflicts, status_encoding_differences = [], []
     if official:
         if set(by_lane) != set('123456'):
             raise ValueError('Official baseline needs six lanes')
@@ -243,7 +243,13 @@ def supplement(rid, row, provenance, official=None):
                              ('course',actual.get('course_number')), ('exhibition_time',observed.get('exhibition_time'))]:
             expected = old.get(field)
             if expected is not None and value is not None and expected != value:
-                conflicts.append({'lane':int(lane), 'field':field, 'official':expected, 'api':value})
+                item={'lane':int(lane), 'field':field, 'official':expected, 'api':value}
+                if field == 'finish' and expected not in range(1,7) and value not in range(1,7):
+                    # Preserve both non-finish encodings without claiming a
+                    # contradictory normal finish or assuming equivalent causes.
+                    status_encoding_differences.append(item)
+                else:
+                    conflicts.append(item)
         # Zero mean-ST is a rookie/empty placeholder, not an instantaneous start.
         avg = numeric(program.get('average_start_timing'), .001, 1)
         b = {'lane':int(lane), 'racer_id':str(program['number']), 'motor_number':program.get('motor_number'),
@@ -256,7 +262,8 @@ def supplement(rid, row, provenance, official=None):
              'program':program, 'preview':observed,
              'official_finish':old.get('finish'), 'official_actual_st':old.get('actual_st')}
         boats.append(b)
-    normal = bool(official and official.get('normal_eligible') and motor_verified and not conflicts)
+    normal = bool(official and official.get('normal_eligible') and motor_verified and not conflicts
+                  and not status_encoding_differences)
     return {'race_id':rid, 'day':row['date'], 'venue_code':f"{row['stadium_number']:02}",
             'race_no':row['race_number'], 'closed_at':row.get('closed_at'), 'boats':boats,
             'preview_environment':{k:v for k,v in preview.items() if k != 'racers'},
@@ -266,6 +273,7 @@ def supplement(rid, row, provenance, official=None):
             'official_motor_identity_verified':motor_verified,
             'official_source_sha256':(official or {}).get('original_sha256'),
             'official_normal_eligible':normal, 'conflicts':conflicts, 'provenance':provenance,
+            'status_encoding_differences':status_encoding_differences,
             'upstream_family':'BOATRACE_official_derived', 'independent_evidence_count':1,
             'usage':'retrospective_research_only', 'prospective_verified':False,
             'unresolved':['tide_observation','current_observation','motor_service_period',
@@ -330,7 +338,7 @@ def report(root, expected_days, baseline_meta):
     root = Path(root)
     counts = {'calendar_days':len(expected_days), 'downloaded_days':0, 'parsed_days':0,
               'supplemented_races':0, 'official_matched_races':0, 'conflict_races':0,
-              'missing_baseline_races':0, 'boats':0}
+              'missing_baseline_races':0, 'boats':0, 'nonfinish_encoding_races':0}
     fields = {k:{'present':0, 'missing':0} for k in GAP_FIELDS}
     pending, errors, duplicates = [], [], {'official_result_copies_not_added_as_new_races':0}
     for day in expected_days:
@@ -347,6 +355,7 @@ def report(root, expected_days, baseline_meta):
         for row in d['races']:
             counts['official_matched_races'] += row['official_result_verified']
             counts['conflict_races'] += bool(row['conflicts'])
+            counts['nonfinish_encoding_races'] += bool(row.get('status_encoding_differences'))
             duplicates['official_result_copies_not_added_as_new_races'] += row['official_result_verified']
             for b in row['boats']:
                 counts['boats'] += 1
@@ -363,14 +372,37 @@ def report(root, expected_days, baseline_meta):
                  'Historical odds collection time is unknown; exclude from pre-deadline EV',
                  'Tide/current/video/motor-period/preinspection still require separate evidence']}
     save_json(root/'summary.json', output)
+    labels = {'calendar_days':'対象日数','downloaded_days':'取得・処理済み日数','parsed_days':'照合処理が通った日数',
+              'supplemented_races':'追加情報を保存した出走表数','official_matched_races':'既存公式データとの一致レース数',
+              'conflict_races':'公式値と相違のあるレース数','missing_baseline_races':'追加情報を結合できない既存レース数',
+              'boats':'保存した艇データ数', 'average_st':'出走表の平均ST', 'exhibition_st':'展示ST（Fを負値で保存）',
+              'nonfinish_encoding_races':'着順外コードの表記差（原因未同定・学習除外）',
+              'exhibition_course':'展示進入','tilt':'チルト','parts':'部品交換情報（交換なしを含む）',
+              'propeller_exchange':'ペラ交換の有無','refund_lanes':'返還明細（返還なしを含む）',
+              'historical_odds':'過去3連単オッズ（取得時刻不明）', 'preview_wind_direction_text':'展示時の風向文字列',
+              'tide_observation':'潮位実測・地点時刻の照合','current_observation':'潮流実測',
+              'motor_service_period':'モーター使用期間の公式照合','preinspection':'前検原本',
+              'video_attack_origin':'映像上の実攻め起点','prerace_receipt':'当時の締切前受領証'}
     lines = ['# データ追加・重複監査', '', '|項目|値|','|---|---:|']
-    lines += [f'|{k}|{v}|' for k,v in counts.items()]
+    lines += [f'|{labels[k]}|{v}|' for k,v in counts.items()]
     lines += ['', '|項目（艇単位）|値あり|未取得・不明|','|---|---:|---:|']
-    lines += [f"|{k}|{v['present']}|{v['missing']}|" for k,v in fields.items()]
+    lines += [f"|{labels[k]}|{v['present']}|{v['missing']}|" for k,v in fields.items()]
     lines += ['', '取得済み結果は公式K/Bと同一IDに結合し、件数を水増ししない。',
               '歴史データの取得日は当時の取得日ではない。締切前の予想原本・前向き成績へ混ぜない。',
               'プロペラnullは交換なしの場合を含む。parts=[]は交換なし、nullは情報不明。',
               f'未取得日数: {len(pending)}。取得エラー・不一致はsummary.jsonで個別確認。']
+    model_path=root/'LIGHTGBM_DIAGNOSTIC.json'
+    if model_path.exists():
+        model=json.loads(model_path.read_bytes())
+        lines += ['', '## LightGBMによる独立した事後研究', '', '|方式|最終期間R数|1着的中率|勝者log-loss|',
+                  '|---|---:|---:|---:|']
+        for name,values in model['models'].items():
+            final=values['final']
+            lines.append(f"|{name}|{final['races']}|{final['top1_hit_rate']:.2%}|{final['winner_log_loss']:.4f}|")
+        lines += ['', '同じ暦日を分割せず学習60%・検証20%・最終20%に分離。',
+                  '過去のAPI入力には当時の受領証がないため、前向き的中率や本番の改善実績ではない。',
+                  '既存AIや固定買い目の比較ではなく、学習期の場別枠別頻度を基準にした1着診断。',
+                  '回収率・EV・本番採用の判定は行わない。場別結果はLIGHTGBM_DIAGNOSTIC.jsonに保存。']
     atomic(root/'REPORT.md', ('\n'.join(lines)+'\n').encode())
     return output
 
@@ -395,7 +427,7 @@ def main():
             for index, record in enumerate(pool.map(lambda d:collect_day(client,d,baseline,a.retry_failed),expected),1):
                 print(json.dumps({'day':record['day'],'status':record['status'],
                                   'races':len(record['races']),'progress':f'{index}/{len(expected)}'}), flush=True)
-                if index % 10 == 0:
+                if index % 50 == 0:
                     report(root,expected,meta)
     result = report(root,expected,meta)
     print(json.dumps({'counts':result['counts'],'pending_days':len(result['pending_days']),

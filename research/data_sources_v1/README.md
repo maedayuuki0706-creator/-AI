@@ -24,9 +24,9 @@ PC不要。既存Discord・X・予想エンジン・研究worker・Secrets・Act
 
 ```sh
 python -m unittest discover -s research/data_sources_v1/tests -v
-python -m research.data_sources_v1.collect --out data/data_sources_v1/20251018_20261018 --start 2025-10-18 --end 2026-10-18
+python -m research.data_sources_v1.collect --out data/data_sources_v1/20251018_20261019 --start 2025-10-18 --end 2026-10-19
 python -m pip install -r research/data_sources_v1/requirements-research.txt
-python -m research.data_sources_v1.train --out data/data_sources_v1/20251018_20261018
+python -m research.data_sources_v1.train --out data/data_sources_v1/20251018_20261019
 ```
 
 標準2ワーカー、最大4ワーカー、全体で最低1秒のリクエスト間隔、25秒タイムアウト、最大16MB/日/ソース。rawはSHA256名でgzip保存、取得時刻とURL/HTTPメタデータを別保存。同じコマンドで成功済みの日別原本を再利用。失敗の再取得は`--retry-failed`。公式基準のrefと正確なcommit・ファイルSHAをsummaryへ記録する。Turnmark取得失敗時だけOpen API v1にフォールバックし、同一原本の全件二重取得を避ける。
@@ -57,3 +57,5 @@ python -m research.data_sources_v1.train --out data/data_sources_v1/20251018_202
 - https://playwright.dev/docs/intro
 
 自動実行・既存シートへの書込・本番採用は接続していない。今回のCLI実行実績と全件の欠測率はdata/data_sources_v1以下のREPORT.md/summary.jsonを参照する。
+
+データ原本は別のデータ専用ZIP（競艇AI_追加研究データ_20251018-20261019.zip）として保存。コードはGitHubのこの研究ブランチを正本とし、ZIPへ重複収録しない。ZIPをリポジトリ直下に展開すると上記のdata/data_sources_v1へ復元できる。

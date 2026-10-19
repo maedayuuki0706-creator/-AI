@@ -86,6 +86,14 @@ class Contracts(unittest.TestCase):
         self.assertEqual(x['boats'][0]['official_finish'],1)
         self.assertFalse(x['official_normal_eligible']);self.assertTrue(x['conflicts'])
 
+    def test_nonfinish_encodings_are_kept_separately_and_excluded(self):
+        row,official=fixture();official['boats'][0]['finish']=0
+        row['result']['racers']['1']['place_number']=99
+        x=supplement('202610170301',row,[],official)
+        self.assertFalse(x['conflicts'])
+        self.assertTrue(x['status_encoding_differences'])
+        self.assertFalse(x['official_normal_eligible'])
+
     def test_different_mirrors_are_one_upstream(self):
         row,official=fixture();x=supplement('202610170301',row,[{'source':'a'},{'source':'b'}],official)
         self.assertEqual(x['independent_evidence_count'],1)
