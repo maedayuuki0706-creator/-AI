@@ -65,6 +65,7 @@ def audit(root: Path, state_sha: str):
     patterns = Counter()
     seen = set()
     zero_weight = Counter()
+    zero_weight_graded = Counter()
     report_totals = Counter()
     diagnostic = Counter()
     completeness = Counter()
@@ -152,6 +153,8 @@ def audit(root: Path, state_sha: str):
             included=win in formations
             candidate_head=any(x.startswith(win.split("-")[0]+"-") for x in formations)
             report_totals[(jcd,"graded")]+=1
+            if all(abs(float(b["score"])) < 1e-12 for b in scores):
+                zero_weight_graded[jcd]+=1
             report_totals[(jcd,kind)]+=1
             report_totals[(jcd,"main_head_correct")]+=int(best)
             report_totals[(jcd,"winning_formation_in_candidates")]+=int(included)
@@ -205,7 +208,7 @@ def audit(root: Path, state_sha: str):
         tally.update({"misses":tally["graded"]-tally["hit"],
                       "roi_pct":round(100*tally["returned"]/tally["stake"],2) if tally["stake"] else None,
                       "profit_yen":tally["returned"]-tally["stake"],
-                      "all_graded_forecast_scores_zero":zero_weight[code]==tally["graded"] and tally["graded"]>0,
+                      "all_graded_forecast_scores_zero":zero_weight_graded[code]==tally["graded"] and tally["graded"]>0,
                       "missing_predeadline_races":current_counts[code].get("missing_count",0),
                       "missing_race_ids":current_counts[code].get("missing_race_ids",[]),
                       "operational_status":current_counts[code].get("operational_status"),
@@ -272,7 +275,7 @@ def markdown(report):
       "",
       "## 1Rずつの検証LOG",
       "",
-      "| 日付 | 場 | R | 結果 | 締切前10点 | 分類 | v2候補に的中目 | 1着本命 | 風m/s | 官方結果 |",
+      "| 日付 | 場 | R | 結果 | 締切前10点 | 分類 | v2候補に的中目 | 1着本命 | 風m/s | 公式結果 |",
       "|---|---|---:|---|---|---|---|---|---:|---|"]
     for r in report["records"]:
         wind=r["environment_at_capture"]["wind_speed"]
