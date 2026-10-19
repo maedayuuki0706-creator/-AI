@@ -226,7 +226,10 @@ def main():
     (opts.out/"article_study.md").write_text(report_md(sources,hypotheses,audit,scan),encoding="utf-8")
     if scan is not None:
         (opts.out/"source_hashes.json").write_text(json.dumps(scan,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-    print(json.dumps({"validation":audit,"source_scan":{k:sum(1 for s in scan or [] if s["status"]==k) for k in ["fetched","unavailable"]}},ensure_ascii=False))
+    print(json.dumps({"validation":audit,
+        "source_scan":{k:sum(1 for s in scan or [] if s["status"]==k) for k in ["fetched","unavailable"]},
+        "unavailable_sources":[{"source_id":s["source_id"],"error_type":s.get("error_type")} for s in scan or [] if s["status"]=="unavailable"],
+        "source_titles_captured":[s["source_id"] for s in scan or [] if s["status"]=="fetched"]},ensure_ascii=False))
     return audit
 
 
