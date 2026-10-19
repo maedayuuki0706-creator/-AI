@@ -1,0 +1,56 @@
+name: Four-venue official sources + archive research (isolated)
+on:
+  push:
+    branches:
+      - research/four-venue-source-learning-20261019
+    paths:
+      - 'research/venue_knowledge/**'
+      - '.github/workflows/four-venue-knowledge-readonly.yml'
+permissions:
+  contents: read
+concurrency:
+  group: four-venue-knowledge-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  venue-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Read research code only
+        uses: actions/checkout@v4
+        with:
+          path: work
+          persist-credentials: false
+      - name: Read immutable official historic archive only
+        uses: actions/checkout@v4
+        with:
+          repository: maedayuuki0706-creator/-AI
+          ref: research/four-venue-phase2-20261018
+          path: historic
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify sources, hypotheses and no model autopromotion
+        working-directory: work
+        run: |
+          python -m unittest discover -s research/venue_knowledge -p 'test_*.py' -v
+          python -m research.venue_knowledge.lab --out ../research_evidence
+      - name: Audit official 8876-race structural-break periods
+        working-directory: work
+        run: |
+          python -m research.venue_knowledge.archive_audit \
+            --archive ../historic/data/research_four_venue_phase2/20251018_20261017/studies/eed2cf3775203abb/audited_races.json.gz \
+            --out ../research_evidence
+      - name: Check original article availability (metadata only, no article text retained)
+        working-directory: work
+        timeout-minutes: 4
+        continue-on-error: true
+        run: python -m research.venue_knowledge.lab --out ../research_evidence --fetch --pause 1.5
+      - name: Save source hashes, research hypotheses and venue-period study
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-venue-source-learning-20261019
+          path: research_evidence/
+          if-no-files-found: error
+          retention-days: 30
