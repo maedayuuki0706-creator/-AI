@@ -7,6 +7,8 @@ on:
       - 'research/four_venue_phase2/selection_v3.py'
       - 'research/four_venue_phase2/evaluate_selection_v3.py'
       - 'research/four_venue_phase2/tests/test_selection_v3.py'
+      - 'research/four_venue_phase2/selection_v4_program.py'
+      - 'research/four_venue_phase2/tests/test_selection_v4.py'
       - '.github/workflows/venue-selection-v3-offline.yml'
   workflow_dispatch:
 permissions:
@@ -17,7 +19,7 @@ concurrency:
 jobs:
   offline-v3-study:
     runs-on: ubuntu-latest
-    timeout-minutes: 9
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,7 +39,8 @@ jobs:
         working-directory: work
         run: |
           python -m py_compile research/four_venue_phase2/selection_v3.py research/four_venue_phase2/evaluate_selection_v3.py
-          python -m unittest research.four_venue_phase2.tests.test_selection_v3 -v
+          python -m py_compile research/four_venue_phase2/selection_v4_program.py
+          python -m unittest research.four_venue_phase2.tests.test_selection_v3 research.four_venue_phase2.tests.test_selection_v4 -v
       - name: Re-evaluate frozen inputs and 2026 historical holdout offline
         working-directory: work
         run: |
@@ -47,10 +50,17 @@ jobs:
             --state ../state/data/venue_specialists_v1 \
             --state-sha 75d7c047c801e57638f1ce824504e9ee4c571f0e \
             --out ../v3_results
-      - name: Upload auditable A/B and V3 comparisons as research artifacts
+      - name: Train independent four-venue V4 on official B program / K normal results
+        working-directory: work
+        timeout-minutes: 10
+        run: |
+          python -m research.four_venue_phase2.selection_v4_program \
+            --history data/research_four_venue_phase2/20251018_20261017/studies/eed2cf3775203abb/audited_races.json.gz \
+            --out ../v3_results/context_v4
+      - name: Upload auditable V3/V4 comparative research artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: four-venue-v3-offline-20261019
+          name: four-venue-v3-v4-offline-20261019
           path: v3_results/
           retention-days: 30
           if-no-files-found: error
