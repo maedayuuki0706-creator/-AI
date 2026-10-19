@@ -301,6 +301,14 @@ def main():
     (a.out/"v4_races.json").write_text(json.dumps(report["all_rows"],ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     print("CONTEXT_LEARNING="+json.dumps({"summary":summary["diagnostics"],
       "train_counts":{code:mod["training_n"] for code,mod in report["models"].items()}},ensure_ascii=False))
+    # Small durable registry may be copied verbatim to a research-only manifest.
+    # Full inputs/training IDs remain in the reproducible Actions artifact.
+    print("MODEL_REGISTRY="+json.dumps({
+        code:{"version":mod["version"],"training_n":mod["training_n"],
+              "training_end":mod["training_end"],"data_input_sha256":mod["training_input_digest"],
+              "model_digest":mod["digest"],"weights_by_feature":dict(zip(mod["features"],mod["weights"])),
+              "adoption_status":mod["adoption_status"],"historical_B_asof_verified":False}
+        for code,mod in report["models"].items()},ensure_ascii=False,sort_keys=True))
 
 
 if __name__=="__main__":
