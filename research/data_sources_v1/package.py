@@ -20,12 +20,18 @@ def main():
         if meta['status']=='ok':
             if digest(gzip.decompress((root/meta['raw_path']).read_bytes()))!=meta['sha256']:
                 raise ValueError('Evidence digest mismatch')
+    for p in (root/'gaps/sources').glob('*.json'):
+        meta=json.loads(p.read_bytes())
+        if meta['status']=='ok' and digest(gzip.decompress((root/'gaps'/meta['raw_path']).read_bytes()))!=meta['sha256']:
+            raise ValueError('Official gap evidence digest mismatch')
     files=sorted(p for p in root.rglob('*') if p.is_file() and not p.name.endswith('.tmp'))
     manifest={'created_at':stamp(),'kind':'data_only_research_archive','code_included':False,
               'quarantined_items':len(summary['errors']),'all_data_complete':False,
               'file_count':len(files),'summary':summary['counts'],
               'files':[{'path':str(p.relative_to(root)),'sha256':digest(p.read_bytes()),'bytes':p.stat().st_size}
                        for p in files]}
+    if (root/'gaps/summary.json').is_file():
+        manifest['additional_official_gap_counts']=json.loads((root/'gaps/summary.json').read_bytes())['counts']
     prefix='data/data_sources_v1/'+root.name+'/'
     target.parent.mkdir(parents=True,exist_ok=True)
     with zipfile.ZipFile(target,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=6) as z:

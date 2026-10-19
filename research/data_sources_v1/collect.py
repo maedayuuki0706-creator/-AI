@@ -372,6 +372,11 @@ def report(root, expected_days, baseline_meta):
                  'Historical odds collection time is unknown; exclude from pre-deadline EV',
                  'Tide/current/video/motor-period/preinspection still require separate evidence']}
     save_json(root/'summary.json', output)
+    if (root/'gaps/summary.json').exists():
+        gap=json.loads((root/'gaps/summary.json').read_bytes())
+        output['additional_official_gaps']={'path':'gaps/summary.json','counts':gap['counts'],
+            'original_field_counts_are_base_api_only':True,'new_races_added':0}
+        save_json(root/'summary.json',output)
     labels = {'calendar_days':'対象日数','downloaded_days':'取得・処理済み日数','parsed_days':'照合処理が通った日数',
               'supplemented_races':'追加情報を保存した出走表数','official_matched_races':'既存公式データとの一致レース数',
               'conflict_races':'公式値と相違のあるレース数','missing_baseline_races':'追加情報を結合できない既存レース数',
@@ -391,6 +396,10 @@ def report(root, expected_days, baseline_meta):
               '歴史データの取得日は当時の取得日ではない。締切前の予想原本・前向き成績へ混ぜない。',
               'プロペラnullは交換なしの場合を含む。parts=[]は交換なし、nullは情報不明。',
               f'未取得日数: {len(pending)}。取得エラー・不一致はsummary.jsonで個別確認。']
+    if 'additional_official_gaps' in output:
+        lines += ['', '## 公式不足データの追加取得', '',
+                  '上表は元のAPI補完の件数。潮位・モーター・前検の追加照合はGAPS_REPORT.mdを参照。',
+                  'gaps/race_enrichment.json.gzを同一race_idへ結合し、元レースや本番入力を上書きしない。']
     model_path=root/'LIGHTGBM_DIAGNOSTIC.json'
     if model_path.exists():
         model=json.loads(model_path.read_bytes())

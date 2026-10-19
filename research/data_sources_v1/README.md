@@ -42,7 +42,8 @@ python -m research.data_sources_v1.train --out data/data_sources_v1/20251018_202
 - 歴史APIにあるオッズは取得時刻不明。締切10分前オッズや当時のEVとして利用しない。
 - 全rawを保存するが学習特徴量は明示許可リストだけ。本番ST、着順、決まり手、配当、過去オッズを事前入力へ混ぜない。
 - 今回取得した過去データには当時の締切前受領証がない。前向き予想・配信の成功率に含めない。
-- 追加項目が埋まっても、潮位実測/潮流・観測点照合・モーター使用期間・前検・実際の攻め起点の映像ラベル・当時の取得時刻は未解決のまま残す。
+- 公式の追加照合は `gaps/race_enrichment.json.gz` に別保存。検潮所の実測潮位は場内実測や流速と区別し、当時の締切前入力へ混ぜない。モーター使用開始日の月単位・資料間の表記差を保持する。
+- 当時の締切前受領証、実測流速、映像上の攻め起点、過去全開催の前検は未解決。追加取得の件数と限界は `GAPS_REPORT.md` を参照する。
 
 ## 一次資料
 
@@ -59,3 +60,16 @@ python -m research.data_sources_v1.train --out data/data_sources_v1/20251018_202
 自動実行・既存シートへの書込・本番採用は接続していない。今回のCLI実行実績と全件の欠測率はdata/data_sources_v1以下のREPORT.md/summary.jsonを参照する。
 
 データ原本は別のデータ専用ZIP（競艇AI_追加研究データ_20251018-20261019.zip）として保存。コードはGitHubのこの研究ブランチを正本とし、ZIPへ重複収録しない。ZIPをリポジトリ直下に展開すると上記のdata/data_sources_v1へ復元できる。
+
+## 公式の残不足データ
+
+`gaps.py` は単発の取得CLI。気象庁39か月・地点ファイルと各場の公式原本を保存する。最小1秒間隔・2ワーカー・成功済み原本再利用。予想や通知に接続しない。
+
+```sh
+python -m research.data_sources_v1.gaps --data data/data_sources_v1/20251018_20261019
+python -m research.data_sources_v1.gaps --offline --data data/data_sources_v1/20251018_20261019 --motor-catalog research/data_sources_v1/gap_motor_cycles.json --series-catalog research/data_sources_v1/gap_preinspection_series.json
+```
+
+月・地点・年・日・毎時の固定長を検証し、締切予定時刻以前の同一時間の潮位だけに結合する。各局の基準面cmを保持し、推算潮位との単純な差引きや標高換算はしない。毎時平滑値は事後公開なので、当時使えた特徴量として扱わない。
+`--offline` はネットワークを使わず保存原本だけで照合を再現する。日付・開催の設定は今回レビューした原本SHAに固定してあり、新しい開催へ流用するには原本の再確認とカタログ更新が必要。
+浜名湖の中間整備PDFから確認した10件はデータZIP内 `gaps/motor_maintenance_records.json` に構造化保存。年全体の整備網羅性や当日取得を示さず、学習へ自動投入しない。
