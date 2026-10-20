@@ -100,7 +100,7 @@ def tick(store,old,source_sha):
             if 0<=remaining<=1235:
                 try:rows.append(capture(store,day,code,r,allow_result=False))
                 except Exception as exc:rows.append({'race_id':f'{day}_{code}_{r:02}','status':'error','reason':str(exc)})
-            elif remaining < -180 and not (store.root/'reused_inputs'/f'{day}_{code}_{r:02}.json').exists():
+            elif remaining < -180:
                 try:rows.append(capture(store,day,code,r))
                 except Exception as exc:rows.append({'race_no':r,'venue_code':code,'status':'error','reason':str(exc)})
     # Repair payout-only originals without touching input or old research state.
@@ -110,10 +110,21 @@ def tick(store,old,source_sha):
         'http_requests':store.fetches-before,'captures':rows,'completed_results':completed,'existing_sources_read_only':True}
     store.record('runs','tick',run);return run
 
+def repair_result_weather_projection(store):
+    # Repair only this new updater's derived output. Preserve the exact older
+    # record in quarantine; original HTML and original forecasts are immutable.
+    for p in (store.root/'result_weather').glob('*.json'):
+        d=read(p);data=d.get('data',{})
+        if 'boats' not in data and 'entry_observed' not in data:continue
+        original=p.read_bytes();once(store.root/'quarantine/result_weather'/p.name,original)
+        d['data']={k:data.get(k) for k in ('wind_speed','wave_cm','air_temp_c','water_temp_c','wind_direction_official_icon','source_weather_time_text')}
+        d['phase']='result';d['projection_version']=2;store.record('result_weather',d['race_id'],d);p.unlink()
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--state',required=True,type=Path);p.add_argument('--reuse',required=True,type=Path);p.add_argument('--source-sha',required=True);p.add_argument('--seconds',type=int,default=0);p.add_argument('--interval',type=int,default=20);p.add_argument('--publish',action='store_true');a=p.parse_args()
     if not 0<=a.seconds<=600 or not 15<=a.interval<=60:raise ValueError('Bounded worker limits')
     s=Store(a.state);end=time.monotonic()+a.seconds
+    repair_result_weather_projection(s)
     refresh_daily(s)
     while True:
         r=tick(s,a.reuse,a.source_sha);print(json.dumps(r,ensure_ascii=False),flush=True)

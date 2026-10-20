@@ -90,7 +90,28 @@ def refresh_daily(store):
             import base64
             h,e=tides(store.body(doc),station)
             once(destination,base64.b64encode(gzip.compress(encode({'acquisition':doc,'hourly':h,'events':e,'station_proxy':True,'current_velocity':False,'usage':'acquired now; no historical predeadline receipt'}),mtime=0)))
+    refresh_observed_tide(store)
     return result
+
+def refresh_observed_tide(store):
+    records=[];year=now().year;month=now().month;ym=f'{year:04}{month:02}'
+    for station in ('TK','UN','MI'):
+        u=f'https://www.data.jma.go.jp/kaiyou/data/db/tide/sokuho/{ym}/z_hry{ym}{station}.txt'
+        doc=store.get(u,ttl=3600);entry={'station':station,'acquisition':doc,'measurement':'smoothed_observed_height_local_gauge_datum_cm','usage':'retrospective_only','venue_measurement':False,'current_velocity':False,'published_at':None}
+        if doc['status']=='ok':
+            hours=[]
+            for line in store.body(doc).splitlines():
+                if not line.strip():continue
+                if len(line) not in (80,136) or line[78:80]!=station or int(line[72:74])!=year%100 or int(line[74:76])!=month:raise ValueError('Observed tide date/station/width mismatch')
+                from datetime import datetime
+                d=datetime(year,month,int(line[76:78]),tzinfo=now().tzinfo)
+                for h in range(24):
+                    cell=line[3*h:3*h+3];v=int(cell) if cell.strip() else None
+                    hours.append({'at':(d+timedelta(hours=h)).isoformat(),'height_cm':v,'missing_reason':None if v is not None else 'not released or missing in official monthly file'})
+            entry['hours']=hours;entry['present']=sum(x['height_cm'] is not None for x in hours)
+            entry['missing']=len(hours)-entry['present']
+        store.record('tide_observed_revisions',station+'_'+ym,entry);records.append(entry)
+    return records
 
 def collect_live_karatsu(store,snapshot):
     m=snapshot['meta'];key=f"{m['day']}_23_{int(m['rno']):02}"

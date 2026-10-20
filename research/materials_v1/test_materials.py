@@ -1,4 +1,5 @@
 import json,tempfile,unittest
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 from datetime import datetime
@@ -40,5 +41,23 @@ class EvidenceTests(unittest.TestCase):
     def test_result_weather_never_renames_actual_start_as_exhibition(self):
         r=result_environment('<html><span class="table1_boatImage1Number">1</span><span class="table1_boatImage1Time">.12</span></html>')
         self.assertNotIn('boats',r);self.assertNotIn('exhibition_st',r);self.assertNotIn('entry_observed',r)
+    def _remote_mock(self,root,*args):
+        from .worker import STATE_BRANCH
+        if args[:2]==('branch','--show-current'):return STATE_BRANCH
+        if args[0]=='status':return '?? evidence.json'
+        if args[:2]==('rev-parse','HEAD'):return 'a'*40
+        if args[0]=='ls-remote':return 'a'*40+'\trefs/heads/'+STATE_BRANCH
+        return ''
+    def _response(self,sha):
+        r=BytesIO(json.dumps({'object':{'sha':sha}}).encode());r.headers={'Date':'Tue, 20 Oct 2026 08:00:00 GMT'};return r
+    def test_old_remote_ref_retried_before_acknowledgement(self):
+        from .worker import publish
+        with tempfile.TemporaryDirectory() as d,patch('research.materials_v1.worker.git',side_effect=self._remote_mock),patch('research.materials_v1.worker.now',return_value=datetime(2026,10,20,17,0,tzinfo=JST)),patch('research.materials_v1.worker.time.sleep'),patch('research.materials_v1.worker.urllib.request.urlopen',side_effect=[self._response('b'*40),self._response('a'*40)]) as fetch:
+            r=publish(Store(d));self.assertEqual(r['remote_commit'],'a'*40);self.assertEqual(fetch.call_count,2)
+    def test_unconfirmed_remote_api_never_becomes_prospective_receipt(self):
+        from .worker import publish
+        with tempfile.TemporaryDirectory() as d,patch('research.materials_v1.worker.git',side_effect=self._remote_mock),patch('research.materials_v1.worker.now',return_value=datetime(2026,10,20,17,0,tzinfo=JST)),patch('research.materials_v1.worker.time.sleep'),patch('research.materials_v1.worker.urllib.request.urlopen',side_effect=[self._response('b'*40) for _ in range(3)]):
+            r=publish(Store(d));self.assertEqual(r['status'],'git_saved_api_ack_pending');self.assertEqual(r['new_forecast_receipts'],0)
+            p=next((Path(d)/'persistence_pending').glob('*.json'));self.assertFalse(json.loads(p.read_text())['prospective_receipt_confirmed'])
 
 if __name__=='__main__':unittest.main()
