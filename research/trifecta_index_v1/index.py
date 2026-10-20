@@ -138,7 +138,8 @@ def build_index(record, kind):
     for idx, row in enumerate(rows, 1):
         first_rank.setdefault(row["raw_strength"], idx)
         row["rank"] = idx
-        row["index_0_100"] = round(100 * (row["raw_strength"] - lo) / (hi - lo), 4) if hi > lo else None
+        row["index_0_100"] = (round(100 * (120 - idx) / 119, 4) if native_order else
+                                    round(100 * (row["raw_strength"] - lo) / (hi - lo), 4) if hi > lo else None)
         row["tied_rank_start"] = first_rank[row["raw_strength"]]
         row["tied_count"] = counts[row["raw_strength"]]
         row["unscored_fallback"] = row["evidence_count"] == 0 if not native_order else False
@@ -158,11 +159,12 @@ def build_index(record, kind):
                scenario.aware(input_created) < scenario.aware(deadline)),
            "remote_predeadline_receipt_verified": False, "count_as_prospective": False,
            "score_kind": score_kind, "native_rank_preserved": native_order,
+           "index_basis": "native_rank_percentile" if native_order else "structural_evidence_minmax",
            "probabilities_calibrated": False, "expected_value_computed": False,
            "count": 120, "ranks": rows,
            "limitations": [
                "Rank 1..120 is relative ordering, NOT 1..120 percent likelihood.",
-               "Index 0..100 is within-race relative strength, NOT hit probability or EV.",
+               "Index 0..100 is within-race relative strength or native-rank percentile, NOT hit probability or EV.",
                "Equal evidence scores use deterministic lexical tie-break; ranks inside ties are not evidence.",
                "Scenario-only outcomes without tactical formation are unscored fallbacks.",
                "Phase2 B native order may not be monotonic in historical_score because pre-race support is primary.",
