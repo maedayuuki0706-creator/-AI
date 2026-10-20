@@ -50,6 +50,7 @@ def fixture():
 
 
 def seal(obj):
+    obj.pop("digest",None)  # tests deliberately mutate signed objects: sign the changed object
     obj["digest"]=scenario.digest(obj)
     return obj
 
