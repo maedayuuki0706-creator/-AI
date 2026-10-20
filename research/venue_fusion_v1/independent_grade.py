@@ -146,6 +146,26 @@ def grade(saved,review):
     winner,payout=next(iter(winnings.items()))
     if winner not in scenario.COMBINATIONS or isinstance(payout,bool) or not isinstance(payout,(int,float)) or payout<=0:
         raise ValueError("Invalid standard official winning combination or payment")
+    # Original forecast may be v1 (cards only) or v2 (120 Main-core ranks
+    # and all six tactical hypotheses). Never reconstruct tactical evidence
+    # from today's code after knowing the official finish.
+    ranked=fore.get("main_core_120_rank")
+    if ranked is not None:
+        if len(ranked)!=120 or set(x["combination"] for x in ranked)!=scenario.COMBINATIONS:
+            raise ValueError("Corrupt original full 120-ranked candidate evidence")
+        winner_rank=next(x["rank"] for x in ranked if x["combination"]==winner)
+    else:
+        winner_rank=None
+    frozen_scenario=fore.get("scenario_formation_candidates")
+    if frozen_scenario is None:
+        winning_scenario_candidate=None
+    else:
+        if not isinstance(frozen_scenario,list) or not set(frozen_scenario).issubset(scenario.COMBINATIONS):
+            raise ValueError("Corrupt original scenario candidate list")
+        winning_scenario_candidate=winner in frozen_scenario
+    six_tactics=fore.get("scenario_all_six")
+    if six_tactics is not None and (len(six_tactics)!=6 or set(b["lane"] for b in six_tactics)!=set(range(1,7))):
+        raise ValueError("Corrupt original six-boat tactical forecast")
     data={}
     for model,picks in fore["model_cards"].items():
         hit=winner in picks
@@ -172,6 +192,10 @@ def grade(saved,review):
         "official_observed_at":review["official_observed_at"],
         "winner":winner,"payout_yen_per_100":int(round(payout)),
         "per_model":data,
+        "winning_main_core_rank_in_frozen_120":winner_rank,
+        "winner_inside_frozen_scenario_candidates":winning_scenario_candidate,
+        "frozen_six_tactical_paths_available":six_tactics is not None,
+        "main_vs_yuuki_card_delta":fore.get("card_comparison"),
         "actual_1mark_tactics_verified":False,
         "model_is_full_production_main":False,
         "remarks":[
