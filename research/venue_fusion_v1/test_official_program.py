@@ -96,7 +96,7 @@ class RealFrozenOfficialTests(TestCase):
             from_frozen_official(original)
         original=deepcopy(self.source)
         original["boats"][0]["course"]=6
-        with self.assertRaisesRegex(ValueError,"exhibition course"):
+        with self.assertRaisesRegex(ValueError,"Unique lanes, courses"):
             from_frozen_official(original)
         original=deepcopy(self.source)
         original["boats"][0]["motor_number"]=999
@@ -121,7 +121,7 @@ class RealFrozenOfficialTests(TestCase):
         self.assertFalse(x["venue_validated_adjustment_active"])
         # Applying the original full-main parity gate to this input MUST fail.
         real_capture=from_frozen_official(self.source)
-        with self.assertRaisesRegex(ValueError,"source"):
+        with self.assertRaisesRegex(ValueError,"official pre-race"):
             hybrid.generate(self.source,real_capture,mode="replay",now=now)
 
     def test_bounded_pilot_on_locked_state_snapshot(self):
