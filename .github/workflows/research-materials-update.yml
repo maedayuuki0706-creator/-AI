@@ -11,7 +11,7 @@ permissions:
   actions: write
 concurrency:
   group: research-materials-independent-v1
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   research-materials:
     runs-on: ubuntu-latest
@@ -61,7 +61,7 @@ jobs:
           path: materials/
           retention-days: 30
       - name: Continue only this independent research process
-        if: always()
+        if: success()
         env:
           MATERIALS_ACTION_TOKEN: ${{ github.token }}
         run: |
