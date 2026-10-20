@@ -85,8 +85,9 @@ def from_frozen_official(snapshot, *, allow_missing_values=False):
     code=str(meta["jcd"]).zfill(2)
     if code not in venues.VENUES:
         raise ValueError("Not a selected four-venue research venue")
-    deadline=scenario.aware(meta["day"]+"T"+meta["deadline"]+":00+09:00" if False else
-                            f'{meta["day"][:4]}-{meta["day"][4:6]}-{meta["day"][6:8]}T{meta["deadline"]}:00+09:00')
+    deadline=scenario.aware(
+        f'{meta["day"][:4]}-{meta["day"][4:6]}-{meta["day"][6:8]}T{meta["deadline"]}:00+09:00'
+    )
     captured=scenario.aware(meta["captured_at"])
     original=deepcopy(snapshot.get("official_originals") or {})
     rh,rt,rhash=_html(original,"racelist",meta,captured,deadline)
