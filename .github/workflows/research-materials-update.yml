@@ -1,0 +1,80 @@
+name: Research materials independent updater
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/research-materials-update.yml']
+  schedule:
+    - cron: '7,27,47 23,0-9 * * *'
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: research-materials-independent-v1
+  cancel-in-progress: false
+jobs:
+  research-materials:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 1b718b8f151c3fce4d6b0f8ecb8499ae9ebce1bb
+          path: code
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /research/
+            /prediction_engine.py
+            /market_structure.py
+      - uses: actions/checkout@v4
+        with:
+          ref: research-venue-specialists-state
+          path: existing
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /data/venue_specialists_v1/
+      - uses: actions/checkout@v4
+        with:
+          ref: research-materials-state-v1
+          path: materials
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Gate independent evidence contracts
+        working-directory: code
+        run: python -m unittest research.materials_v1.test_materials -v
+      - name: Configure only the new research state
+        run: |
+          git -C materials config user.name 'github-actions[bot]'
+          git -C materials config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          echo "MATERIALS_SOURCE_SHA=$(git -C existing rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Reuse, supplement, persist and remotely confirm
+        working-directory: code
+        run: |
+          python -m research.materials_v1.worker --state "$GITHUB_WORKSPACE/materials" --reuse "$GITHUB_WORKSPACE/existing/data/venue_specialists_v1" --source-sha "$MATERIALS_SOURCE_SHA" --seconds 480 --interval 20 --publish
+      - name: Preserve recovery evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-materials-recovery-${{ github.run_id }}
+          path: materials/
+          retention-days: 30
+      - name: Continue only this independent research process
+        if: always()
+        env:
+          MATERIALS_ACTION_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          import os,json,urllib.request
+          hour=datetime.now(ZoneInfo('Asia/Tokyo')).hour
+          if 7 <= hour < 18:
+              u='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/workflows/research-materials-update.yml/dispatches'
+              q=urllib.request.Request(u,data=json.dumps({'ref':'main'}).encode(),method='POST',headers={'Authorization':'Bearer '+os.environ['MATERIALS_ACTION_TOKEN'],'Accept':'application/vnd.github+json'})
+              with urllib.request.urlopen(q,timeout=20) as response:
+                  print('Research-only continuation:',response.status)
+          else:
+              print('Outside target daytime window; scheduled backup resumes research')
+          PY
