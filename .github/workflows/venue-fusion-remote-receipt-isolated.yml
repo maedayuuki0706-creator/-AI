@@ -7,6 +7,8 @@ on:
       - 'research/venue_fusion_v1/remote_receipt.py'
       - 'research/venue_fusion_v1/independent_grade.py'
       - 'research/venue_fusion_v1/test_remote_receipt.py'
+      - 'research/venue_fusion_v1/pilot_worker.py'
+      - 'research/venue_fusion_v1/test_pilot_worker.py'
       - '.github/workflows/venue-fusion-remote-receipt-isolated.yml'
   workflow_dispatch:
 permissions:
@@ -27,10 +29,11 @@ jobs:
           python-version: '3.12'
       - name: Syntax check isolated read-only three-engine code
         run: |
-          python -m py_compile research/venue_fusion_v1/remote_receipt.py research/venue_fusion_v1/independent_grade.py
+          python -m py_compile research/venue_fusion_v1/remote_receipt.py research/venue_fusion_v1/independent_grade.py research/venue_fusion_v1/pilot_worker.py
       - name: Real local bare Git push/fetch/ancestry with synthetic race only
         run: |
           python -m unittest research.venue_fusion_v1.test_remote_receipt -v
+          python -m unittest research.venue_fusion_v1.test_pilot_worker -v
           python -m unittest research.venue_fusion_v1.test_prospective -v
       - name: Guard against production file changes on this PR
         run: |
