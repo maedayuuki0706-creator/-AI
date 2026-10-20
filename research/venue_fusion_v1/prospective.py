@@ -20,7 +20,7 @@ from research.venue_specialists_v1 import engine as venue
 from . import engine as hybrid
 from .official_program import from_frozen_official
 
-VERSION = "venue-fusion-prospective-local-v1"
+VERSION = "venue-fusion-prospective-local-v2-six-boat-audit"
 MODELS = ("official_main_core", "official_main_core_plus_yuuki",
           "official_main_core_plus_yuuki_plus_venue")
 
@@ -51,6 +51,40 @@ def build_live(snapshot: dict, *, now: str | None = None) -> dict:
     for name,card in picks.items():
         if len(card) != 10 or len(set(card)) != 10 or not set(card).issubset(scenario.COMBINATIONS):
             raise ValueError("Bad ten-combination research card: " + name)
+    # Freeze the actual PRE-RACE hypotheses as structured facts, not just the
+    # resulting 10 tickets. Otherwise a later review risks reconstructing
+    # different tactics with today's code/model after observing the result.
+    if len(new_yuuki.get("lanes") or []) != 6:
+        raise ValueError("The research card must freeze all six boats' win/loss hypotheses")
+    scenario_audit = []
+    for boat in sorted(new_yuuki["lanes"], key=lambda row: row["lane"]):
+        if not boat.get("win_paths") or not boat.get("loss_paths") or not boat.get("hypotheses"):
+            raise ValueError("Incomplete six-boat tactical paths")
+        scenario_audit.append({
+            "lane":boat["lane"],"predicted_course":boat["predicted_course"],
+            "racer_id":boat.get("racer_id"),"name":boat.get("name"),
+            "missing_pre_race_features":boat.get("missing_fields") or [],
+            "win_paths":boat["win_paths"],"loss_paths":boat["loss_paths"],
+            "hypotheses":[{
+                "id":h["id"],"tactic":h["tactic"],
+                "attack_origin_lane":h.get("attack_origin_lane"),
+                "supported_pre_race_observations":h.get("supported_observations",0),
+                "formations":[f["combination"] for f in h["formations"]]
+            } for h in boat["hypotheses"]],
+        })
+    all_120 = [{"rank":i,"combination":row["combination"],
+                "main_uncalibrated_strength":round(float(row["main_probability"]),12)}
+               for i,row in enumerate(ranked,1)]
+    if len(all_120)!=120 or set(x["combination"] for x in all_120)!=scenario.COMBINATIONS:
+        raise ValueError("Main-core all 120 predictions were not frozen")
+    original=set(picks["official_main_core"])
+    yuuki=set(picks["official_main_core_plus_yuuki"])
+    coverage={
+        "main_yuuki_shared":len(original&yuuki),
+        "main_only":sorted(original-yuuki),
+        "yuuki_only":sorted(yuuki-original),
+        "all_three_same":len({tuple(c) for c in picks.values()})==1,
+    }
     meta = snapshot["meta"]
     rid = f'{meta["day"]}_{str(meta["jcd"]).zfill(2)}_{int(meta["rno"]):02d}'
     payload = {
@@ -72,6 +106,14 @@ def build_live(snapshot: dict, *, now: str | None = None) -> dict:
         "venue_digest": specialist["digest"],
         "venue_adjustment_validated": bool(active),
         "model_cards": picks,
+        "card_comparison":coverage,
+        "main_core_120_rank":all_120,
+        "main_core_boat_score_components":core.get("boats",[]),
+        "main_core_race_shape":core.get("race_shape"),
+        "scenario_formation_candidates":new_yuuki["formation_candidates"],
+        "scenario_all_six":scenario_audit,
+        "scenario_mechanism_verified":False,
+        "venue_lane_pre_race_observations":specialist["lane_audits"],
         "per_ticket_stake_yen": 100, "ticket_count": 10,
         "status": "local_frozen_unconfirmed",
         "git_remote_receipt_confirmed": False,
