@@ -237,7 +237,11 @@ def load_foot(root, snapshot, *, mode, at):
     if mode == "live" and not before:
         return {"status": "excluded", "reason": "Foot record received after deadline",
                 "observed_at": observed.isoformat(), "sha256": acq["sha256"]}
+    if mode == 'live' and (scenario.aware(at) - observed).total_seconds() > 180:
+        return {'status': 'stale_excluded', 'reason': 'Measurement observation older than three minutes',
+                'observed_at': observed.isoformat(), 'sha256': acq['sha256']}
     return {"status": "joined", "rows": rows, "source_url": acq["url"],
+            "raw_path": acq['raw_path'],
             "sha256": acq["sha256"], "observed_at": observed.isoformat(),
             "available_before_deadline": before,
             "measurement_diagram_url": doc.get("measurement_diagram_url"),
@@ -348,6 +352,7 @@ def build(snapshot, materials, *, state_root=None, mode="replay", now=None):
               "material_sources": materials.sources, "environment": deepcopy(snapshot.get("environment", {})),
               "foot_provenance": {k: v for k, v in foot.items() if k != "rows"},
               "model_cards": cards, "primary_card": primary, "card_changes": changes,
+              "profile_baseline_ranking": [r['combination'] for r in rankings['acquired_course_profiles']],
               "all_six": all_six, "ticket_count": 10, "per_ticket_stake_yen": 100,
               "result_accessed": False, "count_as_prospective": False,
               "remote_receipt_confirmed": False, "production_main_parity": False,
@@ -363,14 +368,19 @@ def build(snapshot, materials, *, state_root=None, mode="replay", now=None):
                               "Same-race foot timing ranks do not prove actual attacks or calibrated probabilities",
                               "Current motor period, comments and tide need separate source matching before scoring",
                               "Live records need an independently confirmed predeadline remote receipt"]}
-    output["digest"] = scenario.digest(output)
+    from .context import enrich
+    output = enrich(output, snapshot, materials, root=state_root)
+    if mode == 'live':
+        output['limitations'] = [v for v in output['limitations'] if not v.startswith('Replay is generated')]
+        output['digest'] = scenario.digest({k: v for k, v in output.items() if k != 'digest'})
     return output
 
 
 def markdown(record):
     lines = [f'# 研究材料を使った6艇検討：{record["race_id"]}', '',
              f'生成区分：{record["status"]}。生成時刻：{record["assembled_at"]}。',
-             '現在の研究処理で再構成した資料。締切前予想の実績には含めない。', '',
+             ('締切前の研究原本。実績算入は別ファイルのリモート保存確認と結果レビュー後。'
+              if record['status'] == 'live_uncheckpointed' else '現在の研究処理で再構成した資料。締切前予想の実績には含めない。'), '',
              '| 艇 | 選手 | 履歴の母数 | 直線順位 | 回り足順位 | 主な勝ち筋 | 主な負け筋 |',
              '|---|---|---:|---:|---:|---|---|']
     for b in record['all_six']:

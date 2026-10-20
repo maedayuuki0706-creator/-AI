@@ -29,7 +29,7 @@ def snapshot():
             'boats': boats, 'environment': {'wind_speed': 3.0, 'wave_cm': 2.0}}
 
 
-def fixtures(root, *, observation='2026-10-21T16:10:00+09:00'):
+def fixtures(root, *, observation='2026-10-21T16:14:00+09:00'):
     (root / 'derived').mkdir()
     profiles = []
     histories = []

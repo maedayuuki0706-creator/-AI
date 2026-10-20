@@ -14,12 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Verify only isolated research files changed
         run: |
+          git fetch --no-tags --depth=1 origin e9b4a6c278ea56af24ce340930f1856b794bdcb6
           python - <<'PY'
           import subprocess
           files = subprocess.check_output(['git','diff','--name-only','e9b4a6c278ea56af24ce340930f1856b794bdcb6','HEAD'], text=True).splitlines()
@@ -27,4 +28,4 @@ jobs:
           print('Isolated files:', len(files))
           PY
       - name: Run data-use contracts and existing regression tests
-        run: python -m unittest research.materials_application_v1.test_application research.materials_v1.test_materials research.venue_fusion_v1.test_engine research.venue_fusion_v1.test_prospective -v
+        run: python -m unittest research.materials_application_v1.test_application research.materials_application_v1.test_live research.materials_v1.test_materials research.venue_fusion_v1.test_engine research.venue_fusion_v1.test_prospective -v
