@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 1b718b8f151c3fce4d6b0f8ecb8499ae9ebce1bb
+          ref: d5cc5e3d5df364d3b92cef109499dc66cce0c757
           path: code
           sparse-checkout-cone-mode: false
           sparse-checkout: |
@@ -52,7 +52,7 @@ jobs:
       - name: Reuse, supplement, persist and remotely confirm
         working-directory: code
         run: |
-          python -m research.materials_v1.worker --state "$GITHUB_WORKSPACE/materials" --reuse "$GITHUB_WORKSPACE/existing/data/venue_specialists_v1" --source-sha "$MATERIALS_SOURCE_SHA" --seconds 480 --interval 20 --publish
+          python -m research.materials_v1.worker --state "$GITHUB_WORKSPACE/materials" --reuse "$GITHUB_WORKSPACE/existing/data/venue_specialists_v1" --source-sha "$MATERIALS_SOURCE_SHA" --seconds 60 --interval 20 --publish
       - name: Preserve recovery evidence
         if: failure()
         uses: actions/upload-artifact@v4
