@@ -69,8 +69,19 @@ class ProspectiveGateTests(TestCase):
                                "official_pages":{"racelist":{"sha256":"b"*64},
                                                  "beforeinfo":{"sha256":"c"*64}}},
                        "limitations":["missing historical profiles"]}
-        fake_yuuki={"digest":"y"*64}
-        fake_venue={"digest":"v"*64,"lane_audits":[]}
+        fake_yuuki={"digest":"y"*64,
+            "formation_candidates":combos[:18],
+            "lanes":[{"lane":i,"predicted_course":i,
+                      "racer_id":str(5000+i),"name":"研究用",
+                      "win_paths":["planned attack or escape"],
+                      "loss_paths":["possible response from opponent"],
+                      "hypotheses":[{"id":f"h{i}","tactic":"逃げ" if i==1 else "差し",
+                                     "attack_origin_lane":None,
+                                     "supported_observations":0,
+                                     "formations":[{"combination":combos[i-1]}]}]}
+                     for i in range(1,7)]}
+        fake_venue={"digest":"v"*64,
+                    "lane_audits":[{"lane":i,"score":0.0} for i in range(1,7)]}
         with mock.patch.object(p,"from_frozen_official",return_value=fake_original),\
              mock.patch.object(p,"analyze_race",return_value=main),\
              mock.patch.object(p.hybrid,"_build_with_ranking",return_value=fake_yuuki),\
@@ -80,6 +91,14 @@ class ProspectiveGateTests(TestCase):
             r=p.build_live(s,now="2026-10-21T11:50:00+09:00")
         self.assertEqual(len(r["model_cards"]),3)
         self.assertTrue(all(len(c)==10 for c in r["model_cards"].values()))
+        self.assertEqual(len(r["scenario_all_six"]),6)
+        self.assertEqual(len(r["main_core_120_rank"]),120)
+        self.assertEqual(len(set(row["combination"] for row in r["main_core_120_rank"])),120)
+        self.assertFalse(r["scenario_mechanism_verified"])
+        self.assertTrue(r["card_comparison"]["all_three_same"])
+        self.assertEqual(r["card_comparison"]["main_yuuki_shared"],10)
+        self.assertEqual(len(r["venue_lane_pre_race_observations"]),6)
+        self.assertTrue(all(x["win_paths"] and x["loss_paths"] for x in r["scenario_all_six"]))
         self.assertFalse(r["git_remote_receipt_confirmed"])
         self.assertFalse(r["count_as_prospective"])
         self.assertFalse(r["main_full_delivery_parity"])
