@@ -3,7 +3,7 @@ import json
 P=Path(__file__).resolve().parent/'review'
 s=json.loads((P/'summary.json').read_text());rs=json.loads((P/'review_cases.json').read_text())
 root='https://github.com/maedayuuki0706-creator/-AI/blob/research/manshu-review-20261020/reviews/manshu/20261020/'
-headers=['日付','場','R','レースキー','確定3連単','払戻(円/100円)','人気','決まり手','事後の事故等','事前保存の確認','締切前版の保存時刻','展示掲載風(m)','展示掲載波(cm)','1号艇展示順位','1号艇全国勝率','勝者展示順位','分析区分','事前の材料','事後専用の確認','今回の確認時刻','公式結果URL','原本・記録参照']
+headers=['日付','場','R','レースキー','確定3連単','払戻(円/100円)','人気','決まり手','事後の事故等','事前保存の確認','締切前版の保存時刻','展示掲載風(m/s)','展示掲載波(cm)','1号艇展示順位','1号艇全国勝率','勝者展示順位','分析区分','事前の材料','事後専用の確認','今回の確認時刻','公式結果URL','原本・記録参照']
 rows=[headers]
 for r in sorted([x for x in rs if x['payout']>=10000],key=lambda x:x['payout'],reverse=True):
  b={z['lane']:z for z in r['prerace_display']['boats']};winner=int(r['trifecta'][0]);p=r.get('verified_prerace_version',{});e=r['prerace_display']['environment'];v=r['review']
