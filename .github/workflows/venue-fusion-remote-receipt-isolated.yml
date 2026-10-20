@@ -1,0 +1,38 @@
+name: Fusion prospective Git receipt and independent grading - isolated tests
+on:
+  push:
+    branches:
+      - research/venue-fusion-remote-receipt-20261020
+    paths:
+      - 'research/venue_fusion_v1/remote_receipt.py'
+      - 'research/venue_fusion_v1/independent_grade.py'
+      - 'research/venue_fusion_v1/test_remote_receipt.py'
+      - '.github/workflows/venue-fusion-remote-receipt-isolated.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: four-venue-fusion-receipt-tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  simulate-immutable-receipt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax check isolated read-only three-engine code
+        run: |
+          python -m py_compile research/venue_fusion_v1/remote_receipt.py research/venue_fusion_v1/independent_grade.py
+      - name: Real local bare Git push/fetch/ancestry with synthetic race only
+        run: |
+          python -m unittest research.venue_fusion_v1.test_remote_receipt -v
+          python -m unittest research.venue_fusion_v1.test_prospective -v
+      - name: Guard against production file changes on this PR
+        run: |
+          git diff --name-only HEAD~3..HEAD || true
+          echo "Isolated tests have no real GitHub write token, official race fetching, result scraping, or Discord/X side effects."
