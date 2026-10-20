@@ -1,0 +1,428 @@
+{
+  "created_at": "2026-10-19",
+  "default_status": "article_inspired_unvalidated",
+  "goal": "Separate sourced knowledge from measured evidence and validated predictive effects",
+  "hypotheses": [
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "month",
+        "race_grade",
+        "racer_strength",
+        "course",
+        "day"
+      ],
+      "exclusion_notes": "潮位推定を実測潮流の方向と扱わない。風向アイコンを未確認のまま方位に変換しない。",
+      "id": "edogawa-tide-wind-interaction",
+      "jcd": "03",
+      "predictive_weight": 0,
+      "priority": "high",
+      "proposition": "同じ風速でも上げ潮と下げ潮、風向・波高の組合せでコース別頭率・相手連動が変化するか",
+      "required_fields": [
+        "official_deadline_at",
+        "official_actual_entrance",
+        "start_at",
+        "measured_tide_phase",
+        "wind_direction_compass",
+        "wind_mps",
+        "wave_cm",
+        "official_trifecta"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "edogawa-national-overview",
+        "edogawa-official-2023-feature"
+      ],
+      "target_measures": [
+        "course_win_rate",
+        "second_third_conditional",
+        "miss_generation_rate"
+      ],
+      "testing_plan": "まず水面別観測点と計時をそろえ、開催日単位で時系列外分割。強風の小標本を一括で使わず、弱風との比較と風向別の信頼区間を算出。",
+      "title": "潮流位相×風向×波高の交互作用"
+    },
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "racer_class",
+        "course",
+        "motor_period",
+        "race_grade"
+      ],
+      "exclusion_notes": "経験=波乗り巧者と即断しない。公式6艇着順未回収の場合は保留。",
+      "id": "edogawa-expert-vs-general",
+      "jcd": "03",
+      "predictive_weight": 0,
+      "priority": "medium",
+      "proposition": "河川の波に対して当地出走経験が多い選手ほど同じ級別/コースで上位残りを示すか",
+      "required_fields": [
+        "racer_id",
+        "venue_starts_asof",
+        "lane",
+        "course",
+        "racer_class",
+        "wave_cm",
+        "official_finish_six",
+        "wind_direction_compass"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "edogawa-national-overview"
+      ],
+      "target_measures": [
+        "conditional_top3_rate",
+        "finish_residual_by_surface"
+      ],
+      "testing_plan": "当地経験数と選手の全体能力を分離し、経験数の過少標本を除外し、時系列外に6艇の残り目を比較。",
+      "title": "荒れ水面での当地経験と3着残り"
+    },
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "wind",
+        "venue_course_prior",
+        "race_class"
+      ],
+      "exclusion_notes": "本番STを予想特徴に使わない。",
+      "id": "edogawa-start-formation",
+      "jcd": "03",
+      "predictive_weight": 0,
+      "priority": "high",
+      "proposition": "事前の平均ST差や展示隊形が、通常の頭予測では拾えない2・3着連動を説明するか",
+      "required_fields": [
+        "pre_race_avg_st",
+        "exhibition_start_position",
+        "official_entry_course",
+        "actual_start_timing_for_review",
+        "official_finish_six"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "edogawa-national-overview"
+      ],
+      "target_measures": [
+        "paired_card_logloss",
+        "conditional_second_third_hit"
+      ],
+      "testing_plan": "締切前データのみで候補を生成し、実STと1Mを事後ラベルとして照合。展示STと本番STの低相関を仮定し過信を防ぐ。",
+      "title": "風とスタート隊形から2着・3着を再評価"
+    },
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "racer_class",
+        "motor_period",
+        "racer_strength",
+        "race_grade"
+      ],
+      "exclusion_notes": "推定潮位だけで『まくり流れ』を確定しない。勝利決まり手と実際の全艇攻防は同一視しない。",
+      "id": "kojima-tide-tailwind",
+      "jcd": "16",
+      "predictive_weight": 0,
+      "priority": "high",
+      "proposition": "潮位の高低と追い風が重なる条件で、差し/逃げと2・3着の残り構成が変化するか",
+      "required_fields": [
+        "measured_tide_height_at_race",
+        "observation_station",
+        "official_start_at",
+        "wind_direction_compass",
+        "wind_mps",
+        "official_winning_method",
+        "official_trifecta"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "kojima-water",
+        "kojima-national-overview",
+        "kojima-older-explainer"
+      ],
+      "target_measures": [
+        "course_win_rate",
+        "winning_method_rate",
+        "second_third_conditional"
+      ],
+      "testing_plan": "満潮/干潮を観測点と時刻から計算し、同開催場の潮位閾値を学習期間で固定。追い風と他風の交互作用を開催節外で検証。",
+      "title": "満潮×追い風時の差し・内残り"
+    },
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "wind_mps",
+        "race_grade",
+        "motor_era"
+      ],
+      "exclusion_notes": "モーター2連対率をそのまま伸び足と解釈しない。",
+      "id": "kojima-ebb-speed",
+      "jcd": "16",
+      "predictive_weight": 0,
+      "priority": "medium",
+      "proposition": "干潮の比較的平穏な水面で伸び足良好艇のセンター/外攻めがどの程度増えるか",
+      "required_fields": [
+        "verified_low_tide",
+        "straight_time",
+        "turn_time",
+        "entry_course",
+        "official_finish_six",
+        "racer_grade"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "kojima-water",
+        "kojima-older-explainer"
+      ],
+      "target_measures": [
+        "outside_course_win_rate",
+        "head_to_second_third_transition"
+      ],
+      "testing_plan": "同モーター期間に限定して展示足の観測時間を合わせ、3〜6コース着順の変化を時系列外比較。",
+      "title": "干潮での外攻めと伸び・回り足"
+    },
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "racer_strength",
+        "motor_era",
+        "wind"
+      ],
+      "exclusion_notes": "公式解説は一般論であり、5が6より常に強いとはしない。",
+      "id": "kojima-course-five",
+      "jcd": "16",
+      "predictive_weight": 0,
+      "priority": "low",
+      "proposition": "5コースと6コースの助走条件の違いが出足・ダッシュ・進入実績とどのように相関するか",
+      "required_fields": [
+        "actual_entry_course",
+        "racer_id",
+        "pre_race_dash_setup",
+        "exhibition_straight_time",
+        "official_finish_six"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "kojima-water"
+      ],
+      "target_measures": [
+        "fifth_versus_sixth_conditioned_finish",
+        "course_acquisition"
+      ],
+      "testing_plan": "5/6コースの選手・モーター力量を揃えて、3着以内率と攻め形の差をテスト。",
+      "title": "5コースの助走・伸びの相対的有利"
+    },
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "race_grade",
+        "racer_strength",
+        "race_time"
+      ],
+      "exclusion_notes": "切替日前の古いコース率を無調整で現在の唐津の係数に適用しない。",
+      "id": "karatsu-pit-change",
+      "jcd": "23",
+      "predictive_weight": 0,
+      "priority": "critical",
+      "proposition": "ピット位置変更により進入変化率と内・外コースの取得構成が変化したか",
+      "required_fields": [
+        "race_date",
+        "pit_location_regime",
+        "official_exhibition_course",
+        "official_actual_course",
+        "class",
+        "racer_id"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "karatsu-water-2025"
+      ],
+      "target_measures": [
+        "entry_change_rate",
+        "course_acquisition",
+        "race_shape"
+      ],
+      "testing_plan": "2025年12月を移行期間として暫定隔離し、2025/11以前と2026/01以降を個別に比較。公式の正確な切替日が見つかった時だけ境界を更新する。",
+      "title": "2025年12月ピット位置変更を学習上の断絶として扱う"
+    },
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "race_grade",
+        "first_pit_change_regime",
+        "racer_strength"
+      ],
+      "exclusion_notes": "唐津の潮位条件は入力・重みに入れない。",
+      "id": "karatsu-wind-shift",
+      "jcd": "23",
+      "predictive_weight": 0,
+      "priority": "high",
+      "proposition": "午前の向かい風から午後の追い風への転換がコース別1着・2着連動に影響するか",
+      "required_fields": [
+        "race_time",
+        "observed_wind_compass",
+        "wind_mps",
+        "venue_axis",
+        "official_result"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "karatsu-water-2025",
+        "karatsu-national-overview"
+      ],
+      "target_measures": [
+        "wind_signed_by_race_hour",
+        "course_win_rate",
+        "second_third_transition"
+      ],
+      "testing_plan": "時刻帯だけで風向を代用せず公式実観測風向を使って条件分岐し、季節ごとのサンプル不足を確認。",
+      "title": "モーニングから午後への風変化"
+    },
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "wind",
+        "race_grade",
+        "post_pit_change_only"
+      ],
+      "exclusion_notes": "『地元が得意』を勝率への自動加点にしない。",
+      "id": "karatsu-local-motor",
+      "jcd": "23",
+      "predictive_weight": 0,
+      "priority": "medium",
+      "proposition": "同程度の選手級別・モーター機歴でも当地経験とピット離れ関連の展開が違うか",
+      "required_fields": [
+        "racer_local_affiliation",
+        "racer_class",
+        "motor_id_period",
+        "motor_starts",
+        "official_entry_course",
+        "exhibition_pit_out",
+        "six_boat_result"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "karatsu-water-2025"
+      ],
+      "target_measures": [
+        "entry_course_residual",
+        "second_third_conditional"
+      ],
+      "testing_plan": "2026年からの現行ピット仕様に固定し、地元/非地元を比較し選手強度を統制。",
+      "title": "地元選手とピット離れ・モーター調整"
+    },
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "season",
+        "grade",
+        "racer_strength"
+      ],
+      "exclusion_notes": "広い水面=常に外有利と決めつけない。",
+      "id": "hamanako-wind-season",
+      "jcd": "06",
+      "predictive_weight": 0,
+      "priority": "high",
+      "proposition": "冬の追い風・夏の向かい風の違いでセンター／外からのまくり差し残りが変わるか",
+      "required_fields": [
+        "observed_wind_compass",
+        "wind_mps",
+        "wave_cm",
+        "official_method",
+        "official_trifecta",
+        "race_at"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "hamanako-water",
+        "hamanako-national-overview"
+      ],
+      "target_measures": [
+        "outside_course_win_rate",
+        "winning_method_rate",
+        "second_third_conditional"
+      ],
+      "testing_plan": "暦の季節を風向代わりにはせず、実測風向を用い開催節で時系列外検証。",
+      "title": "季節ごとの風向・波高とまくり差し"
+    },
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "racer_strength",
+        "course",
+        "event_grade"
+      ],
+      "exclusion_notes": "新しいモーターでも抽選時の未知の調整・整備差を勝ち筋へ断定しない。",
+      "id": "hamanako-motor-era",
+      "jcd": "06",
+      "predictive_weight": 0,
+      "priority": "critical",
+      "proposition": "現行モーターの使用期間に限定した足データの方が、旧世代混合集計より検証に適するか",
+      "required_fields": [
+        "motor_number",
+        "motor_usage_start",
+        "race_date",
+        "motor_starts",
+        "current_motor_2ren",
+        "official_results"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "hamanako-motor-202604"
+      ],
+      "target_measures": [
+        "motor_period_consistency",
+        "out_of_time_reliability",
+        "win_rate_by_motor_run"
+      ],
+      "testing_plan": "2026-04-09以降のモーターを別キーで正規化。使用開始日前のモーター番号一致は別個体として分離。",
+      "title": "2026年4月9日開始のモーター世代を識別"
+    },
+    {
+      "auto_promote": false,
+      "conditioning": [
+        "wind",
+        "racer_strength",
+        "race_grade"
+      ],
+      "exclusion_notes": "公式の決まり手だけで1マークの全艇挙動を自動断定しない。",
+      "id": "hamanako-outside-counter",
+      "jcd": "06",
+      "predictive_weight": 0,
+      "priority": "high",
+      "proposition": "外攻めを予想した時に、内側の差し残りや3着入線の順序をモデル化できるか",
+      "required_fields": [
+        "six_boat_official_finish",
+        "entry_course",
+        "official_method",
+        "video_one_mark_annotation",
+        "pre_race_motor_grades"
+      ],
+      "review_status": "article_inspired_unvalidated",
+      "source_history_before_observation_verified": false,
+      "source_ids": [
+        "hamanako-water"
+      ],
+      "target_measures": [
+        "head_given_tactic_second_third",
+        "scenario_outcome_consistency"
+      ],
+      "testing_plan": "全6艇の勝ち筋・負け筋を予想前に固定し、事後映像レビューで攻撃起点/抵抗/流れ/差し残りを独立に付与。",
+      "title": "まくり差しと内側の抵抗・2着3着連動"
+    }
+  ],
+  "schema": "venue-hypothesis-lab-v1",
+  "validation_policy": {
+    "comparison": "temporal_holdout_by_event_day",
+    "min_races_per_condition": 200,
+    "sample_notes": "200 is a gate to consider testing, not proof of lift",
+    "zero_weight_until_passed": true
+  }
+}
