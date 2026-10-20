@@ -61,7 +61,7 @@ class ProspectiveGateTests(TestCase):
         s=self.sample()
         combos=sorted(scenario.COMBINATIONS)
         main={"model_version":hybrid.EXPECTED_MAIN_VERSION,
-              "trifecta":[{"combination":v,"probability":(121-i)/7260}
+              "trifecta":[{"combination":v,"probability":(120-i)/7260}
                           for i,v in enumerate(combos)]}
         fake_original={"payload":{"race":{"venue":"浜名湖"},"boats":[]},
                        "meta":{"preprocessing_level":"main_official_core_without_profile_form_odds",
