@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 import json
 from pathlib import Path
 import re
+import subprocess
 
 from research.scenario_v2 import engine as scenario
 from . import prospective
@@ -68,8 +69,13 @@ def verify_original(input_file, source_root):
     original_sha=proof.get("commit_sha","")
     if not re.fullmatch(r"[a-f0-9]{40}",str(original_sha)):
         raise ValueError("Original remote commit SHA missing")
-    # The old origin is read-only. Require original SHA to be on its history.
-    remote._run(source_root,"merge-base","--is-ancestor",original_sha,"HEAD")
+    # Read-only fetch of one original remote commit when checkout is shallow.
+    # Receipt belongs to the latest source branch checked out by the workflow;
+    # the original SHA must still be fetchable from the same remote repository.
+    try:
+        remote._run(source_root,"cat-file","-e",original_sha+"^{commit}")
+    except subprocess.CalledProcessError:
+        remote._run(source_root,"fetch","--no-tags","--depth=1","origin",original_sha)
     prior_path=str(proof.get("forecast_path") or "")
     prior_input=str(proof.get("input_path") or "")
     expected_forecast=f"{ORIG_PREFIX}/forecasts/{meta['day']}/{rid}.json"
@@ -77,11 +83,9 @@ def verify_original(input_file, source_root):
         raise ValueError("Existing remote original receipt paths differ")
     old_bytes=remote._run(source_root,"show",f"{original_sha}:{prior_path}",binary=True)
     old_object=json.loads(old_bytes)
-    if old_object.get("digest")!=forecast["digest"] or scenario.digest(old_object)!=forecast["digest"]:
-        # note: digest(object) including digest is not equal to signed digest.
-        if old_object.get("digest")!=forecast["digest"] or scenario.digest({
-            k:v for k,v in old_object.items() if k!="digest"})!=forecast["digest"]:
-            raise ValueError("Original specialist remote Git forecast differs")
+    if old_object.get("digest")!=forecast["digest"] or scenario.digest({
+        k:v for k,v in old_object.items() if k!="digest"})!=forecast["digest"]:
+        raise ValueError("Original specialist remote Git forecast differs")
     input_bytes=remote._run(source_root,"show",f"{original_sha}:{prior_input}",binary=True)
     if scenario.digest(json.loads(input_bytes))!=proof["snapshot_digest"]:
         raise ValueError("Original specialist input not in the original remote commit")
@@ -113,7 +117,8 @@ def scan_inputs(source_root,now=None):
     return [p for _,p in sorted(metadata)]
 
 
-def process(source_root, target_root, scratch, *, clock=None, max_races=2, publish=False):
+def process(source_root, target_root, scratch, *, clock=None, max_races=2,
+            publish=False, allow_local_origin_for_tests=False):
     """Short one-shot scan. Never reconnect to official servers or replay yesterday."""
     clock=clock or remote.now_jst
     if max_races<1 or max_races>12:
@@ -129,7 +134,7 @@ def process(source_root, target_root, scratch, *, clock=None, max_races=2, publi
     if current_branch!=ORIG_SOURCE_BRANCH:
         raise ValueError("Original research source checkout must have its own branch")
     if publish:
-        remote._assert_worktree(target_root)
+        remote._assert_worktree(target_root,allow_local_origin_for_tests=allow_local_origin_for_tests)
     attempts=0
     out={"version":VERSION,"research_only":True,
          "day":today.strftime("%Y%m%d"),"checked_at":today.isoformat(),
@@ -166,7 +171,8 @@ def process(source_root, target_root, scratch, *, clock=None, max_races=2, publi
                     "new_fusion_card_digest":card["digest"],
                     "remote_received":False})
             else:
-                receipt=remote.publish(card,target_root,clock=clock)
+                receipt=remote.publish(card,target_root,clock=clock,
+                                       allow_local_origin_for_tests=allow_local_origin_for_tests)
                 out["published"].append({
                     "race_id":rid,"existing_specialist_commit_sha":old["source_receipt_commit_sha"],
                     "new_fusion_card_digest":card["digest"],
@@ -175,11 +181,14 @@ def process(source_root, target_root, scratch, *, clock=None, max_races=2, publi
                     "note":"Runner clock remote receipt only; requires independent official result grading"})
             attempts+=1
         except (ValueError,KeyError,TypeError,FileNotFoundError,RuntimeError,OSError,
-                __import__("subprocess").CalledProcessError) as exc:
+                subprocess.CalledProcessError) as exc:
             # A fatal publisher error may leave one immutable remote forecast
             # without a receipt. Report, retain local evidence; NEVER backfill.
             out["skipped"].append({"race_id":id_from_file,"reason":type(exc).__name__,
                                     "detail":str(exc)[:250]})
+            if publish and isinstance(exc,(subprocess.CalledProcessError,RuntimeError,OSError)):
+                # Unknown remote commit status: do not attempt another write.
+                break
     scratch.mkdir(parents=True,exist_ok=True)
     (scratch/"pilot_status.json").write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     return out
