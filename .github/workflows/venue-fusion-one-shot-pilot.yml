@@ -1,0 +1,87 @@
+name: Fusion research one-shot pilot - existing predeadline originals only
+on:
+  push:
+    branches:
+      - research/venue-fusion-remote-receipt-20261020
+    paths:
+      - '.github/workflows/venue-fusion-one-shot-pilot.yml'
+permissions:
+  contents: write
+concurrency:
+  group: isolated-research-venue-fusion-one-shot
+  cancel-in-progress: false
+jobs:
+  run-one-shot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Checkout only new fusion research code
+        uses: actions/checkout@v4
+        with:
+          path: code
+          persist-credentials: false
+      - name: Read only existing four-venue specialist received originals
+        uses: actions/checkout@v4
+        with:
+          ref: research-venue-specialists-state
+          path: original
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Checkout isolated fusion research state, never main
+        uses: actions/checkout@v4
+        with:
+          ref: research-venue-fusion-forward-state
+          path: fusion_state
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Prepare two isolated branch worktrees
+        run: |
+          git -C original switch -C research-venue-specialists-state
+          git -C fusion_state switch -C research-venue-fusion-forward-state
+          git -C fusion_state config user.name 'github-actions[bot]'
+          git -C fusion_state config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          test "$(git -C original branch --show-current)" = research-venue-specialists-state
+          test "$(git -C fusion_state branch --show-current)" = research-venue-fusion-forward-state
+          echo "Existing originals source: $(git -C original rev-parse HEAD)"
+          echo "Fusion only state: $(git -C fusion_state rev-parse HEAD)"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require all previous local-git and live-timing safety tests
+        working-directory: code
+        run: |
+          python -m unittest research.venue_fusion_v1.test_remote_receipt research.venue_fusion_v1.test_pilot_worker research.venue_fusion_v1.test_prospective -q
+      - name: Publish at most two genuinely on-time new research cards
+        working-directory: code
+        env:
+          TZ: Asia/Tokyo
+        run: |
+          python -m research.venue_fusion_v1.pilot_worker \
+            --source ../original \
+            --state ../fusion_state \
+            --scratch ../pilot_evidence \
+            --max-races 2 --publish
+      - name: Fail visibly on a possible partial remote write
+        working-directory: code
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          path=pathlib.Path("../pilot_evidence/pilot_status.json")
+          if not path.exists():
+              raise SystemExit("Research pilot did not produce a status file")
+          report=json.loads(path.read_text(encoding="utf-8"))
+          print("REAL_REMOTE_FUSION_CARDS:",len(report["published"]))
+          print("NO_MAIN_OR_EXISTING_AI_WRITES; RESEARCH_STATE_ONLY")
+          errors=[e for e in report["skipped"] if e["reason"] in ("CalledProcessError","RuntimeError","OSError")]
+          if errors:
+              print("Publisher errors (some forecasts may exist without receipts):",errors)
+              raise SystemExit(1)
+          PY
+      - name: Save failure diagnostic / immutable local research evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-fusion-forward-pilot-${{ github.run_id }}
+          path: pilot_evidence/
+          retention-days: 30
+          if-no-files-found: warn
