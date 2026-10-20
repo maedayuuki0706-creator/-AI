@@ -2,7 +2,7 @@ import json,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 from datetime import datetime
-from .collector import Store,once,encode,parse_odds,capture,JST
+from .collector import Store,once,encode,parse_odds,capture,JST,result_environment
 from .supplement import tides,karatsu_foot
 
 class EvidenceTests(unittest.TestCase):
@@ -37,5 +37,8 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):parse_odds('<html>not published</html>')
     def test_incomplete_foot_is_unknown(self):
         with self.assertRaises(ValueError):karatsu_foot('<html>not published</html>')
+    def test_result_weather_never_renames_actual_start_as_exhibition(self):
+        r=result_environment('<html><span class="table1_boatImage1Number">1</span><span class="table1_boatImage1Time">.12</span></html>')
+        self.assertNotIn('boats',r);self.assertNotIn('exhibition_st',r);self.assertNotIn('entry_observed',r)
 
 if __name__=='__main__':unittest.main()

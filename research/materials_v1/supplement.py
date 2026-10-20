@@ -79,7 +79,38 @@ def refresh_daily(store):
             entry['status']='waiting_publication' if '次節開催までしばらくお待ちください' in body else 'raw_saved_requires_series_identity'
             entry['missing_reason']='current table not published' if entry['status']=='waiting_publication' else 'must match series, racer and motor before joining'
         store.record('preinspection_checks',day+'_'+key,entry);result.append(entry)
+    # Annual predictions are immutable source versions. Reuse the acquired
+    # current-year files rather than collecting the same 26,280 heights again.
+    for station in ('TK','UN','MI'):
+        year=now().year;destination=store.root/'tide_predictions'/f'{station}_{year}.json.gz.b64'
+        if destination.exists():continue
+        u=f'https://www.data.jma.go.jp/kaiyou/data/db/tide/suisan/txt/{year}/{station}.txt'
+        doc=store.get(u,ttl=86400)
+        if doc['status']=='ok':
+            import base64
+            h,e=tides(store.body(doc),station)
+            once(destination,base64.b64encode(gzip.compress(encode({'acquisition':doc,'hourly':h,'events':e,'station_proxy':True,'current_velocity':False,'usage':'acquired now; no historical predeadline receipt'}),mtime=0)))
     return result
+
+def collect_live_karatsu(store,snapshot):
+    m=snapshot['meta'];key=f"{m['day']}_23_{int(m['rno']):02}"
+    if m['jcd']!='23':return None
+    source=f"https://www.boatrace-karatsu.jp/sp/index.php?page=yosou-cyokuzen&race={int(m['rno'])}"
+    doc=store.get(source,ttl=60);record={'race_id':key,'acquisition':doc,'status':'missing','published_at':None}
+    try:
+        if doc['status']!='ok':raise ValueError(doc.get('missing_reason'))
+        raw=store.body(doc);values=karatsu_foot(raw);text=re.sub(r'\s+','',parsers.textify(raw))
+        date=f"{m['day'][:4]}/{m['day'][4:6]}/{m['day'][6:8]}"
+        if date not in raw:raise ValueError('Current-day source identity not printed; retain raw, do not join')
+        by={int(x['lane']):x for x in snapshot['boats']}
+        for b in values:
+            old=by[b['lane']]
+            if re.sub(r'\s+','',old['name']) not in text:raise ValueError('Current racer name mismatch')
+            if b['exhibition_time'] is None or abs(b['exhibition_time']-old['exhibition_time'])>.011:raise ValueError('Exhibition time mismatch with official current-race original')
+            b.update(racer_id=old['racer_id'],motor_number=old['motor_number'],motor_cycle_id=None,motor_cycle_missing_reason='latest officially reviewed cycle not yet joined')
+        record.update(status='ok',rows=values,usage='predeadline_measurement_research_only',measurement_diagram_url='https://www.boatrace-karatsu.jp/sp/page/yosou/images/img-s03-modal.png',scoring_connected=False)
+    except Exception as exc:record['missing_reason']=str(exc)
+    store.record('original_foot',key,record);return record
 
 def complete_results(store,old,day):
     result=[]
@@ -99,7 +130,7 @@ def complete_results(store,old,day):
             if any(ids[b['lane']]!=b['racer_id'] for b in details['finish']):raise ValueError('Outcome/original roster conflict')
             record={'race_id':key,'day':day,'venue_code':m['jcd'],'race_no':m['rno'],'acquisition':doc,'payout':pay,'details':details,'usage':'outcome_only','predictive_input_allowed':False}
             once(destination,encode(record))
-            store.record('result_weather',key,{'race_id':key,'acquisition':doc,'data':__import__('research.materials_v1.collector',fromlist=['preview']).preview(raw),'usage':'outcome_only'})
+            store.record('result_weather',key,{'race_id':key,'acquisition':doc,'data':__import__('research.materials_v1.collector',fromlist=['result_environment']).result_environment(raw),'phase':'result','usage':'outcome_only'})
             result.append({'race_id':key,'status':'complete','boats':6})
         except Exception as exc:result.append({'race_id':key,'status':'details_missing','missing_reason':str(exc)})
     store.record('runs','complete_results',{'checked_at':stamp(),'day':day,'records':result});return result

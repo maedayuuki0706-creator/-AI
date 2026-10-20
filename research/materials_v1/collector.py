@@ -136,6 +136,10 @@ def preview(raw):
         b['propeller_cell_status']='no_exchange_text' if not b['propeller_exchange'] else 'published_exchange'
     return p
 
+def result_environment(raw):
+    p=preview(raw)
+    return {k:p.get(k) for k in ('wind_speed','wave_cm','air_temp_c','water_temp_c','wind_direction_official_icon','source_weather_time_text')}
+
 def parse_odds(raw):
     # Official 3t layout: first-place headers 1..6, then five second-place
     # blocks, each containing four third-place rows.
@@ -235,6 +239,17 @@ def capture(store,day,code,rno,*,allow_result=True):
                 from research.venue_fusion_v1.prospective import build_live,save_local_only
                 result=build_live(snapshot)
                 once(frozen,encode(snapshot));save_local_only(result,store.root/'fusion_forecasts'/(key+'.json'))
+                # Persist all six explanations from the same pinned engines;
+                # they remain hypotheses until a separate video review.
+                from research.venue_fusion_v1.official_program import from_frozen_official
+                from research.venue_fusion_v1 import engine as hybrid
+                from prediction_engine import analyze_race
+                main=analyze_race(from_frozen_official(snapshot)['payload'])
+                lanes=hybrid._build_with_ranking(snapshot,hybrid._ordered_cards(main['trifecta']),mode='live',now=stamp())
+                once(store.root/'fusion_scenarios'/(key+'.json'),encode({'race_id':key,'input_digest':result['input_digest'],'generated_at':stamp(),'lanes':lanes['lanes'],'formations':lanes['formation_candidates'],'actual_attack_verified':False}))
+                if code=='23':
+                    from .supplement import collect_live_karatsu
+                    collect_live_karatsu(store,snapshot)
     if day==now().strftime('%Y%m%d'):
         for target in (600,300,180):
             goal=store.root/'odds_targets'/day/(key+f'_{target}.json')
@@ -264,7 +279,7 @@ def capture(store,day,code,rno,*,allow_result=True):
                 record={'race_id':key,'day':day,'venue_code':code,'race_no':rno,'acquisition':res,'payout':payout,'details':details,'usage':'outcome_only','preview_input_allowed':False}
                 store.record('result_versions',key,record)
                 if details:once(store.root/'results'/(key+'.json'),encode(record))
-                store.record('result_weather',key,{'race_id':key,'acquisition':res,'data':preview(body),'usage':'outcome_only'})
+                store.record('result_weather',key,{'race_id':key,'acquisition':res,'data':result_environment(body),'phase':'result','usage':'outcome_only'})
     return {'race_id':key,'status':'captured','remaining_seconds':round(remaining),'frozen':frozen.exists()}
 
 def grade(store):

@@ -24,10 +24,23 @@ def publish(store):
     commit=git(store.root,'rev-parse','HEAD')
     remote=git(store.root,'ls-remote','origin','refs/heads/'+STATE_BRANCH).split()[0]
     if remote!=commit:raise ValueError('Remote state commit not confirmed')
-    req=urllib.request.Request('https://api.github.com/repos/'+REPO+'/git/ref/heads/'+STATE_BRANCH,headers={'User-Agent':'BoatAI-MaterialsResearch/1.0'})
-    with urllib.request.urlopen(req,timeout=20) as response:
-        body=json.load(response);server_date=response.headers.get('Date')
-    if body['object']['sha']!=commit or not server_date:raise ValueError('GitHub ref/date confirmation failed')
+    # Git ref API/CDN can temporarily return the previous head after git push.
+    # Require a fresh server response; a stale/missing acknowledgement must
+    # never become a prospective receipt, but must not stop data collection.
+    body={};server_date=None;error=None
+    for attempt in range(3):
+        proof_url='https://api.github.com/repos/'+REPO+'/git/ref/heads/'+STATE_BRANCH+'?materials_proof='+commit+'&request='+str(time.time_ns())
+        req=urllib.request.Request(proof_url,headers={'User-Agent':'BoatAI-MaterialsResearch/1.0','Cache-Control':'no-cache'})
+        try:
+            with urllib.request.urlopen(req,timeout=20) as response:
+                body=json.load(response);server_date=response.headers.get('Date')
+            if body.get('object',{}).get('sha')==commit and server_date and abs((now()-parsedate_to_datetime(server_date)).total_seconds())<60:break
+            error='remote API returned an old head or stale server date'
+        except Exception as exc:error=type(exc).__name__+': '+str(exc)[:180]
+        time.sleep(attempt+1)
+    else:
+        store.record('persistence_pending',commit,{'commit':commit,'checked_at':stamp(),'reason':error,'git_push_confirmed':True,'prospective_receipt_confirmed':False})
+        return {'remote_commit':commit,'status':'git_saved_api_ack_pending','new_forecast_receipts':0,'reason':error}
     checked=stamp();server_at=parsedate_to_datetime(server_date)
     added=0
     for p in (store.root/'fusion_forecasts').glob('*.json'):
