@@ -1,0 +1,60 @@
+name: Research frozen-official Main-core + Yuuki + venue pilot
+on:
+  push:
+    branches:
+      - research/venue-fusion-official-capture-20261020
+    paths:
+      - 'research/venue_fusion_v1/**'
+      - 'research/capture_v1/parsers.py'
+      - '.github/workflows/venue-fusion-official-core-offline.yml'
+permissions:
+  contents: read
+concurrency:
+  group: isolated-main-core-yuuki-venue-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline-fusion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 11
+    steps:
+      - name: Research code checkout only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          path: repo
+      - name: PIN exact previously received official pre-race originals
+        uses: actions/checkout@v4
+        with:
+          repository: maedayuuki0706-creator/-AI
+          ref: 8f472d36f00fb7ebc5a16d3a84d4c32847d61cb8
+          persist-credentials: false
+          path: state
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile offline code and run 9 original unit tests
+        working-directory: repo
+        run: |
+          python -m py_compile research/venue_fusion_v1/official_program.py research/venue_fusion_v1/offline_pilot.py
+          python -m unittest research.venue_fusion_v1.test_engine -v
+      - name: Validate LIVE original official HTML with production parser, no HTTP requests
+        working-directory: repo
+        env:
+          VENUE_ARCHIVE_STATE: ../state/data/venue_specialists_v1
+          VENUE_ARCHIVE_STATE_SHA: 8f472d36f00fb7ebc5a16d3a84d4c32847d61cb8
+        run: python -m unittest research.venue_fusion_v1.test_official_program -v
+      - name: Compare 2026-10-19 and 2026-10-20 AFTER races (no prospective claims)
+        working-directory: repo
+        run: |
+          python -m research.venue_fusion_v1.offline_pilot \
+            --state ../state/data/venue_specialists_v1 \
+            --source-sha 8f472d36f00fb7ebc5a16d3a84d4c32847d61cb8 \
+            --day 20261019 --day 20261020 \
+            --out ../results
+      - name: Upload audited per-race replay and detailed original rejection reasons
+        uses: actions/upload-artifact@v4
+        with:
+          name: researched-original-maincore-yuuki-venue-oct20
+          path: results/
+          retention-days: 30
+          if-no-files-found: error
