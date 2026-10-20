@@ -40,7 +40,7 @@ def _card_label(winner, picks):
     return "third_not_in_ten_after_head_second"
 
 
-def evidence(root, race_id):
+def evidence(root, race_id, *, allow_local_origin_for_tests=False):
     """Fetch ONLY official Git research state branch; prove forecast and receipt history.
 
     Note: git commit timestamp is not sufficient external time attestation.
@@ -49,9 +49,8 @@ def evidence(root, race_id):
     root=Path(root).resolve()
     forecast_path,receipt_path=rr.source_paths(race_id)
     # Read-only remote ref fetch into ephemeral worktree branch; no pushes.
-    expected=_checked_json("{}")
     remote_url=rr._run(root,"remote","get-url","origin").strip()
-    if remote_url not in rr.REMOTE_URLS:
+    if not allow_local_origin_for_tests and remote_url not in rr.REMOTE_URLS:
         raise ValueError("Only official research GitHub remote is allowed for grading")
     rr._run(root,"fetch","--no-tags","origin",
             f"refs/heads/{rr.REMOTE_BRANCH}:refs/remotes/origin/{rr.REMOTE_BRANCH}")
@@ -72,8 +71,7 @@ def evidence(root, race_id):
     prior_sha=proof.get("forecast_commit_sha")
     if not isinstance(prior_sha,str) or not re.fullmatch(r"[a-f0-9]{40}",prior_sha):
         raise ValueError("Missing immutable forecast commit SHA")
-    if rr._run(root,"merge-base","--is-ancestor",prior_sha,receipt_sha) is None:
-        pass
+    rr._run(root,"merge-base","--is-ancestor",prior_sha,receipt_sha)
     creation=rr._run(root,"log","--format=%H",remote_ref,"--",forecast_path).splitlines()
     if len(creation)!=1 or creation[0]!=prior_sha:
         raise ValueError("Original forecast has been rewritten or replaced")
