@@ -1,0 +1,101 @@
+name: Research materials applied independent runner
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/research-materials-applied.yml']
+  schedule:
+    - cron: '3,13,23,33,43,53 23,0-9 * * *'
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: research-materials-applied-independent-v1
+  cancel-in-progress: false
+jobs:
+  applied-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: a758154f3030e93df720559cd087e8080e50acf0
+          path: code
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /research/
+            /prediction_engine.py
+            /racer_profiles.py
+            /market_structure.py
+      - uses: actions/checkout@v4
+        with:
+          ref: research-materials-state-v1
+          path: materials-source
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /results/
+            /raw/
+            /tide_predictions/
+      - uses: actions/checkout@v4
+        with:
+          ref: research-venue-specialists-state
+          path: existing
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /data/venue_specialists_v1/phase1/preinspection/
+      - uses: actions/checkout@v4
+        with:
+          ref: research-materials-applied-state-v1
+          path: applied-state
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Gate evidence contracts and existing regressions
+        working-directory: code
+        run: python -m unittest research.materials_application_v1.test_application research.materials_application_v1.test_live research.materials_v1.test_materials research.venue_fusion_v1.test_engine research.venue_fusion_v1.test_prospective -q
+      - name: Configure only dedicated state and bounded runtime
+        run: |
+          git -C applied-state config user.name 'github-actions[bot]'
+          git -C applied-state config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          echo "MATERIALS_APPLIED_CODE_SHA=$(git -C code rev-parse HEAD)" >> "$GITHUB_ENV"
+          python - <<'PY'
+          import os
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          seconds=480 if 7 <= datetime.now(ZoneInfo('Asia/Tokyo')).hour < 18 else 0
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              f.write('MATERIALS_APPLIED_SECONDS='+str(seconds)+'\n')
+          PY
+      - name: Fresh inputs, six boats, remote receipts, independent outcomes
+        working-directory: code
+        env:
+          MATERIALS_APPLIED_TOKEN: ${{ github.token }}
+        run: |
+          python -m research.materials_application_v1.live --state "$GITHUB_WORKSPACE/applied-state" --source "$GITHUB_WORKSPACE/materials-source" --existing "$GITHUB_WORKSPACE/existing/data/venue_specialists_v1" --seconds "$MATERIALS_APPLIED_SECONDS" --interval 20 --publish
+      - name: Preserve isolated recovery evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-materials-applied-recovery-${{ github.run_id }}
+          path: applied-state/
+          retention-days: 30
+      - name: Continue only this research process during target daytime
+        if: success()
+        env:
+          MATERIALS_APPLIED_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json,os,urllib.request
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          if 7 <= datetime.now(ZoneInfo('Asia/Tokyo')).hour < 18:
+              url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/workflows/research-materials-applied.yml/dispatches'
+              request=urllib.request.Request(url,data=json.dumps({'ref':'main'}).encode(),method='POST',headers={'Authorization':'Bearer '+os.environ['MATERIALS_APPLIED_TOKEN'],'Accept':'application/vnd.github+json'})
+              with urllib.request.urlopen(request,timeout=20) as response:
+                  print('Independent continuation:',response.status)
+          else:
+              print('Outside daytime research window; scheduled backup will resume')
+          PY
