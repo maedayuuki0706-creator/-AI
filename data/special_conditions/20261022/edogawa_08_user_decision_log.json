@@ -1,0 +1,113 @@
+{
+  "schema_version": "user_pre_race_reasoning_case_v1",
+  "race_id": "20261022_03_08",
+  "race_date": "2026-10-22",
+  "venue": "江戸川",
+  "rno": 8,
+  "label": [
+    "user_reasoning_reported_post_result",
+    "rough_water_special_condition",
+    "high_tilt_lane5",
+    "outside_lane4_head_hedge",
+    "F1_lane3_third_place_preserved",
+    "AI_third_place_formation_miss"
+  ],
+  "source_provenance": {
+    "user_message": "2026-10-22 chat: 本当はチルト2の5頭本線で5-146-146で組んでて、でも3のF持ちも気になったから4-5-全足したら当たった",
+    "notes": "User reported their pre-race reasoning after the race. This is NOT a timestamped prospective pick log. Winning receipt screenshot demonstrates 4-5-3 for 100 yen and payout of 8,270 yen, not a complete bet history.",
+    "machine_forecast": "research-venue-specialists-state/data/venue_specialists_v1/forecasts/20261022/20261022_03_08.json",
+    "model_review": "research-venue-specialists-state/data/venue_specialists_v1/reviews/20261022/20261022_03_08.json"
+  },
+  "verified_pre_race_evidence": {
+    "lane_3": {
+      "racer": "山下流心",
+      "f_holder": "F1",
+      "exhibition_st": -0.15,
+      "exhibition_time": 6.81,
+      "avg_st": 0.18
+    },
+    "lane_4": {
+      "racer": "三村岳人",
+      "class": "A2",
+      "exhibition_st": -0.04,
+      "exhibition_time": 6.94,
+      "avg_st": 0.15,
+      "tilt": 0.5
+    },
+    "lane_5": {
+      "racer": "芝田京介",
+      "class": "B2",
+      "exhibition_st": -0.02,
+      "exhibition_time": 6.73,
+      "avg_st": 0.2,
+      "tilt": 2
+    },
+    "environment": {
+      "wind_speed_mps": 5,
+      "wave_cm": 15
+    },
+    "note": "Exhibition ST negatives mean exhibition flying, not official race flying; do not infer actual start or tactics from them. Tilt and time values are corroborated by frozen research forecast."
+  },
+  "user_reported_decision": {
+    "main": {
+      "reason": "5号艇はチルト2。頭本線で狙う",
+      "formation": "5-146-146",
+      "expansions": [
+        "5-1-4",
+        "5-1-6",
+        "5-4-1",
+        "5-4-6",
+        "5-6-1",
+        "5-6-4"
+      ],
+      "points": 6
+    },
+    "cover": {
+      "reason": "3号艇のF1保有が気になり、4頭で5号艇追走する展開も含めた",
+      "formation": "4-5-全",
+      "expansions": [
+        "4-5-1",
+        "4-5-2",
+        "4-5-3",
+        "4-5-6"
+      ],
+      "points": 4
+    },
+    "insight": "F1艇は頭・2着を軸にしない選択でも3着残りは切らない。5の攻め不発/4先行の展開へのヘッジとして4-5-3を保持した",
+    "source_grade": "post_result_self_report_not_independently_precommitted"
+  },
+  "result": {
+    "official_trifecta": "4-5-3",
+    "payout_per_100_yen": 8270,
+    "winning_ticket_user_photo": {
+      "ticket": "4-5-3",
+      "stake_yen": 100,
+      "return_yen": 8270
+    },
+    "user_full_bankroll_not_verified": true
+  },
+  "venue_specialist_comparison": {
+    "predicted_4_5_6": true,
+    "predicted_4_5_3": false,
+    "predicted_5_4_3": false,
+    "hit": false,
+    "miss_type": "third_place_selection_given_correct_first_second",
+    "meaning": "The AI included 4-5-6 and ranked first/second context plausibly but omitted 4-5-3, the exact winning outcome."
+  },
+  "new_yuuki_research_comparison": {
+    "formation_candidate_count": 40,
+    "contains_4_5_3": false,
+    "contains_5_4_3": false,
+    "official_virtual_card": null,
+    "result_grade": "not_eligible_unfinished_research_scenarios"
+  },
+  "research_hypotheses_only": [
+    "At high-wave Edogawa and lane-5 tilt 2, test lane-4-first and lane-5-first alternate head formations, not only a lane-5 win.",
+    "When an F1 holder is among the inside boats, distinguish probabilities of winning, placing second and surviving third; do not erase from all ticket positions.",
+    "Where an outside attack/pursuit pair is plausible, keep alternative 3rd-place boats with evidence rather than a single selected third lane.",
+    "Race 8 conditions are a special session; train or evaluate separately from regular water, without inferring cause from result alone."
+  ],
+  "limitations": "This is a documented hypothesis/case, NOT validated expected value, statistically reliable adjustment or demonstrated causal mechanism. No edits to production forecasts or broadcasts.",
+  "research_only": true,
+  "live_prediction_unchanged": true
+}
