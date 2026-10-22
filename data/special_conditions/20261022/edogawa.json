@@ -26,9 +26,12 @@
     "wave_range_cm": [
       5,
       15
-    ]
+    ],
+    "race_1_distance_1800_secondary": "https://kyotei-karte.com/race/2026-10-22/edogawa/1/",
+    "race_4_distance_1200_secondary": "https://kyotei-karte.com/race/2026-10-22/edogawa/4/",
+    "race_4_distance_1800_conflicting_secondary": "https://kyotei-picks.com/races/3"
   },
-  "verification_warning": "User reports lap reduction and stabilizer usage on the date. Do NOT apply these as confirmed race-level facts to every one of 12 races: per-race source is incomplete and race 1 is displayed as 1800m by a secondary site. Research flags are session-level until exact R and official 1200m/1800m distance or lap count is verified.",
+  "verification_warning": "User reported shortened laps and stabilizer use; per-race flags not established by authoritative evidence. One secondary page says 1R 1800m, 4R 1200m; another secondary listing says 4R 1800m. Distances for 4R conflict and require official verification. Do not mark all 12 races as shortened or all 12 stabilizer.",
   "labels": [
     "SPECIAL_CONDITIONS",
     "EDOGAWA",
@@ -43,7 +46,9 @@
     "performance_may_be_reported_but_not_used_as_standard_benchmark": true,
     "no_retroactive_forecast_change": true,
     "no_automatic_reweighting": true,
-    "add_zero_until_validated": true
+    "add_zero_until_validated": true,
+    "automated_runtime_exclusion_active": false,
+    "status": "research_label_only_20261022"
   },
   "analysis_plan": [
     "Compare 1 course win rate and within-day winner lane",
@@ -69,10 +74,13 @@
       "wind_mps": 4,
       "wave_cm": 5,
       "condition_label": "rough_water_special_session",
-      "race_lap_reduction": "not_individually_verified",
+      "race_lap_reduction": "unverified_1800m_display",
       "stabilizer_board": "indicated_by_secondary_race_page",
       "weather_source": "frozen_venue_specialists_forecast_environment",
-      "exclude_from_normal_water_baseline": true
+      "exclude_from_normal_water_baseline": true,
+      "distance_m_observed": 1800,
+      "distance_source": "https://kyotei-karte.com/race/2026-10-22/edogawa/1/",
+      "distance_evidence": "secondary_site_result_1800m"
     },
     {
       "race_id": "20261022_03_02",
@@ -102,10 +110,14 @@
       "wind_mps": 6,
       "wave_cm": 15,
       "condition_label": "rough_water_special_session",
-      "race_lap_reduction": "not_individually_verified",
+      "race_lap_reduction": "secondary_1200m_claim_conflicted_official_unverified",
       "stabilizer_board": "not_individually_verified",
       "weather_source": "frozen_venue_specialists_forecast_environment",
-      "exclude_from_normal_water_baseline": true
+      "exclude_from_normal_water_baseline": true,
+      "distance_m_observed": 1200,
+      "distance_source": "https://kyotei-karte.com/race/2026-10-22/edogawa/4/",
+      "distance_evidence": "secondary_site_result_1200m_conflicts_with_other_secondary_1800m",
+      "distance_conflict_source": "https://kyotei-picks.com/races/3"
     },
     {
       "race_id": "20261022_03_05",
