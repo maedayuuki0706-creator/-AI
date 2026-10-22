@@ -1,0 +1,29 @@
+name: Research main + Yuuki + venue fusion (offline)
+on:
+  push:
+    branches: [research/main-yuuki-venue-fusion-20261019]
+    paths:
+      - 'research/venue_fusion_v1/**'
+      - '.github/workflows/venue-main-yuuki-fusion-offline.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: main-yuuki-venue-fusion-offline-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  fusion-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Parse three existing engines and fusion
+        run: |
+          python -m py_compile prediction_engine.py research/scenario_v2/engine.py research/venue_specialists_v1/engine.py research/venue_fusion_v1/engine.py
+      - name: Test 120 rankings, ten tickets, source identity, as-of restrictions and no actual results
+        run: python -m unittest discover -s research/venue_fusion_v1 -p 'test_*.py' -v
