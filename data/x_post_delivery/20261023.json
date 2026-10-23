@@ -129,9 +129,10 @@
   "x_result_attempts": {
     "20261023:06:11": {
       "at": "2026-10-23T15:54:55.251482+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "3ff1d85ff4a8438b8116316896ae0733",
-      "status": "reserved"
+      "retry_at": "2026-10-23T15:55:29.169838+09:00",
+      "status": "retryable"
     },
     "20261023:14:3": {
       "at": "2026-10-23T11:44:24.669371+09:00",
@@ -2373,10 +2374,12 @@
       "attempt": 1,
       "claimed_at": "2026-10-23T15:54:55.251482+09:00",
       "content_sha256": "9356640ac6cbcdceb7125fae6c3df282a4f7a44c97b268cf0477ef1703ec691a",
+      "error_type": "DefiniteRejection",
       "key": "result:20261023:06:11",
       "owner": "3ff1d85ff4a8438b8116316896ae0733",
       "parent_post_id": "2113518922721075394",
       "phase": "result",
+      "request_started_at": "2026-10-23T15:54:57.260260+09:00",
       "row": {
         "day": "20261023",
         "deadline": "15:50",
@@ -2426,7 +2429,14 @@
         "source": "配当期待本線",
         "venue": "浜名湖"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "official result pending",
+        "retryable": true,
+        "transport_http_status": 409
+      },
+      "updated_at": "2026-10-23T15:54:59.169838+09:00"
     },
     "result:20261023:06:6": {
       "attempt": 1,
