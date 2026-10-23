@@ -1,40 +1,29 @@
 {
   "audit": {
-    "already_selected": 6,
-    "eligible": 2,
-    "inside_cutoff": 41,
+    "already_selected": 8,
+    "eligible": 0,
+    "inside_cutoff": 42,
     "prediction_files": 50,
-    "remaining_daily_slots": 24,
-    "selection_gate": 1
+    "remaining_daily_slots": 22
   },
-  "checked_at": "2026-10-23T11:40:51.613550+09:00",
+  "checked_at": "2026-10-23T11:46:21.573314+09:00",
   "counts": {
-    "sent": 2,
-    "waiting_result": 2
+    "uncertain": 1
   },
   "day": "20261023",
   "errors": [],
   "events": [
     {
-      "key": "prediction:20261023:14:8",
-      "post_id": "2113460465561207050",
-      "status": "sent"
-    },
-    {
-      "key": "prediction:20261023:05:4",
-      "post_id": "2113460489154080793",
-      "status": "sent"
-    },
-    {
       "key": "result:20261023:14:3",
-      "status": "waiting_result"
-    },
-    {
-      "key": "result:20261023:22:2",
-      "status": "waiting_result"
+      "status": "uncertain"
     }
   ],
-  "held": [],
+  "held": [
+    {
+      "key": "result:20261023:14:3",
+      "status": "uncertain"
+    }
+  ],
   "mode": "all",
   "production_verification": [
     {
@@ -615,12 +604,12 @@
     }
   ],
   "quarantined": [],
-  "status": "checked",
+  "status": "degraded",
   "trigger_event": "workflow_dispatch",
-  "workflow_run_id": "39890772978",
+  "workflow_run_id": "39891161439",
   "x_monitor": {
     "duplicate_guard_verified": 72,
-    "held_transmissions": 0,
+    "held_transmissions": 1,
     "previous_day": {
       "alerts": [
         "near_full_daily_post_cost"
@@ -641,7 +630,9 @@
     },
     "quarantined_transmissions": 0,
     "today": {
-      "alerts": [],
+      "alerts": [
+        "unresolved_api_attempts"
+      ],
       "confirmed_post_total": 12,
       "confirmed_predictions": 8,
       "confirmed_results": 4,
@@ -654,7 +645,7 @@
       "result_without_prediction_count": 0,
       "results_pending_or_unconfirmed": 4,
       "standard_post_create_unit_usd": 0.015,
-      "unresolved_api_attempt_count": 0
+      "unresolved_api_attempt_count": 1
     }
   }
 }
