@@ -22,7 +22,7 @@ jobs:
           persist-credentials: false
       - name: Download limited historical archive sample without production writes
         run: |
-          python3 viewer/research/collect_official_lzh.py --start 2026-09-24 --end 2026-10-23 --delay 1.8 --max-requests 65 --out /tmp/boat-navi-acquisition
+          python3 viewer/research/collect_official_lzh.py --start 2026-08-25 --end 2026-09-23 --delay 1.8 --max-requests 60 --no-racers --out /tmp/boat-navi-acquisition
       - name: Show audit status and verified archive count
         if: always()
         run: |
@@ -39,8 +39,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: boat-navi-official-lzh-20260924-20261023
+          name: boat-navi-official-lzh-20260825-20260923
           path: /tmp/boat-navi-acquisition/
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 90
           compression-level: 6
