@@ -1,0 +1,57 @@
+name: Boat AI Navi latest October 24-25 research delta
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-recent-20261024-25.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-20261024-25-independent-delta
+  cancel-in-progress: false
+jobs:
+  collect_delta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check parser source without modifications to production
+        run: python3 -m py_compile viewer/research/collect_pre_race_data.py viewer/research/collect_derived_player_stats.py
+      - name: Capture October 24-25 pre-race snapshots for review
+        run: |
+          python3 viewer/research/collect_pre_race_data.py \
+            --start 2026-10-24 --end 2026-10-25 \
+            --delay 2.2 --out /tmp/boater-latest/preview
+      - name: Append-only in separate research artifact: October 24-25 completed results
+        run: |
+          python3 viewer/research/collect_derived_player_stats.py \
+            --from-date 2026-10-24 --to-date 2026-10-25 \
+            --delay 2.2 --out /tmp/boater-latest/results
+      - name: Check audit and exclusions
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for p in Path("/tmp/boater-latest").glob("*/audit.json"):
+              j=json.loads(p.read_text(encoding="utf-8"))
+              print("LATEST_RESEARCH",p.parent.name,
+                    "counts",j.get("counts"),
+                    "quality",j.get("quality"),
+                    "joined_races",j.get("verified_join_races"),
+                    "entries",j.get("entry_rows"),
+                    "errors",len(j.get("errors",[])))
+          PY
+      - name: Preserve only in access-controlled 90-day research artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boat-navi-research-oct24-oct25-preview-results-delta
+          path: /tmp/boater-latest
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
