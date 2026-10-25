@@ -130,3 +130,22 @@
 - 直近1年 **1,653人・9,918コース集計行・累積コース進入330,098回**、3年 **1,751人・10,506行・985,841回**、5年 **1,848人・11,088行・1,640,876回**、全期間 **2,868人・17,208行・7,890,652回**。
 - これらは期間別**累積進入回数**。CSV列のレース数としてみなしたり、同じ期間を足し合わせたりするのは禁止。
 - 納品ZIPにはこのCSV、期別全行CSV、SQLite、監査JSON、READMEを同梱：`boat_official_racer_periods_processed_2001_2026_plus.csv.zip`。ChatGPT会話内に保存、GitHub公開viewerには未接続。
+
+
+## 2026-10-26 追加調査：締切前ソースの実取得・研究用SQLite
+
+- **直前データの取得候補を実ファイルで検証（2026-10-20）**。BoatraceCSV（第三者配布、公式原本ではない）の日次CSVに共通 `レースコード` と `取得日時` が存在:
+  - `previews/stt/YYYY/MM/DD.csv`: 進入コース、スタート展示
+  - `previews/tkz/YYYY/MM/DD.csv`: 展示タイム、チルト、体重、調整
+  - `previews/sui/YYYY/MM/DD.csv`: 締切前に観測された風向・風速・波高・天候・気温・水温
+  - `previews/od3/YYYY/MM/DD.csv`: 3連単120通りの直前オッズ
+  - `previews/original_exhibition/YYYY/MM/DD.csv`: 独自展示指標（一周・まわり足・直線等、計測項目名は日別変動）
+  - `programs/motor_stats/YYYY/MM/DD.csv`: モーター期起算日、出走数、勝率、2/3連率、勝利数、整備回数
+  - `programs/motor_history/YYYY/MM/DD.csv`: モーターの過去使用・節の着順列（事後リーク防止のため収録件数監査だけで予想に混入禁止）
+- 新規研究専用スクリプト：`viewer/research/collect_pre_race_data.py`。取得日時 `<=` 日本時間のレース締切（`レース日`＋`締切時刻`）のみ直前テーブルへ保存する。空欄・締切後・タイムゾーン不明を除外。SQLiteに `preview/exhibition/conditions/odds3/motor_stats` を分離。モーター日次値は更新タイミング不明なので**安全な予想入力とは判定しない**。
+- 2026/10/01〜10/23、7カテゴリ×23日=最大161ファイルの独立収集をGitHub Actionsで開始：
+  https://github.com/maedayuuki0706-creator/-AI/actions/runs/40213965466
+- 新規ワークフロー：`.github/workflows/boaters-preview-research.yml`。研究分離・読み取り専用・Secrets不使用・既存ワークフロー変更無し。成果はActionsの期限付きprivate artifact、公開viewerには掲載しない。監査はログの `PREVIEW_FINAL`、欠測 `PREVIEW_ERRORS` とartifact `audit.json` で照合。
+- その他のデータ：JMAの気象庁「毎時潮位（近年の資料）」と「品質管理情報」を調査。https://www.data.jma.go.jp/kaiyou/db/tide/sea_lev_var/format_download.html 。毎時JST・観測基準面cm・欠測あり。潮位は測候所／ボート場対応・観測地点の移設/基準面・タイムラグを確認するまで場別予想へ加点禁止。
+- **追加元は第三者CSV**。公式K/Bとは別系統で照合要、利用許諾と再配布規約に従い研究用途に限る。事後の着順と同時取得した特徴量を過去の予想に混ぜない。直前オッズは日時一致条件を守り、単一時点のsnapshotと説明。
+- 2024〜2025公式K/Bの取得は 2026-10-26 確認時 2025全期間＋2024年7〜12月の **1,098/1,098ファイル成功**、2024年前半は収集中。これらは原本件数でDB化したレース数ではない。2022〜2023年公式全期間はまだpending。
