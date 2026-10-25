@@ -1,0 +1,38 @@
+name: Boat AI Navi complete racer period archive (research only)
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-period-archive.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-archive-acquire-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  acquire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax check and fetch permitted official period archives with pacing
+        timeout-minutes: 24
+        run: |
+          python -m py_compile viewer/research/collect_racer_period_archive.py
+          python viewer/research/collect_racer_period_archive.py
+      - name: Preserve archive & audit in owner-accessible artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boat-navi-racer-period-official-2002-2026
+          path: /tmp/boat-navi-racer-periods/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
