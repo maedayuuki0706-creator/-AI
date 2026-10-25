@@ -1,0 +1,70 @@
+name: Boat AI Navi official 2024-2025 quarterly backfill (research only)
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-official-historical-2024-2025-backfill.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-official-history-research-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  backfill_official_quarters:
+    name: "Official archive ${{ matrix.label }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - {label: "2025-Q4", from: "2025-10-01", to: "2025-12-31", requests: 184}
+          - {label: "2025-Q3", from: "2025-07-01", to: "2025-09-30", requests: 184}
+          - {label: "2025-Q2", from: "2025-04-01", to: "2025-06-30", requests: 182}
+          - {label: "2025-Q1", from: "2025-01-01", to: "2025-03-31", requests: 180}
+          - {label: "2024-Q4", from: "2024-10-01", to: "2024-12-31", requests: 184}
+          - {label: "2024-Q3", from: "2024-07-01", to: "2024-09-30", requests: 184}
+          - {label: "2024-Q2", from: "2024-04-01", to: "2024-06-30", requests: 182}
+          - {label: "2024-Q1", from: "2024-01-01", to: "2024-03-31", requests: 182}
+    steps:
+      - name: Checkout research branch without token persistence
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Safety and parser syntax check
+        run: |
+          python3 -m py_compile viewer/research/collect_official_lzh.py
+      - name: Read only official B and K archives with access pacing
+        timeout-minutes: 50
+        run: |
+          python3 viewer/research/collect_official_lzh.py \
+            --start "${{ matrix.from }}" \
+            --end "${{ matrix.to }}" \
+            --no-racers \
+            --delay 2.5 \
+            --max-requests "${{ matrix.requests }}" \
+            --out "/tmp/boat-official-archive/${{ matrix.label }}"
+      - name: Print acquired, failed, and missing audit counts
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for p in Path("/tmp/boat-official-archive").glob("*/manifest.json"):
+              x=json.loads(p.read_text(encoding="utf-8"))
+              print("HISTORIC_BACKFILL",p.parent.name,"requested",x["planned"],
+                    "statuses",x["statuses"],"bytes",x["downloaded_bytes"],
+                    "provider_blocked",x["provider_blocked"])
+          PY
+      - name: Retain official archives as owner-only research artifact (not published)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "boat-navi-official-history-${{ matrix.label }}"
+          path: "/tmp/boat-official-archive/${{ matrix.label }}/"
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
