@@ -17,7 +17,7 @@ function validRecord(row) {
   return Array.isArray(row) && row.length >= 5 && /^20\d{6}$/.test(row[0]) &&
     NAMES.has(row[1]) && Number.isInteger(row[2]) && row[2]>=1 && row[2]<=12 &&
     VALID_TRIFECTA.test(row[3]) && new Set(row[3].split('-')).size===3 &&
-    Number.isFinite(row[4]) && row[4] > 0;
+    Number.isInteger(row[4]) && row[4] > 0 && row[4] < 1_000_000_000;
 }
 export function mergeHistory(shards) {
   const dedup = new Map(); let rejected=0,source=0,skipped=0;
@@ -61,4 +61,35 @@ export function rankPlayers(payload,{query='',course=1,level='',branch='',sort='
     return (sort==='st'?x-y:y-x)||a.id.localeCompare(b.id);
   });
   return rows;
+}
+
+// All histories below are retrospective. No model probability or EV is inferred.
+export function filterEnvironment(rows,{windMin='',windMax='',direction='',entry=''}={}) {
+ const lo=finite(windMin),hi=finite(windMax);
+ return rows.filter(r=>{const m=r[5]??{};
+  return (lo===null||(finite(m.wind)!==null&&m.wind>=lo)) &&
+   (hi===null||(finite(m.wind)!==null&&m.wind<=hi)) && (!direction||m.direction===direction) &&
+   (!entry||m.entry_changed===(entry==='changed'));
+ });
+}
+export function summarizePlayer(rows,{venue='',course='',from='',to=''}={}) {
+ const subset=rows.filter(r=>(!venue||r[1]===venue)&&(!course||r[3]===Number(course))&&(!from||r[0]>=from)&&(!to||r[0]<=to));
+ const finished=subset.filter(r=>Number.isInteger(r[4])&&r[4]>=1&&r[4]<=6);
+ const starts=subset.filter(r=>Number.isFinite(r[5]));
+ return {n:subset.length,finished:finished.length,unclassified:subset.length-finished.length,
+  first:finished.filter(r=>r[4]===1).length,top2:finished.filter(r=>r[4]<=2).length,top3:finished.filter(r=>r[4]<=3).length,
+  // Denominator includes abnormal / unclassified appearances. Do not improve the rate by dropping losses.
+  firstRate:subset.length?finished.filter(r=>r[4]===1).length/subset.length*100:null,
+  top2Rate:subset.length?finished.filter(r=>r[4]<=2).length/subset.length*100:null,
+  top3Rate:subset.length?finished.filter(r=>r[4]<=3).length/subset.length*100:null,
+  st:starts.length?starts.reduce((s,r)=>s+r[5],0)/starts.length:null,stN:starts.length,
+  local:subset.filter(r=>Number.isFinite(r[7])).sort((a,b)=>b[0].localeCompare(a[0])||b[2]-a[2])[0]??null};
+}
+export function entrySimulation(ids,order,histories,{venue='',from='',to='',minimum=20}={}) {
+ if(ids.length!==6||new Set(ids).size!==6||ids.some(id=>!/^\d{4}$/.test(id)))throw new Error('異なる6名の登録番号を入力してください。');
+ if(!/^[1-6]{6}$/.test(order)||new Set(order).size!==6)throw new Error('進入は1〜6を1回ずつ入力してください（例：123564）。');
+ return [...order].map((lane,i)=>{
+  const id=ids[Number(lane)-1],stats=summarizePlayer(histories[id]??[],{venue,from,to,course:i+1});
+  return {lane:Number(lane),course:i+1,id,...stats,index:stats.n>=minimum?Math.round(1+119*stats.firstRate/100):null};
+ });
 }

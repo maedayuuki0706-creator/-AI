@@ -1,0 +1,51 @@
+name: Boaters phase2 isolated refresh and QA
+on:
+  push:
+    branches: [research/boaters-phase2-20261025]
+    paths: ['viewer/**', '.github/workflows/boaters-phase2-validation.yml']
+  pull_request:
+    branches: [feature/boaters-data-research-20261025]
+    paths: ['viewer/**', '.github/workflows/boaters-phase2-validation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boaters-phase2-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  isolated-viewer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Unit and integrity tests
+        run: |
+          node --test viewer/tests/test_analysis.mjs viewer/tests/test_navi.mjs viewer/tests/test_research.mjs
+          python3 -m unittest discover -s viewer/tests -p 'test_research*.py'
+      - name: Refresh from read-only Git snapshots into temporary output
+        run: python3 viewer/refresh_research.py --fetch --output /tmp/refreshed-data
+      - name: Package private review artifact; no deployment
+        run: |
+          python3 viewer/build_pages.py --output /tmp/boat-navi-preview --preview --origin https://example.invalid
+          cp -r /tmp/refreshed-data/history /tmp/boat-navi-preview/data/
+          cp -r /tmp/refreshed-data/research /tmp/boat-navi-preview/data/
+          test -f /tmp/boat-navi-preview/analysis/index.html
+      - name: Install isolated browser test dependencies
+        run: |
+          npm install --prefix /tmp/boat-browser playwright@1.62.1
+          node /tmp/boat-browser/node_modules/playwright/cli.js install --with-deps webkit
+      - name: WebKit mobile and desktop regression
+        env:
+          NODE_PATH: /tmp/boat-browser/node_modules
+          QA_OUTPUT: /tmp/boat-navi-preview/qa
+        run: node viewer/tests/browser_research.cjs /tmp/boat-navi-preview
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boaters-phase2-private-review
+          path: /tmp/boat-navi-preview
+          retention-days: 14
