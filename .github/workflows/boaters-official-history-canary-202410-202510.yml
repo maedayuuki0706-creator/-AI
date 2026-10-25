@@ -1,0 +1,48 @@
+name: Boat AI Navi official 2024 2025 historical canary (research only)
+on:
+  push:
+    branches: [feature/boaters-data-research-20261025]
+    paths:
+      - '.github/workflows/boaters-official-history-canary-202410-202510.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-official-history-research-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  probe_previous_years:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Probe two dates of 2025 K & B official archives
+        run: |
+          python3 viewer/research/collect_official_lzh.py --start 2025-10-15 --end 2025-10-16 --delay 2.5 --max-requests 4 --no-racers --out /tmp/boat-historical-canary/2025
+      - name: Probe two dates of 2024 K & B official archives
+        run: |
+          python3 viewer/research/collect_official_lzh.py --start 2024-10-15 --end 2024-10-16 --delay 2.5 --max-requests 4 --no-racers --out /tmp/boat-historical-canary/2024
+      - name: Show real per-year audit and gaps
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for year in ("2025","2024"):
+              p = Path(f"/tmp/boat-historical-canary/{year}/manifest.json")
+              if p.exists():
+                  j = json.loads(p.read_text())
+                  print(year, "PLANNED", j["planned"], "RESULT", j["statuses"], "BYTES", j["downloaded_bytes"])
+                  for f in j["files"]:
+                      print(" FILE", f["path"], f["status"])
+          PY
+      - name: Save raw official archives and audit in access-controlled artifact only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boat-navi-official-2024-2025-canary-20261025
+          path: /tmp/boat-historical-canary
+          if-no-files-found: warn
+          retention-days: 90
