@@ -1,0 +1,57 @@
+name: Boat AI Navi 2026 private research database
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-derived-history.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-private-derived-history
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 48
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify research-only parser syntax
+        run: python3 -m py_compile viewer/research/collect_derived_player_stats.py
+      - name: Collect 2026 daily third-party card+result CSV to separate SQLite
+        timeout-minutes: 43
+        run: |
+          python3 viewer/research/collect_derived_player_stats.py \
+            --from-date 2026-01-01 --to-date 2026-10-23 \
+            --delay 1.3 --out /tmp/boat-navi-public-derived
+      - name: Print audit summary
+        if: always()
+        run: |
+          if test -f /tmp/boat-navi-public-derived/audit.json; then
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('/tmp/boat-navi-public-derived/audit.json')
+          x=json.loads(p.read_text())
+          for k in ('days_requested','days_processed','quality','verified_join_races','entry_rows','unique_racers'):
+              print(k,':',x.get(k))
+          PY
+          fi
+      - name: Keep private research SQLite + derived player counts + audit as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boat-navi-2026-private-derived-history
+          path: |
+            /tmp/boat-navi-public-derived/race_history.sqlite
+            /tmp/boat-navi-public-derived/player_frame_course_counts.json
+            /tmp/boat-navi-public-derived/audit.json
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
