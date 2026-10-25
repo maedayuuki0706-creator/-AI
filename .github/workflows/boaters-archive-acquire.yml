@@ -1,0 +1,46 @@
+name: Boat AI Navi archive acquisition (research only)
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-archive-acquire.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-archive-acquire-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  acquire_archives:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout research branch without token persistence
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Download limited historical archive sample without production writes
+        run: |
+          python3 viewer/research/collect_official_lzh.py --start 2026-09-24 --end 2026-10-23 --delay 1.8 --max-requests 65 --out /tmp/boat-navi-acquisition
+      - name: Show audit status and verified archive count
+        if: always()
+        run: |
+          if test -f /tmp/boat-navi-acquisition/manifest.json; then
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("/tmp/boat-navi-acquisition/manifest.json")
+          x=json.loads(p.read_text())
+          print("AUDIT",x["planned"],x["statuses"],x["downloaded_bytes"])
+          PY
+          fi
+      - name: Save private-accessible research archive and audit to Action artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boat-navi-official-lzh-20260924-20261023
+          path: /tmp/boat-navi-acquisition/
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6
