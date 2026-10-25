@@ -1,0 +1,40 @@
+name: Boat AI Navi historical 2025 Nov-Dec research (isolated)
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-2025-late-history.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-private-derived-history
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Collect confirmed-existing 2025 Nov-Dec daily data, independent of delivery
+        run: |
+          python3 viewer/research/collect_derived_player_stats.py \
+            --from-date 2025-11-01 --to-date 2025-12-31 \
+            --delay 1.3 --out /tmp/boat-navi-derived-2025
+      - name: Preserve research-only SQLite and racer counts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boat-navi-2025-11-12-private-research
+          path: |
+            /tmp/boat-navi-derived-2025/race_history.sqlite
+            /tmp/boat-navi-derived-2025/player_frame_course_counts.json
+            /tmp/boat-navi-derived-2025/audit.json
+          if-no-files-found: warn
+          retention-days: 90
