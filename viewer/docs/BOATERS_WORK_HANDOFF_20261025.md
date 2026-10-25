@@ -7,7 +7,7 @@
 **専用ブランチ**: `feature/boaters-data-research-20261025`
 **本番公開専用ブランチ**: `feature/readonly-race-viewer-20261009`
 **本番表示URL**: https://boat-ai-readonly-view.onrender.com/
-**対象ディレクトリ**: `viewer/` 配下のみ
+**変更範囲**: `viewer/` 配下と、新設の読み取り専用CI `.github/workflows/boaters-analysis-tests.yml` のみ。既存ワークフローには手を加えない。
 
 ## 絶対保護条件
 - **main・Discord配信・X投稿・既存予想・研究ログ・Sheets書込み・既存データ取得・既存GitHub Actions/Render設定を絶対に変更、停止、遅延させない**。
@@ -26,6 +26,7 @@
 - `viewer/build_pages.py`：新ページのナビ・ホーム入口の生成定義
 - 既存静的HTML 12ページ：分析ページのナビリンク追加
 - `viewer/tests/test_analysis.mjs`：公式結果統計・入力検査・選手ランキング・収録整合の回帰テスト
+- `.github/workflows/boaters-analysis-tests.yml`：独立CI。branch/PRのみでNodeテストとPython構文/生成を確認。書込みなし
 
 ### 実データ確認（2026-10-25時点）
 - 既存保存済み公式結果ファイル：26日分（2026-09-13〜2026-10-08）
@@ -39,7 +40,7 @@
 ## Workで実行すべきタスク（優先順）
 1. **安全なCI・現物検証**：当該ブランチをcheckoutして `node --test viewer/tests/test_analysis.mjs`, `node --test viewer/tests/test_navi.mjs`（既存条件に応じて）、`python3 -m py_compile viewer/build_history.py viewer/build_pages.py`、`python3 viewer/build_pages.py --output /tmp/boat-navi-phase2 --preview --origin https://example.invalid` を実行。出力HTML・JS・リンク・mobile viewport・フォーム入力・エラー時の分母を検査。コードの不備があれば閲覧専用ブランチだけで修正。静的生成HTMLを整合させ、サイト導線にリンクが反映されたか再確認。
 2. **研究用プレビュー**：既存Render本番と別の認証/プレビュー環境で `/analysis/`、`/data/history/manifest.json` とチャンク、`/data/public/players.json` のHTTP200と負荷・iPhone Safari実機を確認。公開サイト更新や設定変更は禁止。
-3. **差分確認**：`git diff feature/readonly-race-viewer-20261009...feature/boaters-data-research-20261025` の変更が `viewer/` だけであること。Secrets露出・予想先読み・書込み・解析タグ・広告・課金コードが混入していないこと。全レース集計と誤読させない注記を残す。
+3. **差分確認**：`git diff feature/readonly-race-viewer-20261009...feature/boaters-data-research-20261025` の変更が `viewer/` と、新しい研究専用CI（`.github/workflows/boaters-analysis-tests.yml`）だけであること。Secrets露出・予想先読み・書込み・解析タグ・広告・課金コードが混入していないこと。全レース集計と誤読させない注記を残す。
 4. **自動更新設計**：既存`data/official_results/` の増分データを安全に研究専用で読み取り、`python3 viewer/build_history.py` を独立ジョブで動かしてPRに更新を集約。**既存配信実行時刻・ワークフローを変更しない**。履歴漏れ、日跨ぎ、遅延、再実行、除外理由のカウントを検証。過去結果が未記録なら公式ソースと差分照合（利用規約とレート制限を確認）。
 5. **次の実装**：データが確認できたものから、日付×場×レース・出走選手・モーター・決まり手の横断検索、出走コース/当地/直近期間の選手母数付き成績、進入シミュレーション（仮定表示）、風速×風向×潮位×波高×進入×安定板・周回短縮の条件別集計、120通り指数/期待値の研究表示。勝率や条件付き確率の校正とサンプルサイズ確認が先。事後データが事前予想へ混入しない設計。
 6. **権利と公開可否の確認**：公式データ利用条件・再配布/商用利用の許諾、SEO、運営者情報、プライバシーをユーザー承認前に確認。ボーターズの表現・UIアセットをコピーしない。
