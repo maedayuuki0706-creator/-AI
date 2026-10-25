@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10273e">
+<title>公式結果検索・選手コース別分析｜競艇AIナビ</title>
+<meta name="description" content="保存済み公式結果から万舟・払戻・1着コースを条件検索。選手の全国勝率・コース別1着率・決まり手傾向・平均STを比較。">
+<meta name="robots" content="noindex,nofollow"><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/analysis.css?v=20261025">
+<script type="module" src="/assets/analysis.mjs?v=20261025"></script>
+</head>
+<body>
+<a class="skip" href="#main">本文へ</a>
+<header class="top"><div class="wrap top-inner">
+<a class="brand" href="/">◈ <b>競艇AIナビ</b><small>DATA & INSIGHT</small></a>
+<nav aria-label="主要ページ"><a href="/races/">レース一覧</a><a href="/racers/">選手検索</a><a href="/motors/">モーター</a><a href="/lab/">AI成績</a></nav>
+</div></header>
+<main id="main" class="wrap">
+<div class="eyebrow">BOAT AI NAVI / DATA RESEARCH</div>
+<h1>数字から、<em>展開を読む。</em></h1>
+<p class="lead">実際の公式結果と収録済み選手データを、自由な条件で検索。万舟の傾向とコース適性を自分の目で確かめよう。</p>
+<div class="tabs" role="tablist" aria-label="分析の種類">
+<button id="tab-history" type="button" role="tab" aria-selected="true" aria-controls="history-section">結果・万舟検索</button>
+<button id="tab-players" type="button" role="tab" aria-selected="false" aria-controls="players-section">選手・コース分析</button>
+</div>
+<section id="history-section" role="tabpanel" aria-labelledby="tab-history">
+<div class="section-head"><div><p class="eyebrow">RACE RESULT EXPLORER</p><h2>レース結果を探す。</h2></div><span class="tag">公式確定結果のみ</span></div>
+<div class="caution" id="history-meta">2026年9月13日〜10月8日の保存済み結果を対象に読み込み中。収録のないレース・中止・返還等は分母に含めません。全レース網羅ではありません。</div>
+<form id="history-form" class="panel filters">
+<label>開始日<input id="h-from" type="date" value="2026-09-13" min="2026-09-13" max="2026-10-08"></label>
+<label>終了日<input id="h-to" type="date" value="2026-10-08" min="2026-09-13" max="2026-10-08"></label>
+<label>レース場<select id="h-venue"><option value="">全場（収録分）</option></select></label>
+<label>1着の号艇<select id="h-first"><option value="">全号艇</option><option value="1">1号艇</option><option value="2">2号艇</option><option value="3">3号艇</option><option value="4">4号艇</option><option value="5">5号艇</option><option value="6">6号艇</option></select></label>
+<label>払戻下限（100円あたり）<input id="h-min" type="number" min="0" step="100" placeholder="例：3000"></label>
+<label class="check"><input id="h-manshu" type="checkbox">万舟（10,000円以上）のみ</label>
+<button class="primary" type="submit">条件で検索</button>
+</form>
+<p id="history-status" class="status" role="status" aria-live="polite">履歴を読み込み中…</p>
+<div id="history-metrics" class="metrics" aria-live="polite"></div>
+<div class="panel chart-wrap"><h3>1着号艇の内訳 <small>検索条件内の件数</small></h3><div id="history-chart" class="bar-chart"></div><p class="note">1着率は「検索対象に収録された確定結果」で計算した参考値。風・潮位別、選手別の母数とは異なります。</p></div>
+<div class="section-head"><h3>該当したレース</h3><span class="small" id="history-page-label"></span></div>
+<div class="table-scroll"><table><thead><tr><th>開催日</th><th>場・R</th><th>3連単</th><th>払戻</th><th>公式</th></tr></thead><tbody id="history-rows"></tbody></table></div>
+<button id="history-more" class="secondary" type="button" hidden>さらに100件表示</button>
+</section>
+<section id="players-section" role="tabpanel" aria-labelledby="tab-players" hidden>
+<div class="section-head"><div><p class="eyebrow">RACER COURSE DATABASE</p><h2>選手の得意を探す。</h2></div><span class="tag">保存済み選手DB</span></div>
+<div id="player-meta" class="caution">選手データの収録日時を確認中。当地勝率・今節ST・コース別集計母数は元データにないため、表示しません。</div>
+<form id="player-form" class="panel filters">
+<label>選手名・登録番号<input id="p-query" type="search" placeholder="毒島 誠 / 4238" autocomplete="off" maxlength="40"></label>
+<label>コース<select id="p-course"><option value="1">1コース</option><option value="2">2コース</option><option value="3">3コース</option><option value="4">4コース</option><option value="5">5コース</option><option value="6">6コース</option></select></label>
+<label>級別<select id="p-class"><option value="">全級別</option><option>A1</option><option>A2</option><option>B1</option><option>B2</option></select></label>
+<label>支部<select id="p-branch"><option value="">全支部</option></select></label>
+<label>並び順<select id="p-sort"><option value="course">選択コース1着率（高順）</option><option value="national">全国勝率（高順）</option><option value="st">平均ST（小順）</option></select></label>
+<label>コース1着率 下限<input id="p-min" type="number" min="0" max="100" step="1" placeholder="0"></label>
+<button class="primary" type="submit">選手を比較</button>
+</form>
+<p class="status" role="status" id="player-status" aria-live="polite">このタブを開くと選手データを読み込みます。</p>
+<div class="table-scroll"><table><thead><tr><th>選手</th><th>級別</th><th>全国勝率</th><th>指定コース1着率</th><th>平均ST</th><th>詳細</th></tr></thead><tbody id="player-rows"></tbody></table></div>
+<button id="player-more" type="button" class="secondary" hidden>さらに50名表示</button>
+<div id="player-detail" class="panel detail" hidden tabindex="-1"></div>
+<p class="note">収録済みコース別1着率・決まり手割合の集計期間と試行回数は未取得。0%と未取得を区別していますが、少数サンプルを含む可能性があるため順位の過信は禁物です。</p>
+</section>
+<footer><span>競艇AIナビ｜研究・閲覧専用</span><span>公式結果の照合はBOAT RACE公式をご利用ください。予想の的中や利益を保証しません。</span></footer>
+</main>
+</body></html>
