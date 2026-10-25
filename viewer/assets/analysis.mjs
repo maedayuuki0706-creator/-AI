@@ -51,7 +51,9 @@ function drawHistoryRows(){
 }
 async function loadHistory(){
  text('history-status','公式結果を読み込み中…');
- const results=await Promise.allSettled(SHARDS.map(s=>json('/data/history/'+s+'.json')));
+ const manifest=await json('/data/history/manifest.json').catch(()=>({shards:SHARDS}));
+ const shards=Array.isArray(manifest?.shards) && manifest.shards.length<=100 && manifest.shards.every(s=>/^[0-9a-z-]{7,25}$/.test(s)) ? manifest.shards : SHARDS;
+ const results=await Promise.allSettled(shards.map(s=>json('/data/history/'+s+'.json')));
  const ok=results.filter(r=>r.status==='fulfilled').map(r=>r.value);
  const failed=results.filter(r=>r.status==='rejected').length;
  if(!ok.length){text('history-status','結果データを取得できませんでした。通信を確認して再読み込みしてください。');text('history-meta','データが取得できなかったため、割合は算出しません。');return;}
