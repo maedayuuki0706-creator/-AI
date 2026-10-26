@@ -1,0 +1,72 @@
+name: Boat AI Navi official 1997-1999 first-era original history (research only)
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-official-1997-1999-backfill.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-1997-1999-first-era-serial-source-archive
+  cancel-in-progress: false
+jobs:
+  download:
+    name: "Research only B/K ${{ matrix.period }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - {period: "1997-Q2-MayJun", start: "1997-05-01", end: "1997-06-30", files: 122}
+          - {period: "1997-Q3", start: "1997-07-01", end: "1997-09-30", files: 184}
+          - {period: "1997-Q4", start: "1997-10-01", end: "1997-12-31", files: 184}
+          - {period: "1998-Q1", start: "1998-01-01", end: "1998-03-31", files: 180}
+          - {period: "1998-Q2", start: "1998-04-01", end: "1998-06-30", files: 182}
+          - {period: "1998-Q3", start: "1998-07-01", end: "1998-09-30", files: 184}
+          - {period: "1998-Q4", start: "1998-10-01", end: "1998-12-31", files: 184}
+          - {period: "1999-Q1", start: "1999-01-01", end: "1999-03-31", files: 180}
+          - {period: "1999-Q2", start: "1999-04-01", end: "1999-06-30", files: 182}
+          - {period: "1999-Q3", start: "1999-07-01", end: "1999-09-30", files: 184}
+          - {period: "1999-Q4", start: "1999-10-01", end: "1999-12-31", files: 184}
+    steps:
+      - name: Checkout only research branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check syntax; do not alter original archival collector
+        run: python3 -m py_compile viewer/research/collect_official_lzh.py
+      - name: Fetch official historical archives conservatively with per-file audit
+        timeout-minutes: 70
+        run: |
+          python3 viewer/research/collect_official_lzh.py \
+            --start "${{ matrix.start }}" \
+            --end "${{ matrix.end }}" \
+            --delay 8.0 --max-requests "${{ matrix.files }}" \
+            --no-racers \
+            --out "/tmp/boat-navi-1997-1999/${{ matrix.period }}"
+      - name: Display verified source count and missing details without false completion claims
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          for p in Path('/tmp/boat-navi-1997-1999').glob('*/manifest.json'):
+              j=json.loads(p.read_text(encoding='utf-8'))
+              print('OLD_ARCHIVE',p.parent.name,
+                    'requested',j['planned'],'statuses',j['statuses'],
+                    'bytes',j['downloaded_bytes'],
+                    'provider_blocked',j['provider_blocked'])
+          PY
+      - name: Store original files and acquisition logs in owner-only GitHub artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "boat-navi-official-1997-1999-${{ matrix.period }}"
+          path: "/tmp/boat-navi-1997-1999/${{ matrix.period }}/"
+          retention-days: 90
+          compression-level: 6
+          if-no-files-found: warn
