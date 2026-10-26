@@ -21,6 +21,7 @@ PATHS = {
     "predictions": ("/predictions/", "AI予想", "spark"),
     "motors": ("/motors/", "モーター", "motor"),
     "racers": ("/racers/", "選手データ", "user"),
+    "analysis": ("/analysis/", "データ分析", "chart"),
     "lab": ("/lab/", "AI成績・研究室", "lab"),
 }
 ICONS = {
@@ -29,6 +30,7 @@ ICONS = {
     "spark": '<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/><path d="M19 2v4m-2-2h4"/>',
     "motor": '<path d="M8 6h8v11H8zM6 9H3v6h5m8-6h4v8h-4m-5-14h5m-3 0v3m-3 11v4h7m0 0v-4"/><path d="M11 10h2m-2 3h2"/>',
     "user": '<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2M8 21h8"/>',
+    "chart": '<path d="M4 21V3M4 21h17M8 17v-5m5 5V7m5 10v-9"/>',
     "lab": '<path d="M9 3h6m-5 0v7L4 20a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1l-6-10V3M8 15h8"/><path d="M10 18h.01M14 17h.01"/>',
     "arrow": '<path d="M4 12h16m-6-6 6 6-6 6"/>',
     "share": '<path d="M12 16V3m-4 4 4-4 4 4M5 12v9h14v-9"/>',
@@ -98,6 +100,7 @@ HOME = f'''
         ("/predictions/", "spark", "AI PREDICTIONS", "AI予想", "買い目と、その根拠。<br>選んだレースをじっくり読む。"),
         ("/motors/", "motor", "MOTOR ANALYSIS", "モーターを知る", "伸び・出足・回り足・行き足。<br>6艇の違いを比較する。"),
         ("/racers/", "user", "RACER DATABASE", "選手を調べる", "得意コースと決まり手。<br>数字から選手の個性を探る。"),
+        ("/analysis/", "chart", "DATA ANALYSIS", "結果・コース分析", "収録済み公式結果を条件検索。<br>万舟の傾向と選手コース実績を探る。"),
     ], 1)
 ) + f'''</div></section>
 <section class="home-lower"><a class="lab-feature" href="/lab/"><p class="eyebrow">BOAT AI LAB</p><h2>的中の、その先まで。</h2><p>当たった理由も、外れた理由も。<br>的中率だけに寄らず、回収率と展開から予想を検証する。</p><!--home-latest--><span class="text-link">AI成績・研究室へ{ARROW}</span><div class="lab-lines" aria-hidden="true"></div></a>
@@ -244,7 +247,7 @@ def render(path: str, page: tuple, origin: str, preview: bool, verification: str
 <aside class="ad-slot" data-ad-placement="{current}-bottom" aria-label="広告"></aside>
 <noscript><div class="notice">レース・検索データの表示にはJavaScriptが必要です。研究ノートと出典はそのまま閲覧できます。</div></noscript></main>
 <footer class="site-footer"><div class="wrap footer-main"><div><a class="footer-brand" href="/">競艇AIナビ</a><p class="footer-copy">そのレースを、もっと深く。<br>データの取得日時・出典を明示する、独立したボートレース情報サイト。</p></div>
-<nav class="footer-links" aria-label="フッターメニュー"><a href="/races/">レース一覧</a><a href="/predictions/">AI予想</a><a href="/motors/">モーター情報</a><a href="/racers/">選手データ</a><a href="/lab/">AI成績・研究室</a><a href="/sources/">出典・表示ルール</a><a href="/privacy/">プライバシー</a><button class="text-link" type="button" data-consent-settings>解析設定</button></nav></div>
+<nav class="footer-links" aria-label="フッターメニュー"><a href="/races/">レース一覧</a><a href="/predictions/">AI予想</a><a href="/motors/">モーター情報</a><a href="/racers/">選手データ</a><a href="/analysis/">結果・選手分析</a><a href="/lab/">AI成績・研究室</a><a href="/sources/">出典・表示ルール</a><a href="/privacy/">プライバシー</a><button class="text-link" type="button" data-consent-settings>解析設定</button></nav></div>
 <div class="wrap footer-bottom"><span>© 2026 競艇AIナビ · BOAT AI NAVI</span><span>INDEPENDENT MEDIA · 公式サービスではありません</span></div></footer>
 <div id="consent-panel" class="consent" role="region" aria-label="アクセス解析の選択" hidden><strong>より使いやすいサイトにするために</strong><p>閲覧やボタン操作の解析を許可しますか。許可するまでGoogleの計測タグを読み込みません。拒否してもすべての機能を使えます。</p><div class="consent-actions"><button class="button" type="button" id="consent-accept">解析を許可する</button><button class="button button-outline" type="button" id="consent-decline">許可しない</button><a href="/privacy/">取扱いを確認</a></div></div>
 <div class="toast" id="toast" role="status" hidden></div></body></html>

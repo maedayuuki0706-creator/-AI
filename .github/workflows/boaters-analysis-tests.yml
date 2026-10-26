@@ -1,0 +1,54 @@
+name: Boat AI Navi analysis isolated tests
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - 'viewer/analysis/**'
+      - 'viewer/assets/analysis*'
+      - 'viewer/data/history/**'
+      - 'viewer/build_history.py'
+      - 'viewer/build_pages.py'
+      - 'viewer/tests/test_analysis.mjs'
+      - '.github/workflows/boaters-analysis-tests.yml'
+  pull_request:
+    branches:
+      - feature/readonly-race-viewer-20261009
+    paths:
+      - 'viewer/analysis/**'
+      - 'viewer/assets/analysis*'
+      - 'viewer/data/history/**'
+      - 'viewer/build_history.py'
+      - 'viewer/build_pages.py'
+      - 'viewer/tests/test_analysis.mjs'
+      - '.github/workflows/boaters-analysis-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: boaters-analysis-test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  analysis_check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate analysis client bundle syntax
+        run: |
+          node --check viewer/assets/analysis.mjs
+          node --check viewer/assets/analysis-core.mjs
+      - name: Verify search filters, sample sizes and saved results
+        run: node --test viewer/tests/test_analysis.mjs
+      - name: Validate offline-only index builder
+        run: python3 -m py_compile viewer/build_history.py viewer/build_pages.py
+      - name: Regenerate and validate static multipage HTML in temp only
+        run: |
+          python3 viewer/build_pages.py --output /tmp/boat-ai-navi-qa --preview --origin https://example.invalid
+          test -f /tmp/boat-ai-navi-qa/index.html
+          test -f /tmp/boat-ai-navi-qa/racers/index.html
+          grep -q '/analysis/' /tmp/boat-ai-navi-qa/index.html

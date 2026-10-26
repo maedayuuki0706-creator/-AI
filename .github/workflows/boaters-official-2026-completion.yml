@@ -1,0 +1,60 @@
+name: Boat AI Navi official 2026 Jan-Oct result archive (research only)
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-official-2026-completion.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-official-2026-completion
+  cancel-in-progress: false
+jobs:
+  acquire_2026:
+    name: "2026 official B/K ${{ matrix.period }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - {period: "2026-Q1", start: "2026-01-01", end: "2026-03-31", files: 180}
+          - {period: "2026-Q2", start: "2026-04-01", end: "2026-06-30", files: 182}
+          - {period: "2026-Q3", start: "2026-07-01", end: "2026-09-30", files: 184}
+          - {period: "2026-Oct01-Oct25", start: "2026-10-01", end: "2026-10-25", files: 50}
+    steps:
+      - name: Read only checkout without token persistence
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify collector
+        run: python3 -m py_compile viewer/research/collect_official_lzh.py
+      - name: Retrieve authenticated archive signatures at low rate
+        timeout-minutes: 60
+        run: |
+          python3 viewer/research/collect_official_lzh.py \
+            --start "${{ matrix.start }}" --end "${{ matrix.end }}" \
+            --delay 5 --max-requests "${{ matrix.files }}" \
+            --no-racers --out "/tmp/boater-official-2026/${{ matrix.period }}"
+      - name: Display actual results per quarter including missing and blocked
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          for p in Path('/tmp/boater-official-2026').glob('*/manifest.json'):
+              a=json.loads(p.read_text(encoding='utf-8'))
+              print('OFFICIAL_2026',p.parent.name,'requested',a['planned'],'statuses',a['statuses'],'bytes',a['downloaded_bytes'],'blocked',a['provider_blocked'])
+          PY
+      - name: Private artifact backup; do not publish archives
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "boat-navi-official-2026-${{ matrix.period }}"
+          path: "/tmp/boater-official-2026/${{ matrix.period }}/"
+          retention-days: 90
+          compression-level: 6
+          if-no-files-found: warn

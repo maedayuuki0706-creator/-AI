@@ -1,0 +1,66 @@
+name: Boat AI Navi official 2022-2023 complete daily backfill (research)
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-official-historical-2022-2023-backfill.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+# Never compete with the existing 2024-2025 full-year official backfill.
+concurrency:
+  group: boat-navi-official-history-research-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  collect:
+    name: "Official B/K archives ${{ matrix.period }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - {period: "2023-Q4", start: "2023-10-01", end: "2023-12-31", files: 184}
+          - {period: "2023-Q3", start: "2023-07-01", end: "2023-09-30", files: 184}
+          - {period: "2023-Q2", start: "2023-04-01", end: "2023-06-30", files: 182}
+          - {period: "2023-Q1", start: "2023-01-01", end: "2023-03-31", files: 180}
+          - {period: "2022-Q4", start: "2022-10-01", end: "2022-12-31", files: 184}
+          - {period: "2022-Q3", start: "2022-07-01", end: "2022-09-30", files: 184}
+          - {period: "2022-Q2", start: "2022-04-01", end: "2022-06-30", files: 182}
+          - {period: "2022-Q1", start: "2022-01-01", end: "2022-03-31", files: 180}
+    steps:
+      - name: Checkout isolated PR branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify downloader syntax
+        run: python3 -m py_compile viewer/research/collect_official_lzh.py
+      - name: Download verified official source B and K with conservative pacing
+        timeout-minutes: 70
+        run: |
+          python3 viewer/research/collect_official_lzh.py \
+            --start "${{ matrix.start }}" \
+            --end "${{ matrix.end }}" \
+            --delay 3.5 --max-requests "${{ matrix.files }}" \
+            --no-racers --out "/tmp/boat-official-older/${{ matrix.period }}"
+      - name: Print actual successes, gaps and provider blocks
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for p in Path("/tmp/boat-official-older").glob("*/manifest.json"):
+              j=json.loads(p.read_text(encoding="utf-8"))
+              print("OFFICIAL_OLDER_QUARTER",p.parent.name,"planned",j["planned"],"actual_status",j["statuses"],"bytes",j["downloaded_bytes"],"blocked",j["provider_blocked"])
+          PY
+      - name: Preserve official sources in repo-access-controlled Actions artifact only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "boat-navi-original-official-${{ matrix.period }}"
+          path: "/tmp/boat-official-older/${{ matrix.period }}/"
+          retention-days: 90
+          if-no-files-found: warn
+          compression-level: 6

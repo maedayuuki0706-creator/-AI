@@ -1,0 +1,54 @@
+name: Boat AI Navi 2005-2023 official archives canary (isolated)
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-older-archives-canary-20261025.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-older-archives-one-probe
+  cancel-in-progress: false
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test 1-day B/K official original from 8 distinct older years
+        timeout-minutes: 17
+        run: |
+          set -eu
+          python3 -m py_compile viewer/research/collect_official_lzh.py
+          for year in 2023 2022 2021 2020 2018 2015 2010 2005; do
+            echo "PROBING_OFFICIAL_YEAR $year"
+            python3 viewer/research/collect_official_lzh.py \
+              --start "$year-10-15" --end "$year-10-15" \
+              --no-racers --max-requests 2 --delay 6 \
+              --out "/tmp/boat-navi-older-canary/$year"
+            sleep 8
+          done
+      - name: Report per-year verified file availability
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          roots=sorted(Path("/tmp/boat-navi-older-canary").glob("*/manifest.json"))
+          for path in roots:
+              data=json.loads(path.read_text())
+              print("OLDER_YEAR_RESULT",path.parent.name,"requested",data["planned"],"statuses",data["statuses"],"bytes",data["downloaded_bytes"],"blocked",data["provider_blocked"])
+          print("OLDER_YEARS_TESTED",len(roots))
+          PY
+      - name: Preserve original samples plus audit only as private action artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boat-navi-older-official-years-2005-2023-canary
+          path: /tmp/boat-navi-older-canary/
+          retention-days: 90
+          if-no-files-found: warn

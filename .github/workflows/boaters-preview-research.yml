@@ -1,0 +1,51 @@
+name: Boat AI Navi cutoff-safe exhibition and odds collection (research only)
+on:
+  push:
+    branches: [feature/boaters-data-research-20261025]
+    paths:
+      - '.github/workflows/boaters-preview-research.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-preview-private-research
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout without credential persistence
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify separate research data collector
+        run: python3 -m py_compile viewer/research/collect_pre_race_data.py
+      - name: Collect October 1-23 pre-race exhibition, ST, weather, odds and independent motor data
+        timeout-minutes: 25
+        run: |
+          python3 viewer/research/collect_pre_race_data.py \
+            --start 2026-10-01 --end 2026-10-23 \
+            --delay 1.7 --out /tmp/boat-navi-preview-research
+      - name: Show database validity and missing-file audit
+        if: always()
+        run: |
+          if test -f /tmp/boat-navi-preview-research/audit.json; then
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+          obj=json.loads(Path('/tmp/boat-navi-preview-research/audit.json').read_text(encoding='utf-8'))
+          print('PREVIEW_AUDIT', obj['counts'], obj['quality'], 'errors',len(obj['errors']), 'integrity',obj['integrity'])
+          PY
+          fi
+      - name: Retain private study data (not public web or predictions)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boat-navi-preview-stt-weather-odds-motors-20261001-1023
+          path: |
+            /tmp/boat-navi-preview-research/preview_research.sqlite
+            /tmp/boat-navi-preview-research/audit.json
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
