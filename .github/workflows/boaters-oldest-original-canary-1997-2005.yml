@@ -1,0 +1,58 @@
+name: Boat AI Navi official 1997-2005 oldest archive canary
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-oldest-original-canary-1997-2005.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-navi-oldest-original-canary-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  check_oldest_availability:
+    name: Sample official B/K 1997-2005
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - name: Checkout isolated research branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check source collector syntax
+        run: python3 -m py_compile viewer/research/collect_official_lzh.py
+      - name: Test one day per period with provider-friendly spacing
+        timeout-minutes: 12
+        run: |
+          set -eu
+          for stamp in 1997-05-15 1998-05-15 1999-05-15 2000-05-15 2001-05-15 2002-05-15 2004-05-15 2005-05-15; do
+            echo "PROBE_OLD_DATE $stamp"
+            python3 viewer/research/collect_official_lzh.py \
+              --start "$stamp" --end "$stamp" \
+              --delay 5 --no-racers --max-requests 2 \
+              --out "/tmp/boat-navi-oldest-1997-2005/$stamp"
+            sleep 5
+          done
+      - name: Report genuinely downloaded and missing files for each date
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          for p in sorted(Path('/tmp/boat-navi-oldest-1997-2005').glob('*/manifest.json')):
+              x=json.loads(p.read_text(encoding='utf-8'))
+              print('OLDEST_CANARY',p.parent.name,'planned',x['planned'],
+                    'statuses',x['statuses'],'bytes',x['downloaded_bytes'],
+                    'provider_blocked',x['provider_blocked'])
+          PY
+      - name: Save sample originals and audits privately only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boat-navi-oldest-1997-2005-research-canary
+          path: /tmp/boat-navi-oldest-1997-2005/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
