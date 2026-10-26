@@ -1,0 +1,68 @@
+name: Boat AI Navi official 2020-2021 historical archives (research only)
+on:
+  push:
+    branches:
+      - feature/boaters-data-research-20261025
+    paths:
+      - '.github/workflows/boaters-official-historical-2020-2021-backfill.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  # Excludes concurrent older full-history official harvesting from the same account.
+  group: boat-navi-official-history-research-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  collect:
+    name: "Official B and K archive ${{ matrix.period }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - {period: "2021-Q4", start: "2021-10-01", end: "2021-12-31", files: 184}
+          - {period: "2021-Q3", start: "2021-07-01", end: "2021-09-30", files: 184}
+          - {period: "2021-Q2", start: "2021-04-01", end: "2021-06-30", files: 182}
+          - {period: "2021-Q1", start: "2021-01-01", end: "2021-03-31", files: 180}
+          - {period: "2020-Q4", start: "2020-10-01", end: "2020-12-31", files: 184}
+          - {period: "2020-Q3", start: "2020-07-01", end: "2020-09-30", files: 184}
+          - {period: "2020-Q2", start: "2020-04-01", end: "2020-06-30", files: 182}
+          - {period: "2020-Q1", start: "2020-01-01", end: "2020-03-31", files: 182}
+    steps:
+      - name: Checkout isolated research branch without saved credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Ensure downloader syntax valid
+        run: python3 -m py_compile viewer/research/collect_official_lzh.py
+      - name: Collect public official original B and K archives at conservative pacing
+        timeout-minutes: 70
+        run: |
+          python3 viewer/research/collect_official_lzh.py \
+            --start "${{ matrix.start }}" \
+            --end "${{ matrix.end }}" \
+            --delay 4.0 --max-requests "${{ matrix.files }}" \
+            --no-racers --out "/tmp/boat-navi-older-history/${{ matrix.period }}"
+      - name: Audit acquisitions and provider throttling honestly
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for file in Path("/tmp/boat-navi-older-history").glob("*/manifest.json"):
+              j=json.loads(file.read_text(encoding="utf-8"))
+              print("OLDER_HISTORY",file.parent.name,"requested",j["planned"],
+                    "real_statuses",j["statuses"],"bytes",j["downloaded_bytes"],
+                    "blocked",j["provider_blocked"])
+          PY
+      - name: Save official originals as access-controlled short-retention research artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "boat-navi-official-history-${{ matrix.period }}"
+          path: "/tmp/boat-navi-older-history/${{ matrix.period }}/"
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
