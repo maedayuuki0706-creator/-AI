@@ -10,9 +10,10 @@ import os
 from pathlib import Path
 import tempfile
 from zoneinfo import ZoneInfo
+import fusion_shadow_scenarios as scenarios
 
 JST = ZoneInfo("Asia/Tokyo")
-VERSION = "all-ai-fusion-shadow-v1"
+VERSION = "new-yuuki-fusion-shadow-v2"
 STATE_BRANCH = "research-fusion-shadow-state"
 WEIGHTS = {"existing": .20, "sheet_db": .25, "knowledge_v2": .05, "hiyori": .50}
 POINTS, UNIT_YEN, MIN_LEAD_SECONDS = 10, 100, 180
@@ -176,6 +177,9 @@ def build_prediction(request, analyses, strategies, now, *, context=None, proven
         if context.get("outcome") is not None:
             raise ValueError("Settled research context is forbidden")
     rows, fusion = rank_fusion(analyses, strategies, odds, context)
+    rows, main, cover, boat_scenarios, ticket_reasons = scenarios.rank(analyses, rows, context)
+    fusion = card(main + cover, main_picks=main, cover_picks=cover,
+                  label="新ゆうき・6艇展開融合10点", selection_policy=scenarios.VERSION)
     comparisons = {"fusion": fusion}
     # Same 1,000-yen budget and probability-only selector, alongside variable native policies.
     for name, analysis in analyses.items():
@@ -199,6 +203,10 @@ def build_prediction(request, analyses, strategies, now, *, context=None, proven
               "created_at": now.isoformat(), "code_sha": os.getenv("GITHUB_SHA"),
               "weights": dict(WEIGHTS), "unit_yen": UNIT_YEN,
               "probabilities_are_calibrated": False,
+              "scenario_version": scenarios.VERSION, "boat_scenarios": boat_scenarios,
+              "head_probabilities": {str(s["lane"]): s["head_probability"] for s in boat_scenarios},
+              "ticket_reasons": ticket_reasons,
+              "scenario_coefficients_are_calibrated": False,
               "pre_race_boats": official["inputs"], "pre_race_weather": official.get("preview"),
               "source_versions": {name: a.get("model_version") for name, a in analyses.items()},
               "input_hashes": {name: digest(a) for name, a in analyses.items()},
@@ -296,18 +304,22 @@ def evaluate(record, result, now):
                         "hit": bool(winners), "winning_picks": winners,
                         "eligible_race": status == "settled" and bool(active),
                         "manshu_hit": any(payouts[t] >= 10000 for t in winners)}
-    return {"version": VERSION, "mode": record["mode"], "key": record["key"],
+    return {"version": record["version"], "mode": record["mode"], "key": record["key"],
             "day": record["day"], "venue": record.get("venue"),
             "prediction_digest": record["digest"], "prediction_committed_at": frozen_at.isoformat(),
-            "official_result": result, "evaluated_at": now.isoformat(), "models": models}
+            "official_result": result, "evaluated_at": now.isoformat(), "models": models,
+            "scenario_review": scenarios.evaluate_hypotheses(record, result) if record.get("boat_scenarios") else None}
 
 
 def summarize(root):
     root = Path(root)
-    totals, per_day, pending, late = {}, {}, 0, 0
+    totals, per_day, pending, late, other_engines = {}, {}, 0, 0, 0
     for path in sorted((root / "predictions").glob("*/*.json")):
         record = json.loads(path.read_text())
         if record.get("mode") != "prospective_shadow":
+            continue
+        if record.get("version") != VERSION:
+            other_engines += 1
             continue
         result_path = root / "evaluations" / record["day"] / path.name
         if not result_path.exists():
@@ -336,5 +348,6 @@ def summarize(root):
             item["roi_pct"] = 100 * item["return_yen"] / item["stake_yen"] if item["stake_yen"] else None
     return {"version": VERSION, "mode": "prospective_shadow", "research_only": True,
             "pending_races": pending, "excluded_late_checkpoint_races": late,
+            "excluded_other_engine_races": other_engines,
             "models": totals, "by_day": per_day,
             "note": "Native policy cards have different budgets. Compare equal-budget controls separately."}
