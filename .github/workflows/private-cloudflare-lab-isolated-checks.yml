@@ -39,6 +39,7 @@ jobs:
           node --check src/r2-api.mjs
           node --check public/app.js
           node --check scripts/verify_remote.mjs
+          node --check scripts/configure_workersdev.mjs
       - name: Run access control, API, and config tests
         run: npm test
       - name: Ensure default config fails closed
@@ -47,7 +48,7 @@ jobs:
             echo 'FAIL: unconfigured Cloudflare preflight should block deployment'
             exit 1
           fi
-          echo 'PASS: missing account, email and custom domain are blocked'
+          echo 'PASS: unconfigured production target blocked'
       - name: Ensure no private database or archive is in this public branch
         run: |
           python3 - <<'PY'
@@ -66,3 +67,20 @@ jobs:
           assert public_files == {'index.html','app.js','style.css'}, public_files
           print('PASS: no research dataset or local credential files bundled')
           PY
+      - name: Package prepared Cloudflare site code only
+        if: success() && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: boat-private-lab-cloudflare-code-only
+          path: |
+            private-lab/public/
+            private-lab/src/
+            private-lab/scripts/
+            private-lab/tests/
+            private-lab/docs/
+            private-lab/*.json
+            private-lab/*.sql
+            private-lab/README.md
+          retention-days: 90
+          compression-level: 6
+          if-no-files-found: error
