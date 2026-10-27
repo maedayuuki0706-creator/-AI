@@ -11,7 +11,10 @@ export async function r2Query(request,env){const u=new URL(request.url),p=u.sear
   const index=await read(env,'races/index.json');if(!index)throw Error('missing index');
   // At most 8 daily objects per request, returning a continuation even for sparse matches.
   let scanned=0,continuation=null;
-  const selected=index.filter(x=>(!from||x.day>=from)&&(!to||x.day<=to)&&(!afterDay||x.day<=afterDay)&&(!venue||x.venues.includes(venue)));
+  // Synthetic cursor YYYYMMDD0000 means the previous page fully scanned that day.
+  // Do not read the same R2 daily object again on a sparse next-page request.
+  const skipScannedDay=!!afterDay&&afterId===afterDay.replaceAll('-','')+'0000';
+  const selected=index.filter(x=>(!from||x.day>=from)&&(!to||x.day<=to)&&(!afterDay||x.day<afterDay||(!skipScannedDay&&x.day===afterDay))&&(!venue||x.venues.includes(venue)));
   for(let i=0;i<selected.length;i++){
    const chunk=await read(env,'races/'+selected[i].day+'.json');if(!chunk)throw Error('missing shard');scanned++;
    rows.push(...chunk.filter(r=>(!venue||r.venue===venue)&&(!from||r.day>=from)&&(!to||r.day<=to)&&(!high||r.payout>=10000)&&(!afterDay||r.day<afterDay||r.day===afterDay&&r.id<afterId)));
