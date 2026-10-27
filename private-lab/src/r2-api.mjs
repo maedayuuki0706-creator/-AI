@@ -4,6 +4,7 @@ async function read(env,key){const r=await env.ARCHIVE.get((env.DATA_PREFIX||'qu
 function param(p,key,re){const v=p.get(key)||'';if(v&&!re.test(v))throw Error('invalid '+key);return v;}
 function stats(entries,key){const m=new Map();for(const e of entries){if(!m.has(e[key]))m.set(e[key],{lane:e[key],starts:0,first:0,top2:0,top3:0,st_sum:0,st_n:0});const r=m.get(e[key]);r.starts++;r.first+=e.rank===1?1:0;r.top2+=e.rank<=2?1:0;r.top3+=e.rank<=3?1:0;if(e.st!==null){r.st_sum+=e.st;r.st_n++;}}return [...m.values()].sort((a,b)=>a.lane-b.lane).map(({st_sum,st_n,...r})=>({...r,avg_st:st_n?st_sum/st_n:null}));}
 export async function r2Query(request,env){const u=new URL(request.url),p=u.searchParams,path=u.pathname;const venue=param(p,'venue',/^(0[1-9]|1[0-9]|2[0-4])$/);
+ if(path==='/api/ai')return {rows:[],note:'未取得：締切前予想原本と購入点数・金額・確定払戻を照合してから成績を表示します。'};
  if(path==='/api/status'){const m=await read(env,'summaries/manifest.json');if(!m)throw Error('missing manifest');return m;}
  if(path==='/api/races'){
   const from=param(p,'from',/^\d{4}-\d{2}-\d{2}$/),to=param(p,'to',/^\d{4}-\d{2}-\d{2}$/),cursor=param(p,'after',/^\d{4}-\d{2}-\d{2}:\d{12}$/);const high=p.get('high')==='1';const [afterDay,afterId]=(cursor||':').split(':');let rows=[];
@@ -29,6 +30,6 @@ export async function r2Query(request,env){const u=new URL(request.url),p=u.sear
   const kind=path.endsWith('water')?'water':'manshu';let rows=await read(env,'summaries/'+kind+(venue?'-'+venue:'')+'.json');if(!rows)throw Error('missing summary');const wind=param(p,'wind',/^\d{1,2}$/);if(kind==='water'&&wind)rows=rows.filter(r=>r.wind===Number(wind));return {rows,phase:'post',tide:null};
  }
  if(path==='/api/previews'){const rows=await read(env,'previews/'+(venue||'all')+'.json');if(!rows)throw Error('missing preview');return {rows:rows.slice(0,30),phase:'pre'};}
- if(path==='/api/motors'){const motor=param(p,'motor',/^\d{1,3}$/);if(!venue)return {rows:[],note:'場を指定してください。モーター番号は場・交換期で区別します。'};const rows=await read(env,'motors/'+venue+'.json');if(!rows)throw Error('missing motors');return {rows:rows.filter(r=>!motor||r.motor===motor).slice(0,60),note:'第三者の期別累計スナップショット。時点保証なし。日別値は合算しません。'};}
+ if(path==='/api/motors'){const motor=param(p,'motor',/^\d{1,3}$/);if(!venue)return {rows:[],note:'場を指定してください。モーター番号は場・交換期で区別します。'};const rows=await read(env,'motors/'+venue+'.json');if(!rows)throw Error('missing motors');return {rows:rows.filter(r=>!motor||String(r.motor)===motor).slice(0,60),note:'第三者の期別累計スナップショット。時点保証なし。日別値は合算しません。'};}
  return undefined;
 }
