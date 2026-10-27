@@ -1,18 +1,18 @@
 # 独自ドメイン不要で「航跡 — BOAT LAB」を非公開デプロイする手順（2026-10-27）
 
-**現在の状態:** コード完成・GitHub研究専用PR #54に保存。Cloudflareアカウントにまだ接続していないため**本番URL、Accessアプリ、private R2は未作成**。以下はデプロイ用の完成手順。既存のRender/X/Discord/本番AIは変更禁止。
+**現在の状態（2026-10-27）:** コード完成・GitHub研究専用PR #54に保存。ユーザーがCloudflare管理画面で標準Hello World Worker `boat-private-lab` を作成済み（URL `https://boat-private-lab.maedayuuki0706.workers.dev`）。ただし**Cloudflare Accessの所有者限定Allowルールと「Apply Access」の完了は未確認。コード置き換え・private R2投入・本番サイト化は未実施**。以下は安全に続きから進めるための手順。既存Render/X/Discord/本番AIは変更禁止。
 
 Cloudflareは2026年8月から**Worker単位でAccessを掛ける機能**を提供する。Workersの`workers.dev`サブドメインを自分だけに公開でき、**ドメイン購入は必須ではない**。
 - https://developers.cloudflare.com/workers/configuration/cloudflare-access/
 - https://developers.cloudflare.com/workers/configuration/routing/workers-dev/
 - https://developers.cloudflare.com/changelog/post/2026-08-14-workers-access/
 
-## 第1段階：研究データなし・フェイルクローズのWorkerを作成
+## 第1段階：既存Hello World Workerをフェイルクローズのサイトコードに置き換える
 
-1. CloudflareアカウントでWorkers FreeとZero Trust Freeを利用できる状態にする。既存のアカウントの請求画面・無料枠・R2利用条件を必ず確認。支払い登録/課金変更は本人の承認が必要。
+1. 作成済みの `boat-private-lab` Workerを使う。新しいWorkerを重複作成しない。CloudflareアカウントでWorkers FreeとZero Trust Freeを利用できる状態にする。既存のアカウントの請求画面・無料枠・R2利用条件を必ず確認。支払い登録/課金変更は本人の承認が必要。
 2. 作業用PC/Workのクラウドターミナルで`private-lab/`から `npx wrangler@4.153.0 login` を実行し、ブラウザOAuthログインする。パスワード・キーはチャットに貼らない。
 3. `npx wrangler@4.153.0 deploy --config wrangler.bootstrap.json` を実行。これは**サイトコードのみ**で、R2も研究データもつながない。実行時の`ACCESS_TEAM` / `ACCESS_AUD` / `ALLOWED_EMAILS` が空のため全リクエスト403。
-4. 生成された `https://boat-private-lab.<自分のサブドメイン>.workers.dev` を未ログインで開き、403になるのを確認。この時点で**まだAccessを設定できていない**ので、ブラウザにサイトを表示しない。
+4. 既存URL `https://boat-private-lab.maedayuuki0706.workers.dev` を未ログインで開き、403になるのを確認。この時点で**まだAccessを設定できていない**ので、ブラウザにサイトを表示しない。
 
 ## 第2段階：Worker全体にCloudflare Accessを付ける
 
