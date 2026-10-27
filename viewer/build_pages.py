@@ -263,7 +263,7 @@ def build(output: Path, origin: str, preview: bool = False, verification: str = 
         raise ValueError("Analytics requires a real measurement ID and production mode")
     output.mkdir(parents=True, exist_ok=True)
     if output.resolve() != ROOT.resolve():
-        for folder in ("assets", "data/public", "data/cards", "data/races"):
+        for folder in ("assets", "analysis", "data/history", "data/research", "data/public", "data/cards", "data/races"):
             src = ROOT / folder
             if src.exists():
                 shutil.copytree(src, output / folder, dirs_exist_ok=True)

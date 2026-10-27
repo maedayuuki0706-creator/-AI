@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#10273e">
 <title>公式結果検索・選手コース別分析｜競艇AIナビ</title>
-<meta name="description" content="保存済み公式結果から万舟・払戻・1着コースを条件検索。選手の全国勝率・コース別1着率・決まり手傾向・平均STを比較。">
+<meta name="description" content="保存済み公式結果から万舟・払戻・1着号艇を条件検索。選手の全国勝率・コース別1着率・決まり手傾向・平均STを比較。">
 <meta name="robots" content="noindex,nofollow"><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/analysis.css?v=20261025">
 <script type="module" src="/assets/analysis.mjs?v=20261025"></script>
@@ -25,17 +25,22 @@
 </div>
 <section id="history-section" role="tabpanel" aria-labelledby="tab-history">
 <div class="section-head"><div><p class="eyebrow">RACE RESULT EXPLORER</p><h2>レース結果を探す。</h2></div><span class="tag">公式確定結果のみ</span></div>
-<div class="caution" id="history-meta">2026年9月13日〜10月8日の保存済み結果を対象に読み込み中。収録のないレース・中止・返還等は分母に含めません。全レース網羅ではありません。</div>
+<div class="caution" id="history-meta">保存済み結果の収録期間を確認中。収録のないレース・中止・返還等は分母に含めません。全レース網羅ではありません。</div>
 <form id="history-form" class="panel filters">
-<label>開始日<input id="h-from" type="date" value="2026-09-13" min="2026-09-13" max="2026-10-08"></label>
-<label>終了日<input id="h-to" type="date" value="2026-10-08" min="2026-09-13" max="2026-10-08"></label>
+<label>開始日<input id="h-from" type="date"></label>
+<label>終了日<input id="h-to" type="date"></label>
 <label>レース場<select id="h-venue"><option value="">全場（収録分）</option></select></label>
 <label>1着の号艇<select id="h-first"><option value="">全号艇</option><option value="1">1号艇</option><option value="2">2号艇</option><option value="3">3号艇</option><option value="4">4号艇</option><option value="5">5号艇</option><option value="6">6号艇</option></select></label>
 <label>払戻下限（100円あたり）<input id="h-min" type="number" min="0" step="100" placeholder="例：3000"></label>
+<label>風速下限（m/s）<input id="h-wind-min" type="number" min="0" max="100" step="1"></label>
+<label>風速上限（m/s）<input id="h-wind-max" type="number" min="0" max="100" step="1"></label>
+<label>風向<select id="h-direction"><option value="">指定なし</option><option>北</option><option>北東</option><option>東</option><option>南東</option><option>南</option><option>南西</option><option>西</option><option>北西</option></select></label>
+<label>実進入<select id="h-entry"><option value="">指定なし</option><option value="changed">枠なり以外</option><option value="same">枠なり</option></select></label>
 <label class="check"><input id="h-manshu" type="checkbox">万舟（10,000円以上）のみ</label>
 <button class="primary" type="submit">条件で検索</button>
 </form>
 <p id="history-status" class="status" role="status" aria-live="polite">履歴を読み込み中…</p>
+<p class="note">初期表示は収録最終日までの直近30日。風・実進入は事後観測です。指定条件の欠測は除外し、0として補完しません。潮位・安定板・周回短縮は未取得。</p>
 <div id="history-metrics" class="metrics" aria-live="polite"></div>
 <div class="panel chart-wrap"><h3>1着号艇の内訳 <small>検索条件内の件数</small></h3><div id="history-chart" class="bar-chart"></div><p class="note">1着率は「検索対象に収録された確定結果」で計算した参考値。風・潮位別、選手別の母数とは異なります。</p></div>
 <div class="section-head"><h3>該当したレース</h3><span class="small" id="history-page-label"></span></div>
@@ -44,7 +49,7 @@
 </section>
 <section id="players-section" role="tabpanel" aria-labelledby="tab-players" hidden>
 <div class="section-head"><div><p class="eyebrow">RACER COURSE DATABASE</p><h2>選手の得意を探す。</h2></div><span class="tag">保存済み選手DB</span></div>
-<div id="player-meta" class="caution">選手データの収録日時を確認中。当地勝率・今節ST・コース別集計母数は元データにないため、表示しません。</div>
+<div id="player-meta" class="caution">選手データの収録日時を確認中。詳細では保存番組表の当地勝率と母数付きコース履歴を確認できます。今節STは未接続。</div>
 <form id="player-form" class="panel filters">
 <label>選手名・登録番号<input id="p-query" type="search" placeholder="毒島 誠 / 4238" autocomplete="off" maxlength="40"></label>
 <label>コース<select id="p-course"><option value="1">1コース</option><option value="2">2コース</option><option value="3">3コース</option><option value="4">4コース</option><option value="5">5コース</option><option value="6">6コース</option></select></label>
@@ -57,9 +62,24 @@
 <p class="status" role="status" id="player-status" aria-live="polite">このタブを開くと選手データを読み込みます。</p>
 <div class="table-scroll"><table><thead><tr><th>選手</th><th>級別</th><th>全国勝率</th><th>指定コース1着率</th><th>平均ST</th><th>詳細</th></tr></thead><tbody id="player-rows"></tbody></table></div>
 <button id="player-more" type="button" class="secondary" hidden>さらに50名表示</button>
+<div class="panel filters"><label>履歴詳細の場<select id="p-venue"><option value="">全場（収録分）</option></select></label><label>履歴詳細の期間<select id="p-window"><option value="all">全収録期間</option><option value="90">収録最終日まで90日</option><option value="30">収録最終日まで30日</option></select></label></div>
 <div id="player-detail" class="panel detail" hidden tabindex="-1"></div>
 <p class="note">収録済みコース別1着率・決まり手割合の集計期間と試行回数は未取得。0%と未取得を区別していますが、少数サンプルを含む可能性があるため順位の過信は禁物です。</p>
 </section>
-<footer><span>競艇AIナビ｜研究・閲覧専用</span><span>公式結果の照合はBOAT RACE公式をご利用ください。予想の的中や利益を保証しません。</span></footer>
+<section class="panel detail" aria-labelledby="sim-title">
+<p class="eyebrow">ENTRY LAB / 仮定の比較</p><h2 id="sim-title">進入を変えて、コース実績を比較。</h2>
+<p class="note">入力した6選手の過去コース実績を、仮定の進入に割り当てます。参考指数＝1＋119×収録1着率（四捨五入）。母数20走未満は指数を出しません。選手間の攻防・深い進入・当日の足は未評価。この参考指数は的中確率・期待値ではありません。保存済みAI研究指数は下の別パネルで確認できます。</p>
+<form id="sim-form" class="filters">
+<label>1〜6号艇の登録番号（カンマ区切り）<input id="sim-ids" value="4238,4418,4586,4320,4444,3960" maxlength="29"></label>
+<label>仮定の進入（内から外）<input id="sim-order" value="123456" maxlength="6" inputmode="numeric"></label>
+<label>比較する場<select id="sim-venue"><option value="">全場（収録分）</option></select></label>
+<button type="submit" class="primary">進入を比較</button></form>
+<p id="sim-status" role="status" class="status">操作したときだけ履歴を読み込みます。全収録期間の事後研究です。</p><div id="sim-results" class="table-scroll"></div>
+</section>
+<section class="panel detail"><p class="eyebrow">FROZEN AI RESEARCH</p><h2>保存済みAI・120通り研究指数</h2>
+<p class="caution">2026年10月20・21日の一部研究原本。指数はレース内の相対尺度（0〜100）で、的中確率・期待値ではありません。締切前の指数保存は未実証。新ゆうきは部分展開で、最終買い目ではありません。同点内の通し順位に予測上の差はありません。</p>
+<button id="index-load" class="secondary" type="button">保存済み研究指数を開く</button>
+<div id="index-controls" class="filters" hidden><label>モデル・保存日<select id="index-file"></select></label><label>レース<select id="index-race"></select></label></div>
+<p id="index-status" class="status" role="status"></p><div id="index-results" class="table-scroll"></div></section><footer><span>競艇AIナビ｜研究・閲覧専用</span><span>公式結果の照合はBOAT RACE公式をご利用ください。予想の的中や利益を保証しません。</span></footer>
 </main>
 </body></html>
