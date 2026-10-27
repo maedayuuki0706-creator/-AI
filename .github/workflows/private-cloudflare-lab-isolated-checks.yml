@@ -40,6 +40,7 @@ jobs:
           node --check public/app.js
           node --check scripts/verify_remote.mjs
           node --check scripts/configure_workersdev.mjs
+          node --check scripts/smoke_private_release.mjs
       - name: Run access control, API, and config tests
         run: npm test
       - name: Ensure default config fails closed
