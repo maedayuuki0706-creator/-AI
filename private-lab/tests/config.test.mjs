@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+test('production routes always execute authentication before assets and default URLs disabled',()=>{const c=JSON.parse(fs.readFileSync(new URL('../wrangler.json',import.meta.url)));assert.equal(c.assets.run_worker_first,true);assert.equal(c.workers_dev,false);assert.equal(c.preview_urls,false);assert.equal(c.vars.DATA_BACKEND,'r2');assert.deepEqual(fs.readdirSync(new URL('../public',import.meta.url)).sort(),['app.js','index.html','style.css']);});
