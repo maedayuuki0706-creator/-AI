@@ -1,5 +1,7 @@
 # 航跡 — 自分専用 BOAT LAB
 
+**Cloudflare未接続でもサイトと検索エンジンは完成・ローカル実データ検証済み。** デプロイ前の全拒否Bootstrap、独自ドメイン不要のWorkers.dev＋Worker単位Access版は [docs/WORKERS_DEV_DEPLOY.md](docs/WORKERS_DEV_DEPLOY.md) を参照。Accessの実設定・R2投入・iPhone実機確認は所有者のログインが必要です。
+
 Cloudflare Workers + Access + **private R2** の個人研究サイト。2026-10-27現在はローカル実装・検証済み、Cloudflare未接続・未デプロイ。
 既存 viewer / main / Discord / X / AI / 研究ワーカー / Sheets / Secrets / Render は一切変更しない。
 
