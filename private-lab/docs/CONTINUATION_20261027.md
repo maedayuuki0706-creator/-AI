@@ -45,3 +45,16 @@
 - 公式全4年の出目・払戻205,269Rを内蔵した、iPhoneで操作できる**通信不要の単一HTMLオフライン確認版** `航跡_BOAT_LAB_研究サイト_オフライン確認版.html`（約8MB）も作成。5,000Rの最新明細のみ内蔵、それ以前の明細は未収録。Cloudflareの認証サイトではない点を明示。
 - Playwright Chromium 390x844でオフライン版のホーム、結果一覧30件、レース明細、選手「毒島」検索、水面検索を実際に操作して**JSエラー0・横スクロール0**。iPhone Safari実機では未検証。
 - Cloudflareへは**アカウント接続未実施・URL未発行・Accessアプリ/R2作成未実施**。Cloudflareログイン/権限付与のないチャットからデプロイ成功を主張しない。本番Renderや既存予想配信には影響ゼロ。
+
+
+## 2026-10-27夕方：サイト開発再開・重要API修復
+
+- 新たな研究専用ブランチ/PRを増やさず、**PR #54の研究ブランチ**で再開した。元のRender/Discord/X/予想AI/Secrets/mainには変更なし。
+- `src/r2-api.mjs` の2つのバグを修正：R2稼働時の `/api/ai` が存在しない `env.DB` にフォールバックして503になっていた問題を「未取得」表示に変更、モーター番号がDB内で数値/文字列のいずれでも `/api/motors?venue=03&motor=61` が一致するように正規化。
+- 過去結果の疎な検索で、8日ごとの継続カーソルを使った際に同じ日付のR2オブジェクトを再ダウンロードしないよう修正。検索は30件ずつのページングを維持。
+- 機密データを含まない人工フィクスチャを使う **5件の常時実行自動テスト `tests/r2-synthetic.test.mjs`** を追加。実際の検索API、万舟の絞り込み、30件ページネーション、8日分検索後の続き、欠測処理、モーター番号、AI未取得を検証。
+- GitHub CI https://github.com/maedayuuki0706-creator/-AI/actions/runs/40477742341 **success**。現地再検証で `npm test` **19件中12件成功／失敗0／実データ依存7件スキップ**。スキップのテストを成功扱いしない。
+- **実在する研究用private R2 ZIPをローカルに展開し、Cloudflare APIの全11主要呼び出しで応答200を実確認**。 `/api/status` 公式 **205,269R / 1,231,614出走 / 1,794選手**、江戸川期間指定検索、万舟30件＋次ページID重複0、毒島検索と当地成績、江戸川風速集計315行、万舟内訳5行、モーター61番13行、直前風波30行、展示/オッズ詳細、AI未取得を確認。R2実データの3連単/選手の数値内容は公開Gitにコミットしない。
+- 私有R2リリースをCloudflare投入前に検証する `scripts/smoke_private_release.mjs` を追加。コマンド `LAB_PRIVATE_R2=/absolute/private/release node scripts/smoke_private_release.mjs`。研究データをログや公開ファイルへ書き出さない。
+- **Cloudflare Workerは2026-10-27午後にユーザーが標準Hello Worldを作成済み**：`boat-private-lab.maedayuuki0706.workers.dev`。Cloudflare Accessの `All traffic` は設定画面で選択されたが、Allow Policyの保存・`Apply Access` 完了は未確認。**現時点でも新しいコードのリモートデプロイと研究データ投入は行っていない**。URLに研究DBがあると誤報告しないこと。
+- ユーザーはCloudflareの英語画面が負担。英語UI操作は極力少なくして、アカウント接続・認証設定は一度だけ、コード・自動テストはGitHub側で進める。**Accessゲート・許可ユーザーの確認ができるまでは機密R2は決して公開サイトに置かない。**
