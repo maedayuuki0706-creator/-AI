@@ -1,0 +1,68 @@
+name: Private Cloudflare BOAT LAB isolated checks
+on:
+  push:
+    branches:
+      - research/private-cloudflare-20261027
+    paths:
+      - 'private-lab/**'
+      - '.github/workflows/private-cloudflare-lab-isolated-checks.yml'
+  pull_request:
+    paths:
+      - 'private-lab/**'
+      - '.github/workflows/private-cloudflare-lab-isolated-checks.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boat-lab-private-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: private-lab
+    steps:
+      - name: Read-only checkout without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup isolated Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Worker syntax
+        run: |
+          node --check src/worker.mjs
+          node --check src/auth.mjs
+          node --check src/r2-api.mjs
+          node --check public/app.js
+          node --check scripts/verify_remote.mjs
+      - name: Run access control, API, and config tests
+        run: npm test
+      - name: Ensure default config fails closed
+        run: |
+          if node scripts/preflight.mjs wrangler.json; then
+            echo 'FAIL: unconfigured Cloudflare preflight should block deployment'
+            exit 1
+          fi
+          echo 'PASS: missing account, email and custom domain are blocked'
+      - name: Ensure no private database or archive is in this public branch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          paths = []
+          for p in Path('.').rglob('*'):
+              if not p.is_file():
+                  continue
+              if '.git' in p.parts or 'node_modules' in p.parts:
+                  continue
+              if p.suffix.lower() in ('.db','.sqlite','.zip','.lzh','.env','.pem','.key','.p12','.pfx') or p.name in ('.dev.vars','wrangler.local.json'):
+                  paths.append(str(p))
+          if paths:
+              raise SystemExit('FAIL: private files must not be committed: '+repr(paths))
+          public_files={p.name for p in Path('public').iterdir() if p.is_file()}
+          assert public_files == {'index.html','app.js','style.css'}, public_files
+          print('PASS: no research dataset or local credential files bundled')
+          PY
