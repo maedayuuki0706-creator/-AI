@@ -1,6 +1,7 @@
+import {readPacked} from './packed-r2.mjs';
 // Equivalent read-only API over offline indexes. No D1 bootstrap quota required.
 // All callers must pass through the Worker authorization gate.
-async function read(env,key){const r=await env.ARCHIVE.get((env.DATA_PREFIX||'query')+'/'+key);if(!r)return null;return r.json?await r.json():JSON.parse(await new Response(r.body).text());}
+async function read(env,key){if(env.R2_PACKED==='1')return readPacked(env,key);const r=await env.ARCHIVE.get((env.DATA_PREFIX||'query')+'/'+key);if(!r)return null;return r.json?await r.json():JSON.parse(await new Response(r.body).text());}
 function param(p,key,re){const v=p.get(key)||'';if(v&&!re.test(v))throw Error('invalid '+key);return v;}
 function stats(entries,key){const m=new Map();for(const e of entries){if(!m.has(e[key]))m.set(e[key],{lane:e[key],starts:0,first:0,top2:0,top3:0,st_sum:0,st_n:0});const r=m.get(e[key]);r.starts++;r.first+=e.rank===1?1:0;r.top2+=e.rank<=2?1:0;r.top3+=e.rank<=3?1:0;if(e.st!==null){r.st_sum+=e.st;r.st_n++;}}return [...m.values()].sort((a,b)=>a.lane-b.lane).map(({st_sum,st_n,...r})=>({...r,avg_st:st_n?st_sum/st_n:null}));}
 export async function r2Query(request,env){const u=new URL(request.url),p=u.searchParams,path=u.pathname;const venue=param(p,'venue',/^(0[1-9]|1[0-9]|2[0-4])$/);
