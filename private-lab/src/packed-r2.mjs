@@ -1,17 +1,24 @@
 // Private Cloudflare R2 compressed-pack reader. No authentication is performed
 // here: the caller MUST verify Cloudflare Access JWT before calling this module.
 // The packed release is immutable and maps are served only through a private R2 binding.
-const maps = new Map();
+// r2Query creates a fresh env per request. Reuse a pack within that request,
+// without retaining research data across users/releases or unbounded global caches.
+const requests = new WeakMap();
+async function objectJSON(env,path) {
+  let cache=requests.get(env);
+  if(!cache){cache=new Map();requests.set(env,cache);}
+  if(!cache.has(path))cache.set(path,(async()=>{
+    const obj=await env.ARCHIVE.get(path);
+    if(!obj)throw new Error('Missing private R2 object');
+    return obj.json();
+  })());
+  return cache.get(path);
+}
 
 async function packMap(env, id) {
   const prefix = env.DATA_PREFIX || 'query';
   const path = `${prefix}/packs/maps/${id}.json`;
-  if (maps.has(path)) return maps.get(path);
-  const obj = await env.ARCHIVE.get(path);
-  if (!obj) throw new Error('Missing private R2 lookup map');
-  const mapping = await obj.json();
-  maps.set(path, mapping);
-  return mapping;
+  return objectJSON(env,path);
 }
 
 export async function readPacked(env, key) {
@@ -21,6 +28,9 @@ export async function readPacked(env, key) {
   if (key === 'races/index.json' || key === 'players/index.json') {
     pack = 'packs/meta.json';
   } else if (/^days\/\d{4}-\d{2}-\d{2}\.json$/.test(key)) {
+    const index = await readPacked(env,'races/index.json');
+    if(!Array.isArray(index))throw new Error('Missing private race index');
+    if(!index.some(row=>row.day===key.slice(5,15)))return null;
     const lookup = await packMap(env, `days-${key.slice(5, 9)}`);
     pack = lookup[key];
   } else if (/^players\/\d{4}\.json$/.test(key)) {
@@ -36,9 +46,7 @@ export async function readPacked(env, key) {
     pack = 'packs/previews.json';
   }
   if (!pack) return null;
-  const obj = await env.ARCHIVE.get(`${prefix}/${pack}`);
-  if (!obj) throw new Error('Missing private R2 compressed pack');
-  const entries = await obj.json();
+  const entries = await objectJSON(env,`${prefix}/${pack}`);
   const encoded = entries[key];
   if (typeof encoded !== 'string') return null;
   const bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));

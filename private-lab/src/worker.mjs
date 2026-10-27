@@ -60,7 +60,12 @@ export default {async fetch(request,env){
  try{
   if(!await authorize(request,env))return json({error:'認証が必要です。許可されたアカウントでログインしてください。'},403);
   if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405);
-  if(new URL(request.url).pathname.startsWith('/api/'))return await api(request,env);
+  if(new URL(request.url).pathname.startsWith('/api/')){
+   // Fail closed during migration, including when the switch is absent.
+   // Authorization above always runs before this gate or any R2 read.
+   if(env.DATA_BACKEND==='r2'&&env.DATA_READY!=='1')return json({error:'研究データは検証中です。接続完了までお待ちください。'},503);
+   return await api(request,env);
+  }
   const res=await env.ASSETS.fetch(request);const h=new Headers(res.headers);for(const [k,v] of Object.entries(headers))h.set(k,v);return new Response(res.body,{status:res.status,headers:h});
  }catch(e){return json({error:e.message?.startsWith('invalid')||e.message?.endsWith('required')?'検索条件が正しくありません':'データを取得できません。再試行してください。'},e.message?.startsWith('invalid')||e.message?.endsWith('required')?400:503);}
 }};

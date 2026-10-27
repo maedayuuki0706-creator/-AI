@@ -33,3 +33,9 @@ for(const [key,expected] of Object.entries(realValues)){
 }
 test('does not serve unknown file',async()=>assert.equal(await readPacked(env,'private/secret.json'),null));
 test('does not serve missing item',async()=>assert.equal(await readPacked(env,'players/0000.json'),null));
+test('one request reads each pack once and a new request cannot reuse another bucket',async()=>{
+ let reads=0;const fresh={DATA_PREFIX:base,ARCHIVE:{async get(key){reads++;return {json:async()=>objects.get(key)};}}};
+ await readPacked(fresh,'races/index.json');await readPacked(fresh,'players/index.json');assert.equal(reads,1);
+ const other={DATA_PREFIX:base,ARCHIVE:{async get(){return {json:async()=>({'races/index.json':gzip64([])})};}}};
+ assert.deepEqual(await readPacked(other,'races/index.json'),[]);
+});
