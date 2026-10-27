@@ -1,5 +1,7 @@
 # 航跡 — 自分専用 BOAT LAB
 
+> **最新の稼働状況（2026-10-28）**: Cloudflare Worker・本人限定Access・非公開R2接続済み。公式2022〜2025年の圧縮パック398個（約63.7MB）をR2に保存し、全48か月のレース数を展開・照合して **205,269レース**で一致。実データ接続スイッチ `DATA_READY=1` に変更済み。なお **iPhone Safariの実表示・ログイン後の各API応答・別メールアカウント拒否は未検証**。2026年事前データは今回の稼働リリースに未投入。詳細: [最新Cloudflare稼働状況](docs/CLOUDFLARE_LIVE_STATUS_20261028.md)。この後にある2026-10-27時点の未接続記述は開発当時の記録。
+
 **Cloudflare未接続でもサイトと検索エンジンは完成・ローカル実データ検証済み。** デプロイ前の全拒否Bootstrap、独自ドメイン不要のWorkers.dev＋Worker単位Access版は [docs/WORKERS_DEV_DEPLOY.md](docs/WORKERS_DEV_DEPLOY.md) を参照。Accessの実設定・R2投入・iPhone実機確認は所有者のログインが必要です。
 
 Cloudflare Workers + Access + **private R2** の個人研究サイト。2026-10-27現在はローカル実装・検証済み、Cloudflare未接続・未デプロイ。
