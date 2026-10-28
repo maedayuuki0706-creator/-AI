@@ -20,7 +20,7 @@ const checks={
 };
 const publicDir=new URL('../public/',import.meta.url);
 const actual=fs.readdirSync(publicDir).sort();
-const allowed=['app.js','index.html','style.css'];
+const allowed=['app.js','index.html','style.css','winpaths-ui.js'];
 checks.assets=JSON.stringify(actual)===JSON.stringify(allowed);
 for(const [key,ok] of Object.entries(checks))console.log(key,ok?'PASS':'BLOCKED');
 if(Object.values(checks).some(ok=>!ok)){
