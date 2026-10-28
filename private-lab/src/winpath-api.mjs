@@ -41,12 +41,13 @@ export async function winpathQuery(request,env) {
       return {...r,
         winRate:rate(r.w,r.n),top2Rate:rate(r.t2,r.n),top3Rate:rate(r.t3,r.n),
         escapeRate:rate(won['逃げ']||0,r.n),
+        escapeAllowedRate:rate(lost['逃げ']||0,r.n),
         makuriRate:rate(won['まくり']||0,r.n),
         makurizashiRate:rate(won['まくり差し']||0,r.n),
         sashiRate:rate(won['差し']||0,r.n),
         nigashiRate:basis==='course'&&lane===2?rate(r.in_escape,r.n):null,
-        beatenByMakuriRate:basis==='course'&&lane===1?rate(lost['まくり']||0,defeats):null,
-        beatenBySashiRate:basis==='course'&&lane===1?rate((lost['差し']||0)+(lost['まくり差し']||0),defeats):null,
+        beatenByMakuriRate:lane===1?rate(lost['まくり']||0,defeats):null,
+        beatenBySashiRate:lane===1?rate((lost['差し']||0)+(lost['まくり差し']||0),defeats):null,
         lostCount:defeats,avgSt:r.sn?Math.round((r.ss/r.sn)*1000)/1000:null,
         methods:methods.map(name=>({name,wins:won[name]||0,perStart:rate(won[name]||0,r.n),amongWins:rate(won[name]||0,r.w)}))
       };
@@ -57,6 +58,7 @@ export async function winpathQuery(request,env) {
    definitions:{
     winRate:'指定枠または実進入コースで1着になったレース数÷該当出走数',
     escapeRate:'その選手が「逃げ」で1着となった回数÷該当出走数',
+    escapeAllowedRate:'自分以外の選手が「逃げ」で1着となった回数÷該当出走数',
     nigashiRate:'実進入2コース時に1コースが「逃げ」で1着となった回数÷2コース出走数',
     beatenByMakuriRate:'実進入1コース時に敗れたうち相手決まり手が「まくり」の割合',
     beatenBySashiRate:'実進入1コース時に敗れたうち相手決まり手が「差し」「まくり差し」の割合',
