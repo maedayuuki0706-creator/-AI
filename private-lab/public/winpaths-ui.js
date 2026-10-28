@@ -50,10 +50,10 @@ export async function renderWinpaths(root,ctx) {
     box.append(summary);
     if(d.n<10){box.append(el('div','notice','標本が10走未満。偶然の影響が大きいため、傾向を強く判断しないでください。'));}
     const keyStats=el('div','winpath-metrics');
-    if(source.scope.basis==='course'&&entry.lane===1){
-      keyStats.append(cell('逃げ率',percent(d.escapeRate),'逃げ成功／1コース全出走'),cell('まくられ率',percent(d.beatenByMakuriRate),'まくり負け／1コース敗戦 '+num(d.lostCount)+'走'),cell('差され率',percent(d.beatenBySashiRate),'差し・まくり差し負け／敗戦'));
+    if(entry.lane===1){
+      keyStats.append(cell('逃げ率',percent(d.escapeRate),'本人の逃げ勝利／この位置の全出走'),cell('まくられ率',percent(d.beatenByMakuriRate),'まくり負け／この位置の敗戦 '+num(d.lostCount)+'走'),cell('差され率',percent(d.beatenBySashiRate),'差し・まくり差し負け／敗戦'));
     }else{
-      keyStats.append(cell('まくり勝ち率',percent(d.makuriRate)),cell('まくり差し勝ち率',percent(d.makurizashiRate)),cell('差し勝ち率',percent(d.sashiRate)));
+      keyStats.append(cell('まくり勝ち率',percent(d.makuriRate)),cell('まくり差し勝ち率',percent(d.makurizashiRate)),cell('差し勝ち率',percent(d.sashiRate)),cell('逃し率',percent(d.escapeAllowedRate),'相手1コースの逃げ成功／全出走'));
       if(source.scope.basis==='course'&&entry.lane===2)keyStats.append(cell('逃がし率',percent(d.nigashiRate),'2コース時の相手1コース逃げ成功'));
     }
     box.append(el('h3','','勝ち方・負け方'),keyStats);
@@ -96,7 +96,7 @@ export async function renderWinpaths(root,ctx) {
       results.append(el('p','source','集計範囲：'+data.scope.from+'〜'+data.scope.to+'。分母は各選手の該当条件の出走回数です。'));
       data.rows.forEach(r=>results.append(renderCard(r,data)));
       results.append(el('div','notice',data.note));
-      small(results,'用語：1コースの「まくられ率・差され率」は敗戦したレースを分母にします。2コースの「逃がし率」は2コース全出走を分母にします。艇番と進入を混同しません。');
+      small(results,'用語：1枠／1コースの「まくられ率・差され率」はその位置で敗れたレースを分母にします。「逃し率」は相手の逃げ成功／全出走。「2コース逃がし率」は実進入2コース全出走を分母にします。艇番と進入を混同しません。');
     }catch(err){results.replaceChildren(el('p','empty',err.message||'比較できませんでした。'));}
     finally{action.disabled=false;}
   });
