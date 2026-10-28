@@ -16,7 +16,9 @@ export async function winpathQuery(request,env) {
   if(venue!=='all'&&!/^(0[1-9]|1[0-9]|2[0-4])$/.test(venue))throw Error('invalid venue');
   const basis=qs.get('basis')||'frame',period=qs.get('period')||'all';
   if(!['frame','course'].includes(basis)||!['all','2025'].includes(period))throw Error('invalid filter');
-  const lanes=(qs.get('lanes')||ids.map((_,i)=>String(i+1)).join(',')).split(',').map(Number);
+  const frames=(qs.get('frames')||ids.map((_,i)=>String(i+1)).join(',')).split(',').map(Number);
+  if(frames.length!==ids.length||frames.some(n=>!inRange(n,1,6))||new Set(frames).size!==frames.length)throw Error('invalid frames');
+  const lanes=(qs.get('lanes')||frames.join(',')).split(',').map(Number);
   if(lanes.length!==ids.length||lanes.some(n=>!inRange(n,1,6)))throw Error('invalid lanes');
   const prefix=env.DATA_PREFIX||'query',cache=new Map();
   async function pack(name){
@@ -28,7 +30,7 @@ export async function winpathQuery(request,env) {
   const out=await Promise.all(ids.map(async(id,i)=>{
     const group='p'+String(Math.floor(Number(id)/50)).padStart(3,'0')+'.json';
     const packed=await pack(group);const item=packed?.[id];
-    if(!item)return {id,name:null,frame:i+1,course:lanes[i],sample:null,baseline:null,unavailable:true};
+    if(!item)return {id,name:null,frame:frames[i],course:lanes[i],sample:null,baseline:null,unavailable:true};
     const d=await decompress(item);
     const lane=lanes[i],key=period+'|'+venue+'|'+basis+'|'+lane;
     const sample=d.rows[key]||null;
@@ -49,7 +51,7 @@ export async function winpathQuery(request,env) {
         methods:methods.map(name=>({name,wins:won[name]||0,perStart:rate(won[name]||0,r.n),amongWins:rate(won[name]||0,r.w)}))
       };
     }
-    return {id,name:d.name,frame:i+1,course:lanes[i],lane,sample:present(sample),baseline:present(reference),unavailable:!sample};
+    return {id,name:d.name,frame:frames[i],course:lanes[i],lane,sample:present(sample),baseline:present(reference),unavailable:!sample};
   }));
   return {rows:out,scope:{venue,basis,period,from:period==='all'?'2022-01-01':'2025-01-01',to:'2025-12-31'},
    definitions:{
