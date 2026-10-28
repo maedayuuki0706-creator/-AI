@@ -1,0 +1,7 @@
+import {readFile} from 'node:fs/promises';import path from 'node:path';
+import {performance} from 'node:perf_hooks';import {DatabaseSync} from 'node:sqlite';import {api} from '../src/worker.mjs';import {database} from './local.mjs';
+const db=database(process.env.LAB_DB);const results={backend:process.env.LAB_R2?'r2-local-files':'sqlite'};const env=process.env.LAB_R2?{DATA_BACKEND:'r2',ARCHIVE:{async get(key){try{return {body:await readFile(path.join(process.env.LAB_R2,key))};}catch{return null;}}}}:{DB:db};
+for(const [name,url] of [['race','races?venue=03&from=2024-01-01&to=2024-12-31'],['player_search','players?q=毒島'],['player_detail','player?id=4238&venue=03'],['water','water?venue=03']]){
+ const times=[];let bytes=0;for(let i=0;i<100;i++){const start=performance.now();const r=await api(new Request('https://bench.test/api/'+url),env);const body=await r.text();if(r.status!==200)throw Error(body);bytes=Buffer.byteLength(body);times.push(performance.now()-start);}times.sort((a,b)=>a-b);results[name]={iterations:100,p50_ms:+times[50].toFixed(2),p95_ms:+times[95].toFixed(2),response_bytes:bytes};
+}
+db.close();const sql=new DatabaseSync(process.env.LAB_DB,{readOnly:true});results.index_plan=sql.prepare("EXPLAIN QUERY PLAN SELECT id FROM races WHERE venue=? AND day>=? AND day<=? ORDER BY day DESC,id DESC LIMIT 31").all('03','2024-01-01','2024-12-31');sql.close();console.log(JSON.stringify(results,null,2));

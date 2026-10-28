@@ -1,0 +1,15 @@
+PRAGMA foreign_keys=ON;
+CREATE TABLE IF NOT EXISTS races(id TEXT PRIMARY KEY,day TEXT NOT NULL,venue TEXT NOT NULL,rno INTEGER NOT NULL,weather TEXT,wind_direction TEXT,wind REAL,wave REAL,result TEXT,payout INTEGER,method TEXT,source TEXT NOT NULL,phase TEXT NOT NULL CHECK(phase='post'),UNIQUE(day,venue,rno));
+CREATE INDEX IF NOT EXISTS races_date ON races(day DESC,id DESC);
+CREATE INDEX IF NOT EXISTS races_venue_date ON races(venue,day DESC,id DESC);
+CREATE INDEX IF NOT EXISTS races_high_date ON races(day DESC,id DESC) WHERE payout>=10000;
+CREATE INDEX IF NOT EXISTS races_high_venue ON races(venue,day DESC,id DESC) WHERE payout>=10000;
+CREATE TABLE IF NOT EXISTS entries(race_id TEXT NOT NULL REFERENCES races(id),boat INTEGER NOT NULL,racer_id TEXT NOT NULL,name TEXT,rank INTEGER,course INTEGER,motor INTEGER,st REAL,exhibition REAL,PRIMARY KEY(race_id,boat));
+CREATE INDEX IF NOT EXISTS entries_player ON entries(racer_id,race_id);
+CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY,name TEXT,name_key TEXT,starts INTEGER,first INTEGER,top2 INTEGER,top3 INTEGER,avg_st REAL,first_day TEXT,last_day TEXT);
+CREATE INDEX IF NOT EXISTS player_names ON players(name_key);
+CREATE TABLE IF NOT EXISTS summaries(kind TEXT PRIMARY KEY,json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS motors(day TEXT,venue TEXT,motor TEXT,epoch TEXT,starts REAL,win_rate REAL,two_rate REAL,three_rate REAL,source TEXT,PRIMARY KEY(day,venue,motor));
+CREATE INDEX IF NOT EXISTS motor_search ON motors(venue,motor,day DESC);
+CREATE TABLE IF NOT EXISTS previews(id TEXT PRIMARY KEY,day TEXT,venue TEXT,deadline TEXT,asof TEXT,wind REAL,direction TEXT,wave REAL,source TEXT,phase TEXT CHECK(phase='pre'));
+CREATE INDEX IF NOT EXISTS previews_date ON previews(day DESC,id DESC);
