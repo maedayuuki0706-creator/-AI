@@ -37,6 +37,8 @@ jobs:
           node --check src/worker.mjs
           node --check src/auth.mjs
           node --check src/r2-api.mjs
+          node --check src/winpath-api.mjs
+          node --check public/winpaths-ui.js
           node --check src/staging-bridge.mjs
           node --check public/app.js
           node --check scripts/verify_remote.mjs
@@ -66,7 +68,7 @@ jobs:
           if paths:
               raise SystemExit('FAIL: private files must not be committed: '+repr(paths))
           public_files={p.name for p in Path('public').iterdir() if p.is_file()}
-          assert public_files == {'index.html','app.js','style.css'}, public_files
+          assert public_files == {'index.html','app.js','style.css','winpaths-ui.js'}, public_files
           print('PASS: no research dataset or local credential files bundled')
           PY
       - name: Package prepared Cloudflare site code only
