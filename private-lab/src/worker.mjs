@@ -1,11 +1,12 @@
 import {authorize} from './auth.mjs';
 import {r2Query} from './r2-api.mjs';
+import {winpathQuery} from './winpath-api.mjs';
 const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",'Strict-Transport-Security':'max-age=31536000','X-Robots-Tag':'noindex, nofollow'};
 const json=(x,status=200)=>new Response(JSON.stringify(x),{status,headers:{...headers,'Content-Type':'application/json; charset=utf-8'}});
 function value(p,k,re){const v=p.get(k)||'';if(v&&!re.test(v))throw Error('invalid '+k);return v;}
 async function all(db,sql,args=[]){return (await db.prepare(sql).bind(...args).all()).results;}
 export async function api(request,env){
- if(env.DATA_BACKEND==='r2'){const result=await r2Query(request,env);if(result!==undefined)return json(result,result?.error?404:200);}
+ if(env.DATA_BACKEND==='r2'){if(new URL(request.url).pathname==='/api/winpaths')return json(await winpathQuery(request,env));const result=await r2Query(request,env);if(result!==undefined)return json(result,result?.error?404:200);}
  const u=new URL(request.url),p=u.searchParams,path=u.pathname;
  const venue=value(p,'venue',/^(0[1-9]|1[0-9]|2[0-4])$/);
  const summary=async kind=>{const r=await env.DB.prepare('SELECT json FROM summaries WHERE kind=?').bind(kind).first();return r?JSON.parse(r.json):null;};
