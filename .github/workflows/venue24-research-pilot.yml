@@ -90,6 +90,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: venue24-research-snapshot
-          path: "$RUNNER_TEMP/venue24-snapshot.tar.gz"
+          path: ${{ runner.temp }}/venue24-snapshot.tar.gz
           retention-days: 30
           if-no-files-found: ignore
