@@ -99,7 +99,7 @@ jobs:
           fi
           git -C "$RUNNER_TEMP/venue24-state" config user.name "github-actions[bot]"
           git -C "$RUNNER_TEMP/venue24-state" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C "$RUNNER_TEMP/venue24-state" add -- data/venue24_v1/
+          git -C "$RUNNER_TEMP/venue24-state" add -- data/venue24_v2/
           if ! git -C "$RUNNER_TEMP/venue24-state" diff --cached --quiet; then
             git -C "$RUNNER_TEMP/venue24-state" commit -m "venue24: append immutable 23-venue original-foot snapshot $VENUE24_KEY"
             git -C "$RUNNER_TEMP/venue24-state" push origin HEAD:refs/heads/research-venue24-state-20261101
