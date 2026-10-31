@@ -156,15 +156,18 @@ def collect(official_dir, output_dir, start_day, end_day, *, request_fn=None):
         url = BASE + f"{text_day[:4]}/{text_day[4:6]}/{text_day[6:]}.csv"
         try:
             content, status = download_csv(text_day, out / "source_csv" / (text_day + ".csv"), request_fn)
-            records, errors = csv_records(content, official, url, datetime.now().astimezone().isoformat())
+            manifest_path = out / "manifests" / (text_day + ".json")
+            archived_at = (json.loads(manifest_path.read_text())["archived_at"]
+                           if manifest_path.exists() else datetime.now().astimezone().isoformat())
+            records, errors = csv_records(content, official, url, archived_at)
             for key, record in records.items():
                 engine.immutable_json(out / "normalized" / (key + ".json"), record)
-            engine.immutable_json(out / "manifests" / (text_day + ".json"), {
+            engine.immutable_json(manifest_path, {
                 "day": text_day, "source_url": url,
                 "raw_sha256": sha256(content).hexdigest(),
                 "valid_races": sorted(records),
                 "invalid": errors,
-                "read_status": status,
+                "archived_at": archived_at,
             })
             summary["source_dates_available"] += 1
             summary["matched_races"] += len(records)
