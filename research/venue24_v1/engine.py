@@ -195,6 +195,8 @@ def original_index(folder):
     for p in sorted(Path(folder).rglob("*.json")):
         try:
             item = json.loads(p.read_text(encoding="utf-8"))
+            if not isinstance(item, dict):
+                continue
             key = item.get("race_id")
             if key and re.fullmatch(r"\d{8}_\d{2}_\d{2}", key):
                 records[key].append(item)
