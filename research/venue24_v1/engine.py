@@ -173,7 +173,7 @@ def normalize_original(original, official):
         "source_publish_time_verified": bool(acquisition.get("published_at")),
         "scoring_connected": False,
         "rows_by_lane": normalized,
-    }, "captured_before_deadline"
+    }, ("retrospective_secondary_source" if acquisition.get("source_family") == "BoatraceCSV_secondary" else "captured_before_deadline")
 
 
 def join_official_original(raw, original=None):
@@ -211,11 +211,12 @@ def find_original(variants, official):
     for candidate in variants:
         norm, reason = normalize_original(candidate, official)
         if norm is not None:
-            acceptable.append((as_time(norm["captured_at"]), candidate))
+            source_priority = 0 if candidate.get("acquisition", {}).get("source_family") == "BoatraceCSV_secondary" else 1
+            acceptable.append((source_priority, as_time(norm["captured_at"]), candidate))
         else:
             failures.append(reason)
     if acceptable:
-        return max(acceptable, key=lambda item: item[0])[1]
+        return max(acceptable, key=lambda item: (item[0], item[1]))[2]
     return variants[-1] if variants else None
 
 
