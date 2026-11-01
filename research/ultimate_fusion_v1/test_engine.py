@@ -54,6 +54,10 @@ class FusionContractTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "predeadline"):
             e.prepare_live(v, observed_at="2026-11-02T12:01:00+09:00")
 
+    def test_stale_predeadline_data_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Stale source"):
+            e.prepare_live(race(), observed_at="2026-11-02T11:46:01+09:00")
+
     def test_entrant_identity_guard(self):
         r=race()
         r["rows"][2]["lane"]=2
