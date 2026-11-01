@@ -1,0 +1,32 @@
+name: Ultimate boat data fusion isolated research tests
+
+on:
+  push:
+    branches:
+      - research/ultimate-data-fusion-20261102
+    paths:
+      - research/ultimate_fusion_v1/**
+      - .github/workflows/ultimate-fusion-research-tests.yml
+  pull_request:
+    paths:
+      - research/ultimate_fusion_v1/**
+      - .github/workflows/ultimate-fusion-research-tests.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify isolated data fusion and safety invariants
+        run: python -m unittest research.ultimate_fusion_v1.test_engine -v
+      - name: Verify research package can compile
+        run: python -m compileall -q research/ultimate_fusion_v1
