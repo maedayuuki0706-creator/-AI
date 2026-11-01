@@ -93,6 +93,8 @@ def prepare_live(raw, observed_at=None, minimum_lead_s=180):
         raise ValueError("Current-race result leakage")
     if not taken <= observed <= deadline - timedelta(seconds=minimum_lead_s):
         raise ValueError("Not a predeadline and timely snapshot")
+    if (observed - taken).total_seconds() > 180:
+        raise ValueError("Stale source: older than 180 seconds")
     if taken.date() != deadline.date():
         raise ValueError("Wrong local racing day")
     boats_six(raw["rows"])
@@ -252,7 +254,7 @@ def research_report(snapshot, history=None, foot=None):
         "source_families": {
             "boaters_inspired": "derived_from_own_official",
             "frontier_inspired": "derived_from_own_official",
-            "biyorii_inspired": "derived_from_own_official",
+            "biyori_inspired": "derived_from_own_official",
             "third_party_site_api_integrated": False,
         },
         "features": {"exhibition_time_by_lane": speed, "alerts": derive_alerts(snapshot)},
