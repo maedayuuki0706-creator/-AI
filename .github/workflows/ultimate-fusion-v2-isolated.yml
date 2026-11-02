@@ -1,0 +1,33 @@
+name: Ultimate fusion v2 isolated validation
+on:
+  push:
+    branches: [research/ultimate-fusion-asof-20261102]
+    paths: ['research/ultimate_fusion_v2/**', 'research/ultimate_fusion_v1/**', 'research/scenario_v2/**', 'research/venue24_v1/**', '.github/workflows/ultimate-fusion-v2-isolated.yml']
+  pull_request:
+    paths: ['research/ultimate_fusion_v2/**', 'research/ultimate_fusion_v1/**', 'research/scenario_v2/**', 'research/venue24_v1/**', '.github/workflows/ultimate-fusion-v2-isolated.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m unittest research.ultimate_fusion_v1.test_engine research.ultimate_fusion_v2.tests.test_core research.scenario_v2.tests.test_engine research.ultimate_fusion_v2.tests.test_forward -v
+      - run: python -m compileall -q research/ultimate_fusion_v2 research/ultimate_fusion_v1 research/scenario_v2 research/venue24_v1
+      - run: node --check research/ultimate_fusion_v2/web/app.mjs
+      - run: node --test research/ultimate_fusion_v2/tests/api.test.mjs
+      - name: Reproduce retrospective evaluation (no publishing or production secrets)
+        run: python -m research.ultimate_fusion_v2.evaluate --output /tmp/fusion-evaluation
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ultimate-fusion-v2-research-${{ github.sha }}
+          path: /tmp/fusion-evaluation/

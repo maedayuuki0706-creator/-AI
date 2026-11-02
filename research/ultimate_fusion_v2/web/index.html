@@ -1,0 +1,7 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>航跡｜融合AI 研究室</title><link rel="stylesheet" href="style.css">
+<header><span>航跡 — BOAT LAB</span><small>FUSION RESEARCH / 02</small></header><main><p class="eyebrow">6艇の展開を、根拠から読む</p><h1>融合AI 研究室</h1><p class="warning">研究段階・見送り｜確率未校正。表示は過去データの再生で、当日の購入推奨ではありません。</p>
+<section><h2>時系列検証</h2><div id="metrics" class="metrics"></div><p id="evaluationNote"></p><details><summary>場別・払戻帯別の成績</summary><div id="breakdown"></div></details></section>
+<section><label for="import">保存した研究JSONを開く</label><input id="import" type="file" accept=".json,application/json"><p id="status" role="status">読み込み中…</p><h2 id="race"></h2><p id="source"></p><div id="boats" class="boats"></div></section>
+<section><h2>攻めの起点と連動</h2><p>号艇を選ぶと勝ち筋・負け筋を表示。進入は展示時点の仮定です。</p><div id="tabs" class="tabs"></div><div id="flow"></div></section>
+<section><h2>3連単120通り</h2><p>研究スコアは過去頻度に平滑化を加えた値です。的中確率ではありません。連動印は仮想10点への採用を示します。</p><label for="head">1着艇</label><select id="head"><option value="">全艇</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select><div class="scroll"><table><thead><tr><th>組合せ</th><th>研究スコア</th><th>連動</th><th>公式オッズ</th><th>確率</th><th>期待値</th></tr></thead><tbody id="triples"></tbody></table></div></section>
+<footer>未接続値は「未取得」。本番の配信・購入・設定変更は行いません。</footer></main><script type="module" src="app.mjs"></script></html>

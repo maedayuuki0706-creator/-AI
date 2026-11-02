@@ -1,0 +1,62 @@
+name: Ultimate fusion forward capture pilot
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/ultimate-fusion-asof-20261102]
+    paths: ['research/ultimate_fusion_v2/capture/**', 'research/ultimate_fusion_v2/tests/test_forward.py', '.github/workflows/ultimate-fusion-forward-pilot.yml']
+permissions:
+  contents: write
+concurrency:
+  group: ultimate-fusion-forward-pilot-independent
+  cancel-in-progress: false
+jobs:
+  capture:
+    if: github.ref == 'refs/heads/research/ultimate-fusion-asof-20261102'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: code
+          persist-credentials: false
+          sparse-checkout: |
+            research
+            data/exhibition_log
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test isolated capture and checkpoint guards
+        working-directory: code
+        run: python -m unittest research.ultimate_fusion_v2.tests.test_forward -v
+      - uses: actions/checkout@v4
+        with:
+          ref: research-ultimate-fusion-forward-state-20261102
+          path: state
+          fetch-depth: 1
+          sparse-checkout: data/ultimate_fusion_forward_v2
+      - name: Prepare dedicated append-only state
+        working-directory: state
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          mkdir -p data/ultimate_fusion_forward_v2
+      - name: Bounded official capture (no candidate is an explicit non-capture)
+        working-directory: code
+        run: python -m research.ultimate_fusion_v2.capture.live --out ../state --audit /tmp/fusion-forward/pilot.json
+      - name: Persist originals and confirm remote before deadline
+        working-directory: code
+        run: python -m research.ultimate_fusion_v2.capture.checkpoint --state ../state
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: official-results-readonly
+          persist-credentials: false
+          sparse-checkout: data/official_results
+      - name: Score previously checkpointed originals only
+        working-directory: code
+        run: python -m research.ultimate_fusion_v2.capture.score --state ../state --results ../official-results-readonly/data/official_results --out /tmp/fusion-forward/scoring
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fusion-forward-audit-${{ github.run_id }}
+          path: /tmp/fusion-forward/
