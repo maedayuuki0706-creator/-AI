@@ -222,7 +222,7 @@ def original_exhibition(foot, snapshot):
         published = aware(acq["published_at"])
         deadline = aware(snapshot["deadline_at"])
         if (acq.get("source_family") != "venue_official_verified" or
-            captured > deadline or published > captured or
+            captured > aware(snapshot["snapshot_at"]) or captured > deadline or published > captured or
             foot.get("status") != "ok"):
             raise ValueError("Source not prospectively verified")
         boats_six(foot.get("rows"))
