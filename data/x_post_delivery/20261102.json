@@ -137,9 +137,10 @@
   "x_result_attempts": {
     "20261102:03:11": {
       "at": "2026-11-02T15:30:57.650908+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "0826b235e0844447925422859e8f4413",
-      "status": "reserved"
+      "retry_at": "2026-11-02T15:31:41.688195+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {
@@ -2450,10 +2451,12 @@
       "attempt": 1,
       "claimed_at": "2026-11-02T15:30:57.650908+09:00",
       "content_sha256": "4ba351eecd59e761faf92206d91425248c536bd64db2c18f5065f391fae23f0f",
+      "error_type": "DefiniteRejection",
       "key": "result:20261102:03:11",
       "owner": "0826b235e0844447925422859e8f4413",
       "parent_post_id": "2117138884194947344",
       "phase": "result",
+      "request_started_at": "2026-11-02T15:31:01.045175+09:00",
       "row": {
         "day": "20261102",
         "deadline": "15:29",
@@ -2503,7 +2506,14 @@
         "source": "AI重なり本線",
         "venue": "江戸川"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "official result pending",
+        "retryable": true,
+        "transport_http_status": 409
+      },
+      "updated_at": "2026-11-02T15:31:11.688195+09:00"
     },
     "result:20261102:04:1": {
       "attempt": 1,
