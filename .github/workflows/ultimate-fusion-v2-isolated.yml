@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: python -m unittest research.ultimate_fusion_v1.test_engine research.ultimate_fusion_v2.tests.test_core research.scenario_v2.tests.test_engine -v
+      - run: python -m unittest research.ultimate_fusion_v1.test_engine research.ultimate_fusion_v2.tests.test_core research.scenario_v2.tests.test_engine research.ultimate_fusion_v2.tests.test_forward -v
       - run: python -m compileall -q research/ultimate_fusion_v2 research/ultimate_fusion_v1 research/scenario_v2 research/venue24_v1
       - run: node --check research/ultimate_fusion_v2/web/app.mjs
       - run: node --test research/ultimate_fusion_v2/tests/api.test.mjs
