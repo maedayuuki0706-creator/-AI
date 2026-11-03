@@ -1,13 +1,20 @@
 {
   "day": "20261103",
   "sent_races": [],
-  "updated_at": "2026-11-03T13:20:57.702462+09:00",
+  "updated_at": "2026-11-03T13:34:04.703704+09:00",
   "x_attempts": {
     "20261103:09:7": {
       "at": "2026-11-03T13:11:28.665543+09:00",
       "attempt": 1,
       "id": "160a5ff13ea2492ba2105a31f2517330",
       "retry_at": "2026-11-03T13:12:51.417004+09:00",
+      "status": "uncertain"
+    },
+    "20261103:22:7": {
+      "at": "2026-11-03T13:30:29.173362+09:00",
+      "attempt": 1,
+      "id": "8a887e84afbf4c77afdd88626c1dd212",
+      "retry_at": "2026-11-03T13:31:51.300547+09:00",
       "status": "uncertain"
     }
   },
@@ -77,13 +84,6 @@
       "id": "6a7134d4031148a9929dee1cb1ac6f47",
       "retry_at": "2026-11-03T13:17:41.890204+09:00",
       "status": "uncertain"
-    },
-    "20261103:17:7": {
-      "at": "2026-11-03T13:16:43.521177+09:00",
-      "attempt": 0,
-      "id": "e9bbacf407704487b4bc243c4b36190a",
-      "retry_at": "2026-11-03T13:17:16.422428+09:00",
-      "status": "retryable"
     }
   },
   "x_result_post_ids": {
@@ -94,6 +94,7 @@
     "20261103:09:3": "2117445720580182457",
     "20261103:10:8": "2117457064947818894",
     "20261103:17:2": "2117438504779366809",
+    "20261103:17:7": "2117473237978534343",
     "20261103:21:6": "2117440981167747078",
     "20261103:21:8": "2117455964463051074",
     "20261103:21:9": "2117461649317929431"
@@ -106,6 +107,7 @@
     "20261103:09:3",
     "20261103:10:8",
     "20261103:17:2",
+    "20261103:17:7",
     "20261103:21:6",
     "20261103:21:8",
     "20261103:21:9"
@@ -901,6 +903,65 @@
       "transport_evidence": {},
       "updated_at": "2026-11-03T12:16:52.464861+09:00"
     },
+    "prediction:20261103:22:7": {
+      "attempt": 1,
+      "claimed_at": "2026-11-03T13:30:29.173362+09:00",
+      "content_sha256": "f51d2fdbcaaefd61683716dee3e90f7a51f64d7a95becaf2eb50f309aef48c1d",
+      "error_type": "MissingAcknowledgement",
+      "key": "prediction:20261103:22:7",
+      "owner": "8a887e84afbf4c77afdd88626c1dd212",
+      "parent_post_id": null,
+      "phase": "prediction",
+      "request_started_at": "2026-11-03T13:30:30.295517+09:00",
+      "row": {
+        "day": "20261103",
+        "deadline": "13:46",
+        "format_version": "v3-venue-hashtags",
+        "jcd": "22",
+        "picks": [
+          "1-3-2",
+          "3-1-2",
+          "1-3-4",
+          "1-2-3",
+          "3-1-4",
+          "1-3-6",
+          "3-1-6",
+          "3-2-1",
+          "1-4-3",
+          "1-3-5",
+          "3-4-1",
+          "2-1-3",
+          "4-1-3",
+          "6-3-1",
+          "5-1-3",
+          "3-1-5",
+          "3-6-1",
+          "4-3-1"
+        ],
+        "post": "🚤福岡 7R｜締切 13:46\n🔥 配当期待予想\n🎯 本線 10点\n1-23-23\n3-12-12\n1-3-465\n3-1-46\n1-4-3\n🛡️ 抑え 8点\n3-4-1\n2-1-3\n4-13-13\n6-3-1\n5-1-3\n3-1-5\n3-6-1\n結果も自動投稿｜フォローお願いします！\n\n#競艇 #ボートレース #競艇予想 #ボートレース予想 #無料予想 #福岡 #ボートレース福岡",
+        "prediction_records": [
+          {
+            "commit": "cf5d357286885f44d8c0cdaa8c1bebaa365dbe26",
+            "created_at": "2026-11-03T13:28:00.838809+09:00",
+            "path": "data/prototype3_delivery/predictions/20261103_22_07.json",
+            "record_digest": "8b38ea6d1231d1ca96ae543ba1ee891ba8274c08661dc8e54e2d35f7b3944198",
+            "record_sha256": "52d6ba56251c04bbe3324242146d16768e239930f694f4e0811c4a259955bac3"
+          }
+        ],
+        "resend": false,
+        "rno": 7,
+        "selection_score": 73.25641845049658,
+        "sent_at": "2026-11-03T13:30:27.377035+09:00",
+        "source": "配当期待本線",
+        "venue": "福岡"
+      },
+      "status": "uncertain",
+      "transport_evidence": {
+        "error": "TimeoutError",
+        "transport_http_status": 500
+      },
+      "updated_at": "2026-11-03T13:30:51.300547+09:00"
+    },
     "result:20261103:02:3": {
       "attempt": 1,
       "claimed_at": "2026-11-03T11:53:55.453911+09:00",
@@ -1424,14 +1485,21 @@
     },
     "result:20261103:17:7": {
       "attempt": 1,
-      "claimed_at": "2026-11-03T13:16:43.521177+09:00",
+      "claimed_at": "2026-11-03T13:25:32.235972+09:00",
       "content_sha256": "3f1fb1b4be8055e7c10cda20766f40607f884e0db3662a0c165ce519c7b86f8b",
-      "error_type": "DefiniteRejection",
       "key": "result:20261103:17:7",
-      "owner": "e9bbacf407704487b4bc243c4b36190a",
+      "owner": "042b8c302baa474ea465a9ecafd6373a",
       "parent_post_id": "2117466180302799169",
       "phase": "result",
-      "request_started_at": "2026-11-03T13:16:44.869147+09:00",
+      "post_id": "2117473237978534343",
+      "request_started_at": "2026-11-03T13:25:33.922314+09:00",
+      "response": {
+        "hit": false,
+        "odds": 9.8,
+        "reply_to": "2117466180302799169",
+        "text": "📊 結果｜宮島 7R\n1-2-6　9.8倍\n\n❌ 不的中\n的中もハズレも結果公開します。",
+        "winner": "1-2-6"
+      },
       "row": {
         "day": "20261103",
         "deadline": "13:11",
@@ -1474,14 +1542,10 @@
         "source": "配当期待本線",
         "venue": "宮島"
       },
-      "status": "waiting_result",
-      "transport_evidence": {
-        "definitely_not_posted": true,
-        "error": "official result pending",
-        "retryable": true,
-        "transport_http_status": 409
-      },
-      "updated_at": "2026-11-03T13:16:46.422428+09:00"
+      "sent_at": "2026-11-03T13:25:35.634946+09:00",
+      "status": "sent",
+      "transport_evidence": {},
+      "updated_at": "2026-11-03T13:25:35.635344+09:00"
     },
     "result:20261103:21:6": {
       "attempt": 1,
