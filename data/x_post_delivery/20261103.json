@@ -106,9 +106,10 @@
     },
     "20261103:09:9": {
       "at": "2026-11-03T14:27:23.358696+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "59d02e878ff445e582bd961e166c11c9",
-      "status": "reserved"
+      "retry_at": "2026-11-03T14:27:57.418325+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {
@@ -1610,10 +1611,12 @@
       "attempt": 1,
       "claimed_at": "2026-11-03T14:27:23.358696+09:00",
       "content_sha256": "671d332236c9621ea436efaaa7b68df73c49e1cdf4604be4283171fe2a33744f",
+      "error_type": "DefiniteRejection",
       "key": "result:20261103:09:9",
       "owner": "59d02e878ff445e582bd961e166c11c9",
       "parent_post_id": "2117484004870111542",
       "phase": "result",
+      "request_started_at": "2026-11-03T14:27:26.373128+09:00",
       "row": {
         "day": "20261103",
         "deadline": "14:24",
@@ -1656,7 +1659,14 @@
         "source": "配当期待本線",
         "venue": "津"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "official result pending",
+        "retryable": true,
+        "transport_http_status": 409
+      },
+      "updated_at": "2026-11-03T14:27:27.418325+09:00"
     },
     "result:20261103:10:8": {
       "attempt": 1,
