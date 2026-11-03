@@ -1,7 +1,7 @@
 {
   "day": "20261103",
   "sent_races": [],
-  "updated_at": "2026-11-03T10:53:07.606712+09:00",
+  "updated_at": "2026-11-03T11:04:20.280872+09:00",
   "x_attempts": {},
   "x_exhibition_attempts": {},
   "x_exhibition_update_ids": {},
@@ -28,10 +28,25 @@
   ],
   "x_result_attempts": {
     "20261103:04:1": {
-      "at": "2026-11-03T10:52:59.706986+09:00",
-      "attempt": 1,
-      "id": "97fd539726834fdaaccd6ca220b99b72",
-      "status": "reserved"
+      "at": "2026-11-03T11:02:45.085212+09:00",
+      "attempt": 0,
+      "id": "034c9ae7ea164125958c01dad44d7f68",
+      "retry_at": "2026-11-03T11:03:17.999278+09:00",
+      "status": "retryable"
+    },
+    "20261103:17:2": {
+      "at": "2026-11-03T11:02:40.477500+09:00",
+      "attempt": 0,
+      "id": "abd4ccdb422a40fc85e263b4d2a72a34",
+      "retry_at": "2026-11-03T11:03:13.237035+09:00",
+      "status": "retryable"
+    },
+    "20261103:21:6": {
+      "at": "2026-11-03T11:02:49.750677+09:00",
+      "attempt": 0,
+      "id": "6be9c1a4794548b09817469222dc39f6",
+      "retry_at": "2026-11-03T11:03:31.897142+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {},
@@ -227,12 +242,14 @@
     },
     "result:20261103:04:1": {
       "attempt": 1,
-      "claimed_at": "2026-11-03T10:52:59.706986+09:00",
+      "claimed_at": "2026-11-03T11:02:45.085212+09:00",
       "content_sha256": "d9e4ba73d5e9162151001864df5dd6d8f01a540fb2b66317b529ffe44b091114",
+      "error_type": "DefiniteRejection",
       "key": "result:20261103:04:1",
-      "owner": "97fd539726834fdaaccd6ca220b99b72",
+      "owner": "034c9ae7ea164125958c01dad44d7f68",
       "parent_post_id": "2117431318380486863",
       "phase": "result",
+      "request_started_at": "2026-11-03T11:02:46.603635+09:00",
       "row": {
         "day": "20261103",
         "deadline": "10:52",
@@ -275,7 +292,150 @@
         "source": "配当期待本線",
         "venue": "平和島"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "official result pending",
+        "retryable": true,
+        "transport_http_status": 409
+      },
+      "updated_at": "2026-11-03T11:02:47.999278+09:00"
+    },
+    "result:20261103:17:2": {
+      "attempt": 1,
+      "claimed_at": "2026-11-03T11:02:40.477500+09:00",
+      "content_sha256": "572ff599f7c2172ebf7b26ef0f23dc8eb071b9874206147ffe81fd529a6b8466",
+      "error_type": "DefiniteRejection",
+      "key": "result:20261103:17:2",
+      "owner": "abd4ccdb422a40fc85e263b4d2a72a34",
+      "parent_post_id": "2117431292400984413",
+      "phase": "result",
+      "request_started_at": "2026-11-03T11:02:41.984407+09:00",
+      "row": {
+        "day": "20261103",
+        "deadline": "10:55",
+        "format_version": "v3-venue-hashtags",
+        "jcd": "17",
+        "picks": [
+          "1-3-2",
+          "1-2-3",
+          "3-1-2",
+          "2-1-3",
+          "3-2-1",
+          "2-3-1",
+          "1-3-4",
+          "1-2-4",
+          "1-4-3",
+          "1-4-2",
+          "3-4-1",
+          "2-4-1",
+          "4-3-1",
+          "6-1-3",
+          "5-4-3",
+          "2-1-6",
+          "2-1-4",
+          "2-3-4"
+        ],
+        "post": "🚤宮島 2R｜締切 10:55\n🤝 AI重なり予想\n🎯 本線 10点\n1-234-234\n3-12-12\n2-13-13\n🛡️ 抑え 8点\n3-4-1\n2-14-14\n4-3-1\n6-1-3\n5-4-3\n2-1-6\n2-3-4\n📊 展示反映｜AI頭評価 3=21.5%・2=20.0%・4=14.7%・6=10.0%・5=9.4%\n結果も自動投稿｜フォローお願いします！\n\n#競艇 #ボートレース #無料予想 #宮島",
+        "prediction_records": [
+          {
+            "commit": "ae39219fcd2160036fa92d740dad6df6d12bb1e9",
+            "created_at": "2026-11-03T10:30:41.998799+09:00",
+            "path": "data/prototype12_delivery/predictions/20261103_17_02.json",
+            "record_digest": "45f2e412c433da565d223c3cd2ec04abd4bc1a1df54c20bd44930c864c82a30e",
+            "record_sha256": "0e0ace08537a3751258d31d5c15871ee42735fd3c2071c417e7074f7cb3e5e32"
+          },
+          {
+            "commit": "ae39219fcd2160036fa92d740dad6df6d12bb1e9",
+            "created_at": "2026-11-03T10:31:25.636027+09:00",
+            "path": "data/prototype3_delivery/predictions/20261103_17_02.json",
+            "record_digest": "25aa00812c3ca070b0365111cbc6e5d7e979a2f06980e578213f3180bb83a439",
+            "record_sha256": "9f9961f1996b02b4cb7ce138cbb62779ea20bf91d361a5d464ff1fda74d41869"
+          }
+        ],
+        "resend": false,
+        "rno": 2,
+        "selection_score": 86.2139911826991,
+        "sent_at": "2026-11-03T10:38:49.382982+09:00",
+        "source": "AI重なり本線",
+        "venue": "宮島"
+      },
+      "status": "waiting_result",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "official result pending",
+        "retryable": true,
+        "transport_http_status": 409
+      },
+      "updated_at": "2026-11-03T11:02:43.237035+09:00"
+    },
+    "result:20261103:21:6": {
+      "attempt": 1,
+      "claimed_at": "2026-11-03T11:02:49.750677+09:00",
+      "content_sha256": "4c703d362f975e2d2aa6f683d5818a6ec9c4902a2cc4459290bd9616d2abaf18",
+      "error_type": "DefiniteRejection",
+      "key": "result:20261103:21:6",
+      "owner": "6be9c1a4794548b09817469222dc39f6",
+      "parent_post_id": "2117433693023424927",
+      "phase": "result",
+      "request_started_at": "2026-11-03T11:02:51.308638+09:00",
+      "row": {
+        "day": "20261103",
+        "deadline": "11:00",
+        "format_version": "v3-venue-hashtags",
+        "jcd": "21",
+        "picks": [
+          "1-2-4",
+          "1-4-2",
+          "2-1-4",
+          "1-2-6",
+          "2-4-1",
+          "1-6-2",
+          "1-2-3",
+          "1-2-5",
+          "1-5-2",
+          "2-1-6",
+          "2-1-3",
+          "4-1-2",
+          "6-1-2",
+          "3-1-2",
+          "5-1-2",
+          "4-2-1",
+          "2-1-5",
+          "2-5-1"
+        ],
+        "post": "🚤芦屋 6R｜締切 11:00\n🤝 AI重なり予想\n🎯 本線 10点\n1-24-24\n2-14-14\n1-2-635\n1-6-2\n1-5-2\n2-1-6\n🛡️ 抑え 8点\n2-1-3\n4-12-12\n6-1-2\n3-1-2\n5-1-2\n2-15-15\n結果も自動投稿｜フォローお願いします！\n\n#競艇 #ボートレース #競艇予想 #ボートレース予想 #無料予想 #芦屋 #ボートレース芦屋",
+        "prediction_records": [
+          {
+            "commit": "3502c2b55b88401f271ad1bd40197021ca4ccc67",
+            "created_at": "2026-11-03T10:39:46.121437+09:00",
+            "path": "data/prototype12_delivery/predictions/20261103_21_06.json",
+            "record_digest": "786268340dd3618770fbac163010a92d6e2c8f8e98b7dc268ac32b63be2ebb95",
+            "record_sha256": "97306152afeddc9287775141c93147a01ff31e6e4d0477043daba463bc6cba2e"
+          },
+          {
+            "commit": "3502c2b55b88401f271ad1bd40197021ca4ccc67",
+            "created_at": "2026-11-03T10:40:11.268976+09:00",
+            "path": "data/prototype3_delivery/predictions/20261103_21_06.json",
+            "record_digest": "4d2cd28d36466d4d0ef75021eeb4045dd1896d8b14db69fd00be384f1ec0aba7",
+            "record_sha256": "d4c460526ad295329811bc8ba6d8d2cdbc6e6d6131fee6f8a1ea29037e9f86ed"
+          }
+        ],
+        "resend": false,
+        "rno": 6,
+        "selection_score": 86.66183034197498,
+        "sent_at": "2026-11-03T10:48:22.500249+09:00",
+        "source": "AI重なり本線",
+        "venue": "芦屋"
+      },
+      "status": "waiting_result",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "official result pending",
+        "retryable": true,
+        "transport_http_status": 409
+      },
+      "updated_at": "2026-11-03T11:03:01.897142+09:00"
     }
   }
 }
