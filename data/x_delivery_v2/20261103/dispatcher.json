@@ -1,14 +1,15 @@
 {
   "audit": {
-    "already_selected": 18,
+    "already_selected": 19,
     "eligible": 1,
-    "inside_cutoff": 77,
-    "prediction_files": 96,
-    "remaining_daily_slots": 9
+    "inside_cutoff": 78,
+    "prediction_files": 100,
+    "remaining_daily_slots": 8,
+    "selection_gate": 2
   },
-  "checked_at": "2026-11-03T15:06:07.673250+09:00",
+  "checked_at": "2026-11-03T15:11:48.007488+09:00",
   "counts": {
-    "sent": 1,
+    "sent": 2,
     "uncertain": 1,
     "waiting_result": 1
   },
@@ -16,8 +17,8 @@
   "errors": [],
   "events": [
     {
-      "key": "prediction:20261103:22:10",
-      "post_id": "2117498358919213370",
+      "key": "prediction:20261103:15:1",
+      "post_id": "2117499658293653544",
       "status": "sent"
     },
     {
@@ -26,6 +27,11 @@
     },
     {
       "key": "result:20261103:02:10",
+      "post_id": "2117499690367570039",
+      "status": "sent"
+    },
+    {
+      "key": "result:20261103:06:10",
       "status": "waiting_result"
     }
   ],
@@ -146,6 +152,14 @@
       "verified": true
     },
     {
+      "content_sha256": "eb164d426b38225050d24db7d29862de49af89c03096c24c9201c31d74759eff",
+      "key": "prediction:20261103:15:1",
+      "post_id": "2117499658293653544",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-11-03T15:10:34.759276+09:00",
+      "verified": true
+    },
+    {
       "content_sha256": "572ff599f7c2172ebf7b26ef0f23dc8eb071b9874206147ffe81fd529a6b8466",
       "key": "prediction:20261103:17:2",
       "post_id": "2117431292400984413",
@@ -199,6 +213,14 @@
       "post_id": "2117489980163645826",
       "restart_duplicate_guard_verified": true,
       "sent_at": "2026-11-03T14:32:07.318646+09:00",
+      "verified": true
+    },
+    {
+      "content_sha256": "3c2539c59cd62ffe01828c9c37d614132213dd3895f664904112a33bfc6e54b7",
+      "key": "result:20261103:02:10",
+      "post_id": "2117499690367570039",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-11-03T15:10:42.414902+09:00",
       "verified": true
     },
     {
@@ -805,9 +827,9 @@
   "quarantined": [],
   "status": "degraded",
   "trigger_event": "workflow_dispatch",
-  "workflow_run_id": "41587614387",
+  "workflow_run_id": "41588138567",
   "x_monitor": {
-    "duplicate_guard_verified": 94,
+    "duplicate_guard_verified": 96,
     "held_transmissions": 4,
     "previous_day": {
       "alerts": [
@@ -832,15 +854,15 @@
       "alerts": [
         "unresolved_api_attempts"
       ],
-      "confirmed_post_total": 34,
-      "confirmed_predictions": 19,
-      "confirmed_results": 15,
+      "confirmed_post_total": 36,
+      "confirmed_predictions": 20,
+      "confirmed_results": 16,
       "cost_estimate_only_not_x_invoice": true,
-      "estimated_confirmed_posts_cost_usd": 0.51,
+      "estimated_confirmed_posts_cost_usd": 0.54,
       "full_30_days_cost_estimate_usd": 27.0,
       "full_day_cost_estimate_usd": 0.9,
       "prediction_limit": 30,
-      "remaining_prediction_slots": 11,
+      "remaining_prediction_slots": 10,
       "result_without_prediction_count": 0,
       "results_pending_or_unconfirmed": 4,
       "standard_post_create_unit_usd": 0.015,
