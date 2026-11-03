@@ -1,0 +1,31 @@
+name: Kouseki race comparison read-only research
+on:
+  push:
+    branches:
+      - research/kouseki-race-stats-20261104
+    paths:
+      - research/kouseki_study_v1/**
+      - .github/workflows/kouseki-race-research.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Statistical correctness and no-leakage tests
+        run: python -m unittest discover -s research/kouseki_study_v1 -p 'test_analytics.py' -v
+      - name: Build actual recorded race comparison
+        run: python research/kouseki_study_v1/build_bundle.py --archive data/exhibition_log --target data/exhibition_log/20261103/01_10.json --out /tmp/kouseki-lab-report/
+      - name: Upload read-only comparison artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kouseki-six-racer-real-history
+          path: /tmp/kouseki-lab-report/
+          if-no-files-found: error
+          retention-days: 30
