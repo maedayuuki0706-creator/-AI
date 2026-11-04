@@ -25,13 +25,15 @@
     "20261101.json",
     "20261102.json",
     "20261103.json",
-    "20261104.json"
+    "20261104.json",
+    "20261105.json"
   ],
   "base": {
     "head_distribution_all": {
       "1": 11,
       "2": 2,
-      "3": 2
+      "3": 2,
+      "6": 1
     },
     "head_distribution_manshu": {
       "3": 1
@@ -41,9 +43,9 @@
     "manshu_2_3_head": 1,
     "manshu_4_5_6_head": 0,
     "manshu_races": 1,
-    "manshu_rate_pct": 6.7,
+    "manshu_rate_pct": 6.2,
     "manshu_with_5_or_6_in_top3": 1,
-    "races": 15
+    "races": 16
   },
   "baseline_version": "course1-venue-baseline-20260701-20260930-v1",
   "cohorts": {
@@ -81,7 +83,8 @@
       "head_distribution_all": {
         "1": 11,
         "2": 2,
-        "3": 2
+        "3": 2,
+        "6": 1
       },
       "head_distribution_manshu": {
         "3": 1
@@ -91,14 +94,15 @@
       "manshu_2_3_head": 1,
       "manshu_4_5_6_head": 0,
       "manshu_races": 1,
-      "manshu_rate_pct": 6.7,
+      "manshu_rate_pct": 6.2,
       "manshu_with_5_or_6_in_top3": 1,
-      "races": 15
+      "races": 16
     },
     "lane1_exhibition_rank4_or_worse": {
       "head_distribution_all": {
         "1": 3,
-        "2": 1
+        "2": 1,
+        "6": 1
       },
       "head_distribution_manshu": {},
       "insufficient_for_stable_generalization": true,
@@ -108,13 +112,14 @@
       "manshu_races": 0,
       "manshu_rate_pct": 0.0,
       "manshu_with_5_or_6_in_top3": 0,
-      "races": 4
+      "races": 5
     },
     "no_a1_in_2or3": {
       "head_distribution_all": {
         "1": 6,
         "2": 1,
-        "3": 1
+        "3": 1,
+        "6": 1
       },
       "head_distribution_manshu": {
         "3": 1
@@ -124,14 +129,15 @@
       "manshu_2_3_head": 1,
       "manshu_4_5_6_head": 0,
       "manshu_races": 1,
-      "manshu_rate_pct": 12.5,
+      "manshu_rate_pct": 11.1,
       "manshu_with_5_or_6_in_top3": 1,
-      "races": 8
+      "races": 9
     },
     "outer_exhibition_top3": {
       "head_distribution_all": {
         "1": 9,
-        "3": 1
+        "3": 1,
+        "6": 1
       },
       "head_distribution_manshu": {
         "3": 1
@@ -141,9 +147,9 @@
       "manshu_2_3_head": 1,
       "manshu_4_5_6_head": 0,
       "manshu_races": 1,
-      "manshu_rate_pct": 10.0,
+      "manshu_rate_pct": 9.1,
       "manshu_with_5_or_6_in_top3": 1,
-      "races": 10
+      "races": 11
     },
     "venue_02": {
       "head_distribution_all": {
@@ -179,7 +185,8 @@
     },
     "venue_04": {
       "head_distribution_all": {
-        "1": 7
+        "1": 7,
+        "6": 1
       },
       "head_distribution_manshu": {},
       "insufficient_for_stable_generalization": true,
@@ -189,7 +196,7 @@
       "manshu_races": 0,
       "manshu_rate_pct": 0.0,
       "manshu_with_5_or_6_in_top3": 0,
-      "races": 7
+      "races": 8
     }
   },
   "coverage_note": "Cumulative of ONLY pre-deadline observed-and-settled research logs. Not every official race; not a live model.",
@@ -774,6 +781,43 @@
       "rno": 3,
       "trifecta": "1-2-3",
       "venue": "戸田"
+    },
+    {
+      "alert": false,
+      "contains_outer": true,
+      "date": "20261104",
+      "head": 6,
+      "in_loss_suppressed_as_normal_venue": true,
+      "jcd": "04",
+      "key": "20261104_04_03",
+      "manshu": false,
+      "outcome_pattern": "4_5_6号艇頭_外攻め",
+      "payout_per_100": 3400,
+      "pre_features": {
+        "a1_boats_2or3": [],
+        "a1_with_both_exhibition_edges": [],
+        "five_ex_top3": false,
+        "grade_status": "confirmed",
+        "lane1_class": "B1",
+        "lane1_ex_rank": 5.0,
+        "pre_ex_courses": {
+          "1": 1.0,
+          "2": 2.0,
+          "3": 3.0,
+          "4": 4.0,
+          "5": 5.0,
+          "6": 6.0
+        },
+        "pre_ex_inner_dip_s": -0.05,
+        "pre_ex_outer_gap_s": 0.26,
+        "pre_wave_cm": 3.0,
+        "pre_wind_m": 2.0,
+        "six_ex_top3": true
+      },
+      "result_source": "https://www.boatrace.jp/owpc/pc/race/raceresult?hd=20261104&jcd=04&rno=3",
+      "rno": 3,
+      "trifecta": "6-3-5",
+      "venue": "平和島"
     }
   ],
   "notes": [
@@ -805,7 +849,7 @@
   },
   "one_head_manshu_count": 0,
   "ordinary_a1_2or3_head_manshu_candidates": [],
-  "resolved_observed_cases_all_venues": 119,
+  "resolved_observed_cases_all_venues": 121,
   "scope": "only settled races with frozen BEFORE-deadline six-boat data",
   "version": "weak-in-manshu-patterns-v1",
   "weak_in_head_does_not_imply_manshu": true
