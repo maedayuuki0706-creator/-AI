@@ -1,41 +1,35 @@
 {
   "audit": {
-    "already_selected": 11,
+    "already_selected": 12,
     "eligible": 1,
-    "inside_cutoff": 57,
-    "prediction_files": 70,
-    "remaining_daily_slots": 19,
-    "selection_gate": 1
+    "inside_cutoff": 58,
+    "prediction_files": 71,
+    "remaining_daily_slots": 18
   },
-  "checked_at": "2026-11-05T13:24:00.815152+09:00",
+  "checked_at": "2026-11-05T13:28:14.363618+09:00",
   "counts": {
-    "reserved": 1,
-    "sent": 1,
-    "waiting_result": 1
+    "sent": 3
   },
   "day": "20261105",
   "errors": [],
   "events": [
     {
-      "key": "prediction:20261105:03:7",
-      "post_id": "2118197470828404965",
+      "key": "prediction:20261105:04:7",
+      "post_id": "2118198600320835960",
       "status": "sent"
     },
     {
       "key": "result:20261105:04:6",
-      "status": "waiting_result"
+      "post_id": "2118198618259964133",
+      "status": "sent"
     },
     {
       "key": "result:20261105:08:7",
-      "status": "reserved"
+      "post_id": "2118198638828810670",
+      "status": "sent"
     }
   ],
-  "held": [
-    {
-      "key": "result:20261105:08:7",
-      "status": "reserved"
-    }
-  ],
+  "held": [],
   "mode": "all",
   "production_verification": [
     {
@@ -60,6 +54,14 @@
       "post_id": "2118191532893515803",
       "restart_duplicate_guard_verified": true,
       "sent_at": "2026-11-05T12:59:50.514492+09:00",
+      "verified": true
+    },
+    {
+      "content_sha256": "5e792b643f5ca41a8dc6b4fd02873ba942ce16def73de4d98fb877b4f837561e",
+      "key": "prediction:20261105:04:7",
+      "post_id": "2118198600320835960",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-11-05T13:27:55.551224+09:00",
       "verified": true
     },
     {
@@ -143,11 +145,27 @@
       "verified": true
     },
     {
+      "content_sha256": "3789aa0425c0196ab80fce209fbcf1566b22000830f092ccfb36f9e8f23f85dd",
+      "key": "result:20261105:04:6",
+      "post_id": "2118198618259964133",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-11-05T13:27:59.807312+09:00",
+      "verified": true
+    },
+    {
       "content_sha256": "1a00da953562f385c0276e2cc378cc2090ab9c308e6b2661e0bcad1c5b39034d",
       "key": "result:20261105:08:2",
       "post_id": "2118162819288121783",
       "restart_duplicate_guard_verified": true,
       "sent_at": "2026-11-05T11:05:44.628501+09:00",
+      "verified": true
+    },
+    {
+      "content_sha256": "de09b1a27d557f9f03ab52d5da32ef8942459a39296f51f45c41993581747b0a",
+      "key": "result:20261105:08:7",
+      "post_id": "2118198638828810670",
+      "restart_duplicate_guard_verified": true,
+      "sent_at": "2026-11-05T13:28:04.715120+09:00",
       "verified": true
     },
     {
@@ -496,12 +514,12 @@
     }
   ],
   "quarantined": [],
-  "status": "degraded",
+  "status": "checked",
   "trigger_event": "workflow_dispatch",
-  "workflow_run_id": "41967422308",
+  "workflow_run_id": "41967881634",
   "x_monitor": {
-    "duplicate_guard_verified": 57,
-    "held_transmissions": 1,
+    "duplicate_guard_verified": 60,
+    "held_transmissions": 0,
     "previous_day": {
       "alerts": [],
       "confirmed_post_total": 36,
@@ -521,17 +539,17 @@
     "quarantined_transmissions": 0,
     "today": {
       "alerts": [],
-      "confirmed_post_total": 21,
-      "confirmed_predictions": 12,
-      "confirmed_results": 9,
+      "confirmed_post_total": 24,
+      "confirmed_predictions": 13,
+      "confirmed_results": 11,
       "cost_estimate_only_not_x_invoice": true,
-      "estimated_confirmed_posts_cost_usd": 0.315,
+      "estimated_confirmed_posts_cost_usd": 0.36,
       "full_30_days_cost_estimate_usd": 27.0,
       "full_day_cost_estimate_usd": 0.9,
       "prediction_limit": 30,
-      "remaining_prediction_slots": 18,
+      "remaining_prediction_slots": 17,
       "result_without_prediction_count": 0,
-      "results_pending_or_unconfirmed": 3,
+      "results_pending_or_unconfirmed": 2,
       "standard_post_create_unit_usd": 0.015,
       "unresolved_api_attempt_count": 0
     }
