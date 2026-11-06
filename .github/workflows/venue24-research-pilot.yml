@@ -1,0 +1,114 @@
+name: Venue24 independent exhibition archive / research pilot
+
+on:
+  push:
+    branches:
+      - research/venue24-original-exhibition-20261101
+    paths:
+      - research/venue24_v1/**
+      - .github/workflows/venue24-research-pilot.yml
+  workflow_dispatch:
+  schedule:
+    # 02:18 JST, effective ONLY when this file is on default branch.
+    - cron: '18 17 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: venue24-independent-archive
+  cancel-in-progress: false
+
+jobs:
+  archive-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate safety and source contracts
+        run: python -m unittest discover -s research/venue24_v1 -p "test_*.py" -v
+      - name: Checkout original-foot research state read-only
+        run: |
+          git fetch --no-tags --depth=1 origin refs/heads/research-materials-state-v1:refs/remotes/origin/research-materials-state-v1
+          git worktree add --detach "$RUNNER_TEMP/original-foot-state" refs/remotes/origin/research-materials-state-v1
+          test -d "$RUNNER_TEMP/original-foot-state/original_foot"
+      - name: Import 23 venue original exhibition snapshots as secondary historical data
+        run: |
+          END=$(TZ=Asia/Tokyo date -d 'yesterday' +%Y%m%d)
+          START=$(TZ=Asia/Tokyo date -d '60 days ago' +%Y%m%d)
+          if [[ "$START" < "20261004" ]]; then START="20261004"; fi
+          python -m research.venue24_v1.mirror \
+            --official-dir data/exhibition_log \
+            --out "$RUNNER_TEMP/venue24-mirror" \
+            --start "$START" --end "$END"
+          mkdir -p "$RUNNER_TEMP/venue24-original-combined"
+          find "$RUNNER_TEMP/original-foot-state/original_foot" -maxdepth 1 -name '*.json' -type f \
+            -exec cp -n {} "$RUNNER_TEMP/venue24-original-combined/" \;
+          find "$RUNNER_TEMP/venue24-mirror/normalized" -maxdepth 1 -name '*.json' -type f \
+            -exec cp -n {} "$RUNNER_TEMP/venue24-original-combined/" \;
+
+      - name: Generate 24 venue and racer archives (no model deployments)
+        run: |
+          DAY=$(TZ=Asia/Tokyo date +%Y%m%d)
+          echo "VENUE24_DAY=$DAY" >> "$GITHUB_ENV"
+          KEY="$DAY"
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then KEY="$DAY-pilot-${GITHUB_SHA:0:8}"; fi
+          echo "VENUE24_KEY=$KEY" >> "$GITHUB_ENV"
+          python -m research.venue24_v1.engine --official-dir data/exhibition_log \
+            --original-dir "$RUNNER_TEMP/venue24-original-combined" \
+            --out "$RUNNER_TEMP/venue24-output-v2" --through "$DAY"
+          test "$(find "$RUNNER_TEMP/venue24-output-v2/models/$DAY" -name '*.json' | wc -l)" -eq 24
+          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
+            -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/venue24-snapshot.tar.gz" \
+            venue24-output-v2 venue24-mirror/source_csv venue24-mirror/manifests
+      - name: Persist exclusively to independent new venue24 state
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin refs/heads/research-venue24-state-20261101:refs/remotes/origin/research-venue24-state-20261101
+          git worktree add --detach "$RUNNER_TEMP/venue24-state" refs/remotes/origin/research-venue24-state-20261101
+          STATE="$RUNNER_TEMP/venue24-state/data/venue24_v2"
+          mkdir -p "$STATE/snapshots" "$STATE/models/$VENUE24_KEY" "$STATE/reports/$VENUE24_KEY"
+          # Never silently rewrite a frozen dated archive.
+          TARGET="$STATE/snapshots/$VENUE24_KEY.tar.gz"
+          if [ -f "$TARGET" ]; then
+            cmp -s "$TARGET" "$RUNNER_TEMP/venue24-snapshot.tar.gz" || { echo "Immutable dated archive conflict"; exit 1; }
+          else
+            cp "$RUNNER_TEMP/venue24-snapshot.tar.gz" "$TARGET"
+          fi
+          for SOURCE in "$RUNNER_TEMP/venue24-output-v2/models/$VENUE24_DAY/"*.json; do
+            BASE="$(basename "$SOURCE")"
+            DEST="$STATE/models/$VENUE24_KEY/$BASE"
+            if [ -f "$DEST" ]; then
+              cmp -s "$SOURCE" "$DEST" || { echo "Immutable model conflict: $BASE"; exit 1; }
+            else
+              cp "$SOURCE" "$DEST"
+            fi
+          done
+          REPORT="$STATE/reports/$VENUE24_KEY/build.json"
+          SOURCE="$RUNNER_TEMP/venue24-output-v2/reports/$VENUE24_DAY/build.json"
+          if [ -f "$REPORT" ]; then
+            cmp -s "$SOURCE" "$REPORT" || { echo "Immutable report conflict"; exit 1; }
+          else
+            cp "$SOURCE" "$REPORT"
+          fi
+          git -C "$RUNNER_TEMP/venue24-state" config user.name "github-actions[bot]"
+          git -C "$RUNNER_TEMP/venue24-state" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$RUNNER_TEMP/venue24-state" add -- data/venue24_v2/
+          if ! git -C "$RUNNER_TEMP/venue24-state" diff --cached --quiet; then
+            git -C "$RUNNER_TEMP/venue24-state" commit -m "venue24: append immutable 23-venue original-foot snapshot $VENUE24_KEY"
+            git -C "$RUNNER_TEMP/venue24-state" push origin HEAD:refs/heads/research-venue24-state-20261101
+          fi
+      - name: Retain reproducible pilot artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: venue24-research-snapshot
+          path: ${{ runner.temp }}/venue24-snapshot.tar.gz
+          retention-days: 30
+          if-no-files-found: ignore
