@@ -61,9 +61,10 @@
     },
     "20261107:11:4": {
       "at": "2026-11-07T11:57:45.409979+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "cd183d9d5c73477a860a64417d6fea45",
-      "status": "reserved"
+      "retry_at": "2026-11-07T11:58:17.990118+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {
@@ -913,10 +914,12 @@
       "attempt": 1,
       "claimed_at": "2026-11-07T11:57:45.409979+09:00",
       "content_sha256": "af87a5771f963164c3f512d13d5c32f21a8c70670f781e125e750796d48f9eac",
+      "error_type": "DefiniteRejection",
       "key": "result:20261107:11:4",
       "owner": "cd183d9d5c73477a860a64417d6fea45",
       "parent_post_id": "2118895894456365504",
       "phase": "result",
+      "request_started_at": "2026-11-07T11:57:46.863163+09:00",
       "row": {
         "day": "20261107",
         "deadline": "11:50",
@@ -966,7 +969,14 @@
         "source": "AI重なり本線",
         "venue": "びわこ"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "official result pending",
+        "retryable": true,
+        "transport_http_status": 409
+      },
+      "updated_at": "2026-11-07T11:57:47.990118+09:00"
     }
   }
 }
