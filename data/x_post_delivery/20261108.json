@@ -21,9 +21,10 @@
   "x_result_attempts": {
     "20261108:11:3": {
       "at": "2026-11-08T11:29:32.867085+09:00",
-      "attempt": 1,
+      "attempt": 0,
       "id": "e918037be0de431b8d2b89fe03395ebf",
-      "status": "reserved"
+      "retry_at": "2026-11-08T11:30:05.846850+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {},
@@ -91,10 +92,12 @@
       "attempt": 1,
       "claimed_at": "2026-11-08T11:29:32.867085+09:00",
       "content_sha256": "0f88e8f26d5df45f6be6145dd9234b36bd9e1543e7a3bcc4a6e7dac9c40bdfae",
+      "error_type": "DefiniteRejection",
       "key": "result:20261108:11:3",
       "owner": "e918037be0de431b8d2b89fe03395ebf",
       "parent_post_id": "2119251267046510929",
       "phase": "result",
+      "request_started_at": "2026-11-08T11:29:34.141816+09:00",
       "row": {
         "day": "20261108",
         "deadline": "11:23",
@@ -137,7 +140,14 @@
         "source": "配当期待本線",
         "venue": "びわこ"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "official result pending",
+        "retryable": true,
+        "transport_http_status": 409
+      },
+      "updated_at": "2026-11-08T11:29:35.846850+09:00"
     }
   }
 }
