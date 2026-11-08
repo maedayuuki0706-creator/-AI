@@ -1,7 +1,7 @@
 {
   "day": "20261108",
   "sent_races": [],
-  "updated_at": "2026-11-08T16:43:25.768351+09:00",
+  "updated_at": "2026-11-08T16:57:19.425495+09:00",
   "x_attempts": {
     "20261108:03:4": {
       "at": "2026-11-08T12:05:59.164333+09:00",
@@ -95,10 +95,11 @@
   ],
   "x_result_attempts": {
     "20261108:19:3": {
-      "at": "2026-11-08T16:43:23.174668+09:00",
-      "attempt": 1,
-      "id": "001a79c587a44450b738d35225c164e5",
-      "status": "reserved"
+      "at": "2026-11-08T16:57:01.018757+09:00",
+      "attempt": 0,
+      "id": "22484ed0d747407dadb4128128f65c57",
+      "retry_at": "2026-11-08T16:57:34.132147+09:00",
+      "status": "retryable"
     }
   },
   "x_result_post_ids": {
@@ -2145,12 +2146,14 @@
     },
     "result:20261108:19:3": {
       "attempt": 1,
-      "claimed_at": "2026-11-08T16:43:23.174668+09:00",
+      "claimed_at": "2026-11-08T16:57:01.018757+09:00",
       "content_sha256": "f208b1a511a55edbffe51c69cfdeab02288ec8e1a47fc62d58951dba2a6b4c9f",
+      "error_type": "DefiniteRejection",
       "key": "result:20261108:19:3",
-      "owner": "001a79c587a44450b738d35225c164e5",
+      "owner": "22484ed0d747407dadb4128128f65c57",
       "parent_post_id": "2119324480615088581",
       "phase": "result",
+      "request_started_at": "2026-11-08T16:57:02.188327+09:00",
       "row": {
         "day": "20261108",
         "deadline": "16:18",
@@ -2193,7 +2196,14 @@
         "source": "配当期待本線",
         "venue": "下関"
       },
-      "status": "sending"
+      "status": "waiting_result",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "official result pending",
+        "retryable": true,
+        "transport_http_status": 409
+      },
+      "updated_at": "2026-11-08T16:57:04.132147+09:00"
     },
     "result:20261108:23:10": {
       "attempt": 1,
