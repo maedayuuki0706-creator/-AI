@@ -130,7 +130,8 @@
       "at": "2026-11-14T14:38:19.643713+09:00",
       "attempt": 1,
       "id": "7ef59ff41ef646b981c47d8cb491cd20",
-      "status": "reserved"
+      "retry_at": "2026-11-14T14:39:22.492680+09:00",
+      "status": "blocked"
     },
     "20261114:22:4": {
       "at": "2026-11-14T11:58:25.962984+09:00",
@@ -1313,10 +1314,12 @@
       "attempt": 1,
       "claimed_at": "2026-11-14T14:38:19.643713+09:00",
       "content_sha256": "dab970400eadcac5c9a825880eaa0802a1a378e03f4dc2d6501036e28931c3c9",
+      "error_type": "DefiniteRejection",
       "key": "prediction:20261114:16:9",
       "owner": "7ef59ff41ef646b981c47d8cb491cd20",
       "parent_post_id": null,
       "phase": "prediction",
+      "request_started_at": "2026-11-14T14:38:21.098874+09:00",
       "row": {
         "day": "20261114",
         "deadline": "14:51",
@@ -1366,7 +1369,14 @@
         "source": "配当期待本線",
         "venue": "児島"
       },
-      "status": "sending"
+      "status": "failed",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "X HTTP 402",
+        "retryable": false,
+        "transport_http_status": 502
+      },
+      "updated_at": "2026-11-14T14:38:22.492680+09:00"
     },
     "prediction:20261114:22:4": {
       "attempt": 1,
