@@ -25,7 +25,8 @@
       "at": "2026-11-17T12:46:40.819625+09:00",
       "attempt": 1,
       "id": "3cf8678ccc074e56a53b154358c49964",
-      "status": "reserved"
+      "retry_at": "2026-11-17T12:47:43.783231+09:00",
+      "status": "blocked"
     },
     "20261117:18:8": {
       "at": "2026-11-17T11:37:37.976465+09:00",
@@ -258,10 +259,12 @@
       "attempt": 1,
       "claimed_at": "2026-11-17T12:46:40.819625+09:00",
       "content_sha256": "6f6daeea1abfd19a332cd7a0fa11f8e0da70341a63c24ff69309ae259aa3bfe4",
+      "error_type": "DefiniteRejection",
       "key": "prediction:20261117:18:10",
       "owner": "3cf8678ccc074e56a53b154358c49964",
       "parent_post_id": null,
       "phase": "prediction",
+      "request_started_at": "2026-11-17T12:46:42.244220+09:00",
       "row": {
         "day": "20261117",
         "deadline": "13:01",
@@ -304,7 +307,14 @@
         "source": "配当期待本線",
         "venue": "徳山"
       },
-      "status": "sending"
+      "status": "failed",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "X HTTP 402",
+        "retryable": false,
+        "transport_http_status": 502
+      },
+      "updated_at": "2026-11-17T12:46:43.783231+09:00"
     },
     "prediction:20261117:18:8": {
       "attempt": 1,
