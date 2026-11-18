@@ -88,7 +88,8 @@
       "at": "2026-11-18T15:03:14.105633+09:00",
       "attempt": 1,
       "id": "85eec324c2894520b8ae699c13c63a73",
-      "status": "reserved"
+      "retry_at": "2026-11-18T15:04:16.765017+09:00",
+      "status": "blocked"
     },
     "20261118:17:5": {
       "at": "2026-11-18T11:51:19.512463+09:00",
@@ -891,10 +892,12 @@
       "attempt": 1,
       "claimed_at": "2026-11-18T15:03:14.105633+09:00",
       "content_sha256": "a3e07269f77255f545ca097d86721e24044f0c49b4c2964d982aab0899a2e8e7",
+      "error_type": "DefiniteRejection",
       "key": "prediction:20261118:15:1",
       "owner": "85eec324c2894520b8ae699c13c63a73",
       "parent_post_id": null,
       "phase": "prediction",
+      "request_started_at": "2026-11-18T15:03:15.680089+09:00",
       "row": {
         "day": "20261118",
         "deadline": "15:19",
@@ -944,7 +947,14 @@
         "source": "配当期待本線",
         "venue": "丸亀"
       },
-      "status": "sending"
+      "status": "failed",
+      "transport_evidence": {
+        "definitely_not_posted": true,
+        "error": "X HTTP 402",
+        "retryable": false,
+        "transport_http_status": 502
+      },
+      "updated_at": "2026-11-18T15:03:16.765017+09:00"
     },
     "prediction:20261118:17:5": {
       "attempt": 1,
