@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 
 from analytics import build_report
+from analyst_context import build_context
 
 MIN_N = 20  # descriptive review threshold, not statistical validation
 
@@ -78,6 +79,12 @@ def main():
     report = build_report(args.archive, args.target)
     target = json.loads(args.target.read_text(encoding="utf-8"))
     brief = make_brief(report, target)
+    brief['schema'] = 'kouseki/analyst-brief-v0.2'
+    brief['historical_context'] = build_context(args.archive, target)
+    brief['unavailable_in_this_version'] = [
+        'モーター周期・出足/伸び/回り足分析', '風向・潮位',
+        'オリジナル展示分割タイム・締切前原本照合', '相手条件別の因果分析・校正済み確率',
+    ]
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("x", encoding="utf-8") as f:
         json.dump(brief, f, ensure_ascii=False, indent=2)
