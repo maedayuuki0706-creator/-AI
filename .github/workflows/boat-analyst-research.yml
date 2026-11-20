@@ -1,0 +1,31 @@
+name: Boat analyst isolated research
+on:
+  push:
+    branches:
+      - research/boat-analyst-20261120
+    paths:
+      - research/kouseki_study_v1/**
+      - .github/workflows/boat-analyst-research.yml
+permissions:
+  contents: read
+jobs:
+  analyst-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run research unit tests
+        run: python -m unittest discover -s research/kouseki_study_v1 -p 'test_*.py' -v
+      - name: Replay archived race (not a live prediction)
+        run: |
+          python research/kouseki_study_v1/analyst.py --archive data/exhibition_log --target data/exhibition_log/20261102/24_12.json --out research/output/analyst_20261102_24_12.json
+          python -c "import json; d=json.load(open('research/output/analyst_20261102_24_12.json')); assert len(d['boats']) == 6; assert d['historical_context']['history_audit']['included_races'] > 0; print(d['historical_context']['history_audit'])"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: archived-analyst-replay
+          path: research/output/analyst_20261102_24_12.json
+          if-no-files-found: error
+          retention-days: 14
