@@ -63,6 +63,14 @@ def exhibit(names, cols):
         return f'<td class="r{rank}">{cell(v)}</td>'
     return '<div class="scroll"><table><tr><th>艇番</th>'+''.join('<th>'+cell(n)+'</th>' for n in names)+'</tr>'+''.join('<tr><td>'+str(i+1)+'</td>'+''.join(td(i,col) for col in cols)+'</tr>' for i in range(6))+'</table></div>'
 
+def player_list(players):
+    profiles=[]
+    for rid,rows in sorted(players.items()):
+        if not rows:continue
+        ss=summarize(rows)
+        profiles.append((rid,rows[-1]['name'],len(rows),ss['first_pct'],ss['top3_pct'],ss['st_mean'],summarize(recent(rows))['top3_pct']))
+    return profiles
+
 def build(a):
     data=a.data
     path=data/'exhibition_log'/a.day/f'{a.venue}_{a.race:02}.json'
@@ -96,10 +104,7 @@ def build(a):
             group=[r for r in sample if r['day']>=lo]; ss=summarize(group)
             player_tables.append((b['name'],c,window,len(group),ss['first_pct'],ss['second_pct'],ss['third_pct'],fmt(rate(sum(x['finish']<=2 for x in group),len(group))),ss['st_mean']))
     pages['6艇比較']=f'<p>{cell(label)}　想定進入は'+('展示進入' if course_ok else '枠なり仮定')+'。対象日より前の収録済み完走歴を使用。</p>'+table(['艇','選手','登録','想定コース','走数','1着%','3連対%','本番平均ST','ST標準偏差'],summary)+table(['選手','コース','日数','走数','1着%','2着%','3着%','2連対','平均ST'],player_tables)
-    profiles=[]
-    for rid,rows in sorted(players.items()):
-        ss=summarize(rows)
-        profiles.append((rid,rows[-1]['name'],len(rows),ss['first_pct'],ss['top3_pct'],ss['st_mean'],summarize(recent(rows))['top3_pct']))
+    profiles=player_list(players)
     pages['選手検索']='<label>氏名・登録番号 <input id="search" type="search"></label>'+table(['登録','選手','収録走','1着%','3連対%','平均ST','直近10走 3連対%'],profiles)
     cycles=json.loads((data/'motor_cycles.json').read_text())['cycles']
     motors=[]

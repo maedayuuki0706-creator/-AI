@@ -38,3 +38,11 @@ class SourceTests(unittest.TestCase):
         past=dict(target,day='20261113',venue='08',race_no=1,method='逃げ')
         rr,n=nearest([past,dict(past,day='20261114')],target)
         self.assertEqual((rr[0][0],n),(0,1))
+
+class MissingHistoryTests(unittest.TestCase):
+    def test_lineup_only_day_has_no_recent_observations(self):
+        from collections import defaultdict
+        from desk import player_list
+        players=defaultdict(list)
+        players['4910']
+        self.assertEqual(player_list(players),[])
