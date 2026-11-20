@@ -23,9 +23,23 @@ jobs:
         run: |
           python research/kouseki_study_v1/analyst.py --archive data/exhibition_log --target data/exhibition_log/20261102/24_12.json --out research/output/analyst_20261102_24_12.json
           python -c "import json; d=json.load(open('research/output/analyst_20261102_24_12.json')); assert len(d['boats']) == 6; assert d['historical_context']['history_audit']['included_races'] > 0; print(d['historical_context']['history_audit'])"
+      - name: Read-only checkout of current runtime data
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: runtime-data
+          persist-credentials: false
+          sparse-checkout: |
+            data/race_cards
+            data/exhibition_log
+      - name: Audit completed prior-day coverage (not a completeness certification)
+        run: |
+          git -C runtime-data rev-parse HEAD > research/output/audit-source-sha.txt
+          python research/kouseki_study_v1/coverage_audit.py --cards runtime-data/data/race_cards --archive runtime-data/data/exhibition_log --start 20261119 --end 20261119 > research/output/coverage_20261119.json
+          python -c "import json; d=json.load(open('research/output/coverage_20261119.json')); print(d['totals']); assert len(d['all_24_venues']) == 24"
       - uses: actions/upload-artifact@v4
         with:
           name: archived-analyst-replay
-          path: research/output/analyst_20261102_24_12.json
+          path: research/output/
           if-no-files-found: error
           retention-days: 14
