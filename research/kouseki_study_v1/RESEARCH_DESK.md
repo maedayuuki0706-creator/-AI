@@ -51,3 +51,30 @@ python research/kouseki_study_v1/coverage_audit.py --cards /private/snapshot/dat
 同場のイン逃げ基準値は2022〜24年に成功数+1、走数+2で推定。未使用2025年に実測との差・Brier・自然対数Log Lossを算出し、全国固定の基準と比較する。日別再学習・ライブ確率校正・信頼度に応じた判断の検証は別工程。公式成績の正常完走限定に伴う選択バイアスと、モーター・選手を繰り返し観測する依存性がある。Wilson区間はレースを独立とした目安。
 
 実データでの照合件数・成績・不足と原本識別情報は本人用の実行出力に収める。全日全場収録・実機Safari・Discordの実送信は個別に確認する。
+
+## 追加資料と再現
+
+- 二次結果は BoatraceOpenAPI/results の gh-pages、docs/v2/YYYY/YYYYMMDD.json を使う。1日1ファイルの原本hashを索引に保存する。正常な6選手・6艇・実進入・着順が揃った結果だけを採用し、公式Kに存在するレースは3連単組番、金額、艇番に対応する登録・進入・着順を照合する。年別の除外件数と照合件数は画面に表示される。二次の正常完走数を開催予定件数には使用しない。
+- 二次番組は BoatraceOpenAPI/programs の同じ形式で別索引にする。未知の開催中止・不成立・事故を一律欠損と認定しない。公式の代替照合に使った番組・結果ともに事後の保存である。
+- データ拡張時は公式K（年次検証の固定基準）と二次索引を別々に保持する。元データに対する書込みは行わない。以下の出力は新規ファイル名に限定される。
+
+```sh
+python research/kouseki_study_v1/extended_history.py --files /private/results/docs/v2 --official /private/official_results_2022_2025.sqlite --out /private/snapshot/data/extended.sqlite --start 20210101 --end YYYYMMDD --revision RESULTS_COMMIT_SHA
+python research/kouseki_study_v1/program_history.py --files /private/programs/docs/v2 --out /private/snapshot/data/programs.sqlite --start 20210101 --end YYYYMMDD --revision PROGRAMS_COMMIT_SHA
+```
+
+- BOAT RACE公式「ダウンロード・他」掲載の半期ファン手帳を展開し、data/racer_terms/YYYY-1.txt（前期）または YYYY-2.txt（後期）としてCP932固定長のまま保存。対になるJSONにurl、acquired_at、sha256、rowsを記録。公式レイアウトの登録番号、勝率、算出期間、コース別進入・着順・STとスタート順位を使用する。適用期と算出終了日を両方確認する。
+- data/program_source/YYYYMMDD.json は BoatraceOpenAPI/api v1 の番組。対になる YYYYMMDD.meta.json に取得時刻・URL・SHA256を記録。6艇の登録番号一致を条件として、当該番組の全国・当地勝率、連対率、Fを表示する。事前に内容が不変だったことは保証できない。
+- 気象庁「潮位表」のテキストデータ版を data/tide/YYYY-観測地点コード.txt に原形で保存。同名の .json にURL、取得日時、SHA256を記録する。data/venue_tide_profiles.json で場と地点・潮汐適用可否を確認。締切以前の直近正時と1時間前の掲載値の差をcmで出す。天文潮位と実測・流速・潮止まりを混同しない。
+- 分割展示は同場・艇名照合・6値が有効な列だけで実コース別の展示上位と着順を比較。機番別の整備比較は同一周期の記録に限り、直前3走と当走を含む次の3走を上限とする。
+- 類似レースは厳密条件の他に、利用者が明示的に開ける距離検索を提供する。級・展示順位・展示進入・チルト・風・波の6軸が揃った過去レースを等重みで比較する。距離式と件数・払戻分布は結果とともに表示する。
+
+公式資料： https://www.boatrace.jp/owpc/pc/extra/data/download.html 、https://www.boatrace.jp/owpc/pc/extra/data/layout.html 。水面資料： https://www.data.jma.go.jp/kaiyou/db/tide/suisan/ 。二次資料： https://github.com/BoatraceOpenAPI/results 、https://github.com/BoatraceOpenAPI/programs 。
+
+保存番組の全艇番号・登録番号を確認した索引を作ると、展示保存以前の日も番組と着順履歴を選択できる。展示欠損はそのまま表示される。
+
+```sh
+python research/kouseki_study_v1/lineup_store.py --folder /private/programs/docs/v2 --out /private/snapshot/data/lineups.sqlite --start 20210101 --end YYYYMMDD --revision PROGRAMS_COMMIT_SHA
+```
+
+「進入変更を試す」は内から6艇の順列を入力して、各選手がその実コースで走った365日内の成績・母数を再表示する。進入の深さは未観測。「番組表gradeコード」は1＝SG、2＝G1系、3＝G2、4＝G3、5＝一般で、併催等は開催レベルの記録である。

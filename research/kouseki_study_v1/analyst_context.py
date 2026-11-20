@@ -42,7 +42,7 @@ def read_history(archive, target_day):
                 method = None
                 audit["missing_method"] += 1
             races.append({"day": str(race["day"]), "venue": code, "race_no": number,
-                          "rows": rows, "winning_course": winner["actual_course"],
+                          "rows": rows, "deadline":race.get("deadline"), "winning_course": winner["actual_course"],
                           "method": method, "source": str(p.relative_to(archive))})
         except (OSError, ValueError, TypeError, KeyError, AttributeError):
             audit["excluded_unreadable"] += 1

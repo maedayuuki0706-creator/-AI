@@ -11,4 +11,9 @@ const data=@@DATA@@,attacker=document.querySelector('#attacker'),method=document
 function simulate(){const rows=data.filter(r=>r.attacker===Number(attacker.value)&&r.deciding_method===method.value), n=rows.reduce((a,r)=>a+r.n,0);
 let html='<p>条件一致 '+n+'レース</p>';if(n){html+='<div class="scroll"><table><tr><th>実コース</th><th>2着 件数（%）</th><th>3着 件数（%）</th></tr>';for(let c=1;c<=6;c++){html+='<tr><td>'+c+'</td>';for(const key of ['second','third']){const k=rows.filter(r=>r[key]===c).reduce((a,r)=>a+r.n,0);html+='<td>'+k+'（'+(100*k/n).toFixed(1)+'%）</td>'}html+='</tr>'}html+='</table></div>'}document.querySelector('#conditional').innerHTML=html}
 method.value='逃げ';attacker.onchange=method.onchange=simulate;simulate();
+const orderInput=document.querySelector('#order'),lineStats=JSON.parse(document.querySelector('#line_stats').textContent);
+function redrawOrder(){const target=document.querySelector('#order_result');target.replaceChildren();const order=[...orderInput.value];
+if(order.slice().sort().join('')!=='123456'){target.textContent='1〜6を重複なく入力してください。';return}
+for(let i=0;i<6;i++){const item=lineStats[order[i]],line=document.createElement('div');line.textContent=(i+1)+'コース　'+order[i]+'号艇 '+item.name+'　1着 '+(item.stats[String(i+1)]||'0件');target.appendChild(line)}}
+orderInput.oninput=redrawOrder;redrawOrder();
 </script></html>

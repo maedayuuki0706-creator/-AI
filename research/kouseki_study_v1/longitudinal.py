@@ -121,3 +121,32 @@ def discover(db, cutoff):
     v=min(candidates,key=lambda v:difference(v,0))
     return [(v,h,w,rate(k,n)) for h in (0,1) for w in (0,1)
             for n,k in [cells.get((v,w,h),(0,0))]]
+
+def nearest(history,target,limit=20):
+    """Explicit broader search. Equal contributions, fixed scales, complete vectors only."""
+    def vector(rows):
+        boats=sorted(rows,key=lambda b:b['lane'])
+        grades=[b.get('current_class') for b in boats]
+        times=[b.get('exhibition_time') for b in boats]
+        courses=[b.get('exhibition_course') for b in boats]
+        tilt=[b.get('tilt') for b in boats]
+        wind=[b.get('wind_m') for b in boats];wave=[b.get('wave_cm') for b in boats]
+        def valid(nums,lo,hi):return all(type(x) in (float,int) and lo<=x<=hi for x in nums)
+        if (not all(g in ('A1','A2','B1','B2') for g in grades) or not valid(times,4,10)
+            or not valid(courses,1,6) or sorted(courses)!=list(range(1,7)) or not valid(tilt,-1,4)
+            or not valid(wind,0,40) or len(set(wind))!=1 or not valid(wave,0,200) or len(set(wave))!=1):return None
+        return grades,[1+sum(y<x for y in times) for x in times],courses,tilt,wind[0],wave[0]
+    a=vector(target['rows']);matches=[]
+    if a is None:return [],0
+    for r in history:
+        if r['venue']!=target['jcd'] or r['day']>=target['day']:continue
+        b=vector(r['rows'])
+        if b is None:continue
+        delta=[sum(x!=y for x,y in zip(a[0],b[0]))/6,
+               sum(abs(x-y) for x,y in zip(a[1],b[1]))/30,
+               sum(x!=y for x,y in zip(a[2],b[2]))/6,
+               sum(min(1,abs(x-y)/2) for x,y in zip(a[3],b[3]))/6,
+               min(1,abs(a[4]-b[4])/5),min(1,abs(a[5]-b[5])/10)]
+        order='-'.join(str(x['lane']) for x in sorted(r['rows'],key=lambda x:x['finish'])[:3])
+        matches.append((sum(delta)/6,r['day'],r['race_no'],r['method'],order))
+    return sorted(matches)[:limit],len(matches)

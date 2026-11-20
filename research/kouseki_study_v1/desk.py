@@ -12,8 +12,12 @@ from statistics import mean, median, pstdev
 from analytics import VENUES, as_day, is_six, recent, summarize
 from analyst_context import pre_race_exhibition, rate, read_history, valid_number
 from coverage_audit import coverage
-from longitudinal import connect, scenarios, follower, similar, check_g1, evaluate_escape, discover
-from relationships import study
+from longitudinal import connect, scenarios, follower, similar, nearest, check_g1, evaluate_escape, discover
+from relationships import study, start_study, motor_events
+from lineup_store import target_record
+from tide_study import tide
+from official_profiles import racer_terms, program
+from exhibition_study import columns, cohorts, audit_splits
 
 def cell(x):
     return escape(str(x)) if x is not None else '未取得'
@@ -49,19 +53,8 @@ def orig(data, target):
         matches=[r for r in csv.DictReader(f) if r['レースコード']==f'{day}{venue}{n:02}']
     if len(matches)!=1:return [],[]
     r=matches[0]
-    norm=lambda s: ''.join(s.split())
-    boats=sorted(target['rows'],key=lambda b:b['lane'])
-    if any(norm(r[f'艇{i}_選手名'])!=norm(b['name']) for i,b in enumerate(boats,1)):return [],[]
-    cols=[]; labels=[]
-    for j in range(1,4):
-        if not r.get(f'計測項目{j}'): continue
-        times=[]
-        for i in range(1,7):
-            try: v=float(r[f'艇{i}_値{j}'])
-            except (ValueError,TypeError): v=None
-            times.append(v if valid_number(v,0.01,180) else None)
-        cols.append(times);labels.append(r[f'計測項目{j}'])
-    return labels,cols
+    metrics=columns(r,sorted(target['rows'],key=lambda b:b['lane']))
+    return list(metrics),list(metrics.values())
 
 def exhibit(names, cols):
     def td(i,col):
@@ -73,7 +66,7 @@ def exhibit(names, cols):
 def build(a):
     data=a.data
     path=data/'exhibition_log'/a.day/f'{a.venue}_{a.race:02}.json'
-    t=json.loads(path.read_text()); day=t['day']; code=t['jcd']
+    t=target_record(data,a.day,a.venue,a.race); day=t['day']; code=t['jcd']
     if (day,code,t['rno'])!=(a.day,a.venue,a.race) or not is_six(t['rows']):raise ValueError('target identity mismatch')
     boats=sorted(t['rows'],key=lambda b:b['lane'])
     history,audit=read_history(data/'exhibition_log',day)
@@ -138,7 +131,7 @@ def build(a):
     pages['収録・欠損']=f'<p>{cell(a.audit_start)}〜{cell(a.audit_end)}　番組表不明 {cv["totals"].get("unknown_manifest_days",0)}日。分母は保存した完全番組表の予定数。</p>'+table(['場','予定','ファイルあり','未収録','正常完走','未確定','異常・不完全','無効'],[(v['name'],v.get('expected',0),v.get('expected',0)-v.get('missing_archive',0),v.get('missing_archive',0),v.get('normal_result',0),v.get('unsettled_or_unverified',0),v.get('abnormal_or_incomplete_result',0),v.get('invalid_archive',0)) for v in cv['all_24_venues']])+''.join('<details><summary>'+cell(d['day'])+'</summary>'+table(['場','R','状態','欠損項目・艇番'],[(r['venue'],r['race_no'],r['status'],json.dumps(r['issues'],ensure_ascii=False)) for r in d.get('races',[]) if r['issues'] or r['status']!='normal_result'])+'</details>' for d in cv['days'])
     g=check_g1(db,a.g1,day)
     checks=Counter(official_result(data,r)[0] for r in history)
-    pages['精度・出典']=table(['2026年完走着順 × 保存公式3連単','件数'],sorted(checks.items()))+table(['常滑G1','収録R','1号艇1着','万舟','長期DB照合一致','不一致','照合対象外'],[(k,len(rs),sum(x[1]==1 for x in rs),sum(isinstance(x[2],int) and x[2]>=10000 for x in rs),sum(x[4] is True for x in rs),sum(x[4] is False for x in rs),sum(x[4] is None for x in rs)) for k,rs in g.items()])+table(['資料','対象期間・取得記録'],[('公式K成績（6艇完走）',str(tuple(db.execute('select min(day),max(day),count(*) from race where day<?',(day,)).fetchone()))),('出走・展示保存',path.name+' / '+str(t.get('captured_at'))),('分析対象履歴',str(audit)),('原本の締切前固定','未確認。リプレイ専用'),('未取得・未検証','潮位、事故理由の全件分類、2021年、確率校正、実機Safari、全選手の公式勝率・級別/節区分補正'),('生成日時 UTC',datetime.now(timezone.utc).isoformat())])
+    pages['精度・出典']=table(['2026年完走着順 × 保存公式3連単','件数'],sorted(checks.items()))+table(['常滑G1','収録R','1号艇1着','万舟','長期DB照合一致','不一致','照合対象外'],[(k,len(rs),sum(x[1]==1 for x in rs),sum(isinstance(x[2],int) and x[2]>=10000 for x in rs),sum(x[4] is True for x in rs),sum(x[4] is False for x in rs),sum(x[4] is None for x in rs)) for k,rs in g.items()])+table(['資料','対象期間・取得記録'],[('公式K成績（6艇完走）',str(tuple(db.execute('select min(day),max(day),count(*) from race where day<?',(day,)).fetchone()))),('出走・展示保存',path.name+' / '+str(t.get('captured_at'))),('分析対象履歴',str(audit)),('原本の締切前固定','未確認。リプレイ専用'),('未取得・未検証','潮位、事故理由の全件分類、2021年結果の公式全件照合、個別レース確率の校正、実機Safari、級別/節区分補正'),('生成日時 UTC',datetime.now(timezone.utc).isoformat())])
     roles,starts,motor_rows=study(history,t,cycles)
     role_view=[];st_view=[];motor_view=[]
     for b in boats:
@@ -178,7 +171,139 @@ def build(a):
     for file in sorted(p_recent.glob('*.acquisition_error.audit.json')):
         item=json.loads(file.read_text()); errors.append((item.get('date'),item.get('checked_at'),item.get('error')))
     pages['収録・欠損']+='<h3>オリジナル展示の取得エラー記録</h3>'+table(['日付','確認日時','取得結果'],errors)
-    pages['精度・出典']+=table(['原本','参照情報'],[('長期資料',a.db.name),('常滑G1',a.g1.name),('当該レース原本',str(path.relative_to(data))),('対象レース出典',t.get('source')),('分割展示','BoatraceCSV・日別CSVと同日監査JSON'),('選手・機力・近況の履歴範囲',min((r['day'] for r in history),default='未取得')+'〜'+max((r['day'] for r in history),default='未取得')),('注意','日数指定は検索窓。保存されていない日も含む。監査と結果照合は対象日以降の記録を含み得るため、レース説明変数には使用しない。')])
+    pages['精度・出典']+=table(['原本','参照情報'],[('長期資料',a.db.name),('常滑G1',a.g1.name),('当該レース原本',str(path.relative_to(data)) if path.exists() else 'lineups.sqlite / '+day+code+f'{a.race:02}'),('対象レース出典',t.get('source')),('分割展示','BoatraceCSV・日別CSVと同日監査JSON'),('選手・機力・近況の履歴範囲',min((r['day'] for r in history),default='未取得')+'〜'+max((r['day'] for r in history),default='未取得')),('注意','日数指定は検索窓。保存されていない日も含む。監査と結果照合は対象日以降の記録を含み得るため、レース説明変数には使用しない。')])
+    split_history=cohorts(p_recent,code,day,local)
+    pages['展示比較']+='<h3>同じ場・実進入での展示順位と本番3連対</h3>'+table(['計測項目','実コース','展示順位','3連対'],[(metric,c,'上位2位' if top else '3位以下',fmt(rate(sum(f<=3 for f in finishes),len(finishes)))) for (metric,c,top),finishes in sorted(split_history.items())])
+    profile_file=data/'venue_tide_profiles.json'
+    if profile_file.is_file():
+        source=json.loads(profile_file.read_text())
+        profiles=source.get('venues',{})
+        pages['水面・風・潮']+=table(['水質','潮差','観測地点・適用条件','資料更新'],[(profiles.get(code,{}).get('water_type'),profiles.get(code,{}).get('tidal_difference'),profiles.get(code,{}).get('exclusion_reason') or profiles.get(code,{}).get('station_name'),source.get('updated_at'))])
+        p=profiles.get(code,{})
+        state=tide(data/'tide',p,day,t.get('deadline'))
+        if state:
+            pages['水面・風・潮']+=table(['最終正時 JST','天文潮位 cm','前1時間変化 cm','方向'],[state])
+        trend=[]
+        for c,vp in sorted(profiles.items()):
+            observed=defaultdict(list)
+            for race in history:
+                if race['venue']!=c:continue
+                state=tide(data/'tide',vp,race['day'],race['deadline'])
+                if state:observed[state[3]].append(race)
+            for direction,rs in sorted(observed.items()):
+                trend.append((VENUES[int(c)-1],vp.get('station_name'),direction,len(rs),
+                    fmt(rate(sum(r['winning_course']==1 and r['method']=='逃げ' for r in rs if r['method']),sum(bool(r['method']) for r in rs)))))
+        pages['水面・風・潮']+='<h3>周辺地点の潮位変化と当地の逃げ</h3><p>気象庁の公開天文潮位（予報値）。締切前の直近正時と1時間前の差。水面の実測値・流速は未取得。同値を潮止まりとは認定しない。</p>'+table(['場','基準地点','前1時間の方向','対象R','逃げ'],trend)
+    derby=db.execute("""SELECT deciding_method,count(*),sum(winning_boats like '1-%'),sum(payout_yen>=10000)
+        FROM race WHERE jcd='08' AND day BETWEEN '20221025' AND '20221030' AND day<? GROUP BY deciding_method""",(day,)).fetchall()
+    pages['全国24場']+='<h3>常滑SG・第69回ボートレースダービー</h3><p>公式開催期間 2022年10月25〜30日。対象は公式K成績の6艇正常完走。</p>'+table(['決まり手','完走R','1号艇1着','万舟'],derby)
+    explanations=[]
+    for b in boats:
+        c=b['exhibition_course'] if course_ok else b['lane']
+        key=str(b['racer_id']),c;known=[x for x in roles[key] if x[0] is not None]
+        for method in ('逃げ',) if c==1 else ('差し','まくり','まくり差し'):
+            k=sum(m==method and finish==1 for m,_,finish in known)
+            local_cases=[r for r in scen if r['attacker']==c and r['deciding_method']==method]
+            n=sum(r['n'] for r in local_cases)
+            if not n:continue
+            followers=Counter()
+            for r in local_cases:followers[r['second']]+=r['n']
+            leader,hits=followers.most_common(1)[0]
+            explanations.append((b['name'],c,method,fmt(rate(k,len(known))),f'{leader}コース '+fmt(rate(hits,n)),f'他コースが2着 {n-hits}/{n}'))
+    pages['展開シミュレーション']+='<h3>この6選手の攻めと、当地での連動</h3><p>本人がその勝ち方をした頻度と、当地で同じ攻めが成立した後の2着を比較。想定進入が動けば該当する行も変わる。</p>'+table(['攻める選手','想定コース','勝ち筋','本人・既知完走あたり','当地の最多2着コース','反対事例'],explanations)
+    split_totals,retry=audit_splits(p_recent,cv['days'])
+    pages['収録・欠損']+='<h3>23場のオリジナル展示・行単位の棚卸し</h3><p>番組表既知日のみ。保存はレースコード1行あり。各タイム完備の保証はない。中止掲示は場単位で、個々のRの返還は未照合。江戸川は公式展示を使う。</p>'+table(['場','予定','保存','重複','中止掲示・行なし','要再確認'],[(VENUES[v-1],x['scheduled'],x['saved'],x['duplicate'],x['cancel_notice'],x['scheduled']-x['saved']-x['cancel_notice']) for v in range(1,25) if v!=3 for x in [split_totals[f'{v:02}']]])
+    import base64
+    export={'audit':cv,'original_exhibition_retry':retry,'source_note':'daily manifests; race-code presence only; original records distinct from official exhibition'}
+    encoded=base64.b64encode(json.dumps(export,ensure_ascii=False,separators=(',',':')).encode()).decode()
+    pages['収録・欠損']+=f'<p><a download="coverage_{a.audit_end}.json" href="data:application/json;base64,{encoded}">日別・場別・R別の欠損と再取得対象を保存（JSON）</a></p>'
+    riders={str(b['racer_id']):(b['exhibition_course'] if course_ok else b['lane']) for b in boats}
+    terms=racer_terms(data/'racer_terms',day,riders)
+    if terms:
+        pages['選手検索']+='<h3>対象6選手・公式期別成績の推移</h3>'+table(['登録','適用期','算出開始','算出終了','級','全国勝率','全走数','実コース','進入数','1着','2着','3着','平均ST','平均ST順位'],[v[:-1] for v in terms])
+        pages['精度・出典']+=table(['期','公式ファン手帳URL'],sorted({(r[1],r[-1]) for r in terms}))
+    prog=program(data,t)
+    if prog:
+        info,meta=prog
+        pages['6艇比較']='<p>'+cell(info.get('title'))+'　'+cell(info.get('subtitle'))+'　'+cell(info.get('grade_number_source'))+'</p>'+table(['艇','選手','全国勝率','当地勝率','全国2連対%','当地2連対%','全国3連対%','当地3連対%','F保有'],[(b['entry_number'],b['name'],b.get('national_win_rate'),b.get('local_win_rate'),b.get('national_top_2_percent'),b.get('local_top_2_percent'),b.get('national_top_3_percent'),b.get('local_top_3_percent'),b.get('flying_count')) for b in sorted(info['racers'].values(),key=lambda b:b['entry_number'])])+pages['6艇比較']
+        pages['精度・出典']+=table(['当日番組出典','二次資料取得時刻'],[(meta['url'],meta['acquired_at'])])
+    elif (data/'lineups.sqlite').is_file():
+        line=connect(data/'lineups.sqlite')
+        record=line.execute('select * from program_boat where id=? order by lane',(day+code+f'{a.race:02}',)).fetchall()
+        line.close()
+        if len(record)==6 and all(str(b['racer_id'])==v['racer'] and b['lane']==v['lane'] for b,v in zip(boats,record)):
+            pages['6艇比較']=table(['艇','選手','番組全国勝率','当地勝率','F保有'],[(v['lane'],v['name'],v['national'],v['local'],v['f']) for v in record])+pages['6艇比較']
+    ext_path=data/'extended.sqlite'
+    if ext_path.is_file():
+        ext=connect(ext_path)
+        yearly=ext.execute("select substr(day,1,4),count(*),sum(raw),sum(included),sum(excluded) from source group by 1").fetchall()
+        pages['収録・欠損']+='<h3>2021年以降の結果アーカイブ（独立した二次資料）</h3>'+table(['年','日別原本','収録結果','正常完走','除外'],yearly)
+        pages['精度・出典']+=table(['年','公式Kと重なるR','組番相違','払戻欠損','払戻相違'],ext.execute('select * from result_check'))+table(['年','艇番が一致する比較行','登録・実進入・着順の相違行'],ext.execute('select * from entry_check'))+table(['結果アーカイブ改訂','索引作成日時'],ext.execute('select * from provenance'))
+        full=[]
+        for rid,c in riders.items():
+            for days in (30,90,180,365):
+                since=(as_day(day)-timedelta(days=days)).strftime('%Y%m%d')
+                rr=ext.execute("select finish,st from runner where racer=? and course=? and id>=? and id<?",(rid,c,since,day)).fetchall()
+                good=[x['st'] for x in rr if valid_number(x['st'],0,.99)]
+                full.append((rid,c,days,len(rr),fmt(rate(sum(x['finish']==1 for x in rr),len(rr))),fmt(rate(sum(x['finish']<=3 for x in rr),len(rr))),len(good),round(mean(good),3) if good else None))
+        pages['6艇比較']+='<h3>長期結果アーカイブで同じ期間を照合</h3><p>二次資料の正常完走のみ。展示保存履歴と重複する走もあるため合算はしない。</p>'+table(['登録','コース','日数','完走','1着','3連対','ST件数','平均ST'],full)
+        ext.close()
+    shapes,corr=start_study(local)
+    pages['6艇比較']+='<h3>当地の展示STと本番ST</h3>'+table(['本番コース','両方有効','展示平均','本番平均','相関 r'],corr)+table(['展示隊形','対象R','実1コース逃げ'],[(k,len(rs),fmt(rate(sum(r['method']=='逃げ' and r['winning_course']==1 for r in rs if r['method']),sum(bool(r['method']) for r in rs)))) for k,rs in sorted(shapes.items())])+'<p>展示進入順の内・中・外2艇ずつの平均STを使用。最も遅い組が次の組より0.05秒以上遅いときだけ凹みと分類。閾値の予測能力は未検証。</p>'
+    events,angles=motor_events(local,t,cycles)
+    pages['モーター']+='<h3>記録された整備前後</h3>'+table(['機番','日','R','交換記録','直前最大3走・2連対','当走から最大3走・2連対'],[(m,d,n,p,fmt(before),fmt(after)) for m,d,n,p,before,after in events])+table(['機番','チルト','2連対'],[(m,tilt,fmt(rr)) for m,tilt,rr in angles])+'<p>正常完走の観測比較。複数の整備が近接すると観測窓が重なる。</p>'
+    pg_path=data/'programs.sqlite'
+    if ext_path.is_file() and pg_path.is_file():
+        con=connect(pg_path)
+        con.execute('attach database ? as ext',(ext_path.resolve().as_uri()+'?mode=ro',))
+        rates=con.execute("""select p.venue,count(*),sum(r.id is not null)
+                         from schedule p left join ext.result r using(id) where p.day between ? and ? group by p.venue""",(a.audit_start,a.audit_end))
+        pages['収録・欠損']+='<h3>二次番組表と結果アーカイブの独立照合</h3>'+table(['場','予定掲載R','正常完走結果あり','中止・事故・未収録等 要区分'],[(VENUES[int(v)-1],n,k,n-k) for v,n,k in rates])
+        years=[]
+        for rid,c in riders.items():
+            rows=con.execute("""select p.grade,p.stage,e.finish from ext.runner e join schedule p using(id)
+                               where e.racer=? and e.course=? and p.day>=? and p.day<?""",(rid,c,(as_day(day)-timedelta(days=365)).strftime('%Y%m%d'),day))
+            by=defaultdict(list)
+            for grade,stage,finish in rows:
+                tag='準優勝戦' if '準優勝戦' in (stage or '') else '優勝戦' if (stage or '').strip()=='優勝戦' else '予選系' if '予選' in (stage or '') else 'その他'
+                by[grade,tag].append(finish)
+            for (grade,tag),fs in sorted(by.items(),key=lambda kv:str(kv[0])):
+                years.append((rid,c,grade,tag,len(fs),fmt(rate(sum(f==1 for f in fs),len(fs))),fmt(rate(sum(f<=3 for f in fs),len(fs)))))
+        pages['6艇比較']+='<h3>同じ実コースでのグレード・競走区分別成績</h3>'+table(['登録','実コース','番組表gradeコード','競走区分','走数','1着','3連対'],years)
+        pages['精度・出典']+=table(['二次番組アーカイブ改訂','索引作成日時'],con.execute('select * from provenance'))
+        event=con.execute('select grade,title,stage from schedule where id=?',(day+code+f'{a.race:02}',)).fetchone()
+        if event:
+            grade_names={1:'SG',2:'G1系',3:'G2',4:'G3',5:'一般'}
+            pages['ホーム・開催場']+='<p>選択中の番組　'+cell(event['title'])+'　'+cell(event['stage'])+'　'+cell(grade_names.get(event['grade']))+'</p>'
+        con.execute('attach database ? as official',(a.db.resolve().as_uri()+'?mode=ro',))
+        graded=con.execute("""select grade,deciding_method,count(*),sum(winning_boats like '1-%'),sum(payout_yen>=10000)
+            from schedule p join official.race r using(id) where p.venue='08' and p.day<? and grade in (1,2)
+            group by 1,2 order by 1,3 desc""",(day,))
+        pages['全国24場']+='<h3>常滑・高グレード開催の決まり手</h3><p>番組表の開催グレードと公式KをレースIDで照合。男女併催等は開催全体の分類。</p>'+table(['開催区分','決まり手','完走R','1号艇1着','万舟'],[('SG' if g==1 else 'G1系',m,n,k,h) for g,m,n,k,h in graded])
+        pages['収録・欠損']+=table(['二次番組の掲載日','有効な予定R','正常完走R','結果原本あり・正常完走外','結果原本で未照合'],con.execute("""select count(distinct p.day),count(*),sum(r.id is not null),sum(r.id is null and x.id is not null),sum(r.id is null and x.id is null) from schedule p left join ext.result r using(id) left join (select distinct id from ext.exclusion) x using(id) where p.day between ? and ?""",(a.audit_start,a.audit_end)))
+        con.close()
+    neighbors,eligible=nearest(local,t)
+    values=[payout[r[1],r[2]] for r in neighbors if payout[r[1],r[2]] is not None]
+    pages['類似レース']+='<details><summary>条件距離で近い履歴を検索（最大20件）</summary><p>同場・過去日の完全入力 '+str(eligible)+'R。級別・展示順位・展示進入・チルト・風速・波高の6項目を等重み。艇番ごとの級別と進入は不一致率、展示順位差は5、チルト差は2度、風速差は5m/s、波高差は10cmで正規化。各距離は1が上限。近い順に表示。</p>'+table(['距離','日付','R','決まり手','確定組','払戻円'],[(round(d,3),rd,rn,m,o,payout[rd,rn]) for d,rd,rn,m,o in neighbors])+table(['払戻取得R','最小円','中央値円','最大円','万舟'],[(len(values),min(values,default=None),median(values) if values else None,max(values,default=None),fmt(rate(sum(v>=10000 for v in values),len(values))))])+'</details>'
+    perm={}
+    if ext_path.is_file():
+        con=connect(ext_path)
+        since=(as_day(day)-timedelta(days=365)).strftime('%Y%m%d')
+        for b in boats:
+            stats={}
+            for c,n,k in con.execute("select course,count(*),sum(finish=1) from runner where racer=? and id>=? and id<? group by course",(str(b['racer_id']),since,day)):
+                stats[str(c)]=fmt(rate(k,n))
+            perm[str(b['lane'])]={'name':b['name'],'stats':stats}
+        con.close()
+    else:
+        for b in boats:
+            rows=players[str(b['racer_id'])];stats={}
+            for c in range(1,7):
+                rr=[r for r in rows if r['course']==c]
+                stats[str(c)]=fmt(rate(sum(r['finish']==1 for r in rr),len(rr)))
+            perm[str(b['lane'])]={'name':b['name'],'stats':stats}
+    order=''.join(str(b['lane']) for b in sorted(boats,key=lambda b:b.get('exhibition_course') if course_ok else b['lane']))
+    pages['展開シミュレーション']+='<h3>進入変更を試す</h3><label>内から艇番6つ <input id="order" inputmode="numeric" maxlength="6" value="'+order+'"></label><div id="order_result" aria-live="polite"></div><script type="application/json" id="line_stats">'+json.dumps(perm,ensure_ascii=False).replace('<','\\u003c')+'</script><p>実進入ごとの過去365日内の1着率を再表示。深さや助走距離による当日の変化は未推定。</p>'
     db.close()
     return pages,scen,cv,checks,windows
 
