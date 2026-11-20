@@ -37,9 +37,3 @@ jobs:
           git -C runtime-data rev-parse HEAD > research/output/audit-source-sha.txt
           python research/kouseki_study_v1/coverage_audit.py --cards runtime-data/data/race_cards --archive runtime-data/data/exhibition_log --start 20261119 --end 20261119 > research/output/coverage_20261119.json
           python -c "import json; d=json.load(open('research/output/coverage_20261119.json')); print(d['totals']); assert len(d['all_24_venues']) == 24"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: archived-analyst-replay
-          path: research/output/
-          if-no-files-found: error
-          retention-days: 14

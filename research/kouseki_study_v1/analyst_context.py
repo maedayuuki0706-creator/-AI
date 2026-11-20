@@ -30,6 +30,7 @@ def read_history(archive, target_day):
             if (race.get("settled") is not True or str(race["day"]) != p.parent.name
                 or code not in [f"{i:02}" for i in range(1, 25)] or not 1 <= number <= 12
                 or p.stem != f"{code}_{number:02}" or not is_six(rows)
+                or any(str(b.get("day",race["day"]))!=p.parent.name or str(b.get("jcd",code)).zfill(2)!=code or b.get("rno",number)!=number for b in rows)
                 or any(type(b.get("finish")) is not int or type(b.get("actual_course")) is not int for b in rows)
                 or sorted(b["finish"] for b in rows) != list(range(1, 7))
                 or sorted(b["actual_course"] for b in rows) != list(range(1, 7))):

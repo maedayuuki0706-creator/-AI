@@ -30,6 +30,7 @@ def as_day(s):
 
 def is_six(rows):
     return (isinstance(rows, list) and len(rows) == 6 and
+            all(isinstance(r, dict) and type(r.get('lane')) is int for r in rows) and
             sorted([r.get('lane') for r in rows]) == [1,2,3,4,5,6] and
             len({str(r.get('racer_id')) for r in rows}) == 6 and
             all(is_valid_id(r.get('racer_id')) for r in rows))
