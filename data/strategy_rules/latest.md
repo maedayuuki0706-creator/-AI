@@ -1,6 +1,6 @@
 # 勝ちルール探索レポート
 
-対象 6662R / 62日 / 的中率 43.8% / 回収率 73.2% / 収支 -2,085,690円
+対象 6663R / 63日 / 的中率 43.8% / 回収率 73.3% / 収支 -2,078,330円
 
 ## 運用ルール
 
@@ -12,26 +12,27 @@
 ## 検証済みプラス候補
 
 - venue=下関 / wind=2-3m: 検証 24R / 的中45.8% / ROI109.6%
+- tide_phase=rising / slit_shape=outer_attack_3: 検証 28R / 的中57.1% / ROI102.1%
 
 ## 見送り候補
 
-- venue=桐生 / wind=2-3m: 検証 27R / 的中14.8% / ROI18.4%
+- venue=桐生 / wind=2-3m: 検証 24R / 的中16.7% / ROI21.2%
 - venue=鳴門 / slit_shape=outer_pressure: 検証 27R / 的中14.8% / ROI21.5%
-- venue=丸亀 / tide_level=low: 検証 26R / 的中34.6% / ROI23.7%
-- tide_phase=rising / slit_shape=outer_attack_4: 検証 28R / 的中25.0% / ROI29.4%
-- venue=福岡 / tide_level=mid: 検証 32R / 的中28.1% / ROI33.0%
-- head_gap=<5pt / slit_shape=flat_or_inner: 検証 25R / 的中28.0% / ROI38.1%
-- attack_style_prior=dominant_makurizashi: 検証 34R / 的中26.5% / ROI38.6%
-- venue=福岡 / tide_phase=falling: 検証 54R / 的中33.3% / ROI38.7%
+- tide_phase=rising / slit_shape=outer_attack_4: 検証 26R / 的中23.1% / ROI30.0%
+- venue=福岡 / tide_level=mid: 検証 29R / 的中27.6% / ROI33.2%
 - venue=鳴門 / grade=B: 検証 35R / 的中31.4% / ROI39.0%
-- venue=福岡 / grade=C: 検証 34R / 的中29.4% / ROI39.4%
+- venue=福岡 / tide_phase=falling: 検証 46R / 的中32.6% / ROI39.5%
+- attack_style_prior=dominant_makurizashi: 検証 32R / 的中25.0% / ROI39.5%
 - venue=浜名湖: 検証 41R / 的中29.3% / ROI40.1%
-- venue=福岡 / slit_shape=outer_pressure: 検証 38R / 的中39.5% / ROI40.5%
-- venue=桐生 / grade=A: 検証 31R / 的中35.5% / ROI41.9%
-- venue=津 / grade=A: 検証 32R / 的中46.9% / ROI42.1%
-- outer_fast=no / head_gap=<5pt: 検証 29R / 的中27.6% / ROI43.9%
-- venue=常滑 / grade=B: 検証 44R / 的中27.3% / ROI44.3%
+- venue=福岡 / slit_shape=outer_pressure: 検証 35R / 的中40.0% / ROI40.2%
+- venue=津 / grade=A: 検証 28R / 的中42.9% / ROI40.6%
+- venue=常滑 / grade=B: 検証 39R / 的中23.1% / ROI41.1%
+- outer_fast=no / head_gap=<5pt: 検証 25R / 的中24.0% / ROI41.6%
+- venue=桐生 / wave=0-2cm: 検証 41R / 的中29.3% / ROI41.8%
+- venue=福岡 / grade=C: 検証 32R / 的中31.2% / ROI41.8%
+- venue=三国 / wave=0-2cm: 検証 31R / 的中38.7% / ROI41.9%
+- venue=児島 / grade=B: 検証 31R / 的中25.8% / ROI43.2%
 - venue=鳴門 / wave=3-6cm: 検証 41R / 的中31.7% / ROI44.6%
-- venue=平和島 / grade=C: 検証 53R / 的中22.6% / ROI44.7%
-- score=60-74 / head_gap=5-9pt: 検証 79R / 的中34.2% / ROI44.9%
-- venue=丸亀 / grade=B: 検証 36R / 的中36.1% / ROI45.9%
+- venue=桐生 / grade=A: 検証 28R / 的中35.7% / ROI44.7%
+- slit_shape=outer_attack_4: 検証 91R / 的中37.4% / ROI45.7%
+- venue=鳴門 / tide_phase=rising: 検証 44R / 的中34.1% / ROI46.0%
